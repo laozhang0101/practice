@@ -1,0 +1,4 @@
+interface:
+  display_name: "Game Design"
+  short_description: "游戏与战斗系统设计工作流"
+  default_prompt: "使用结构化游戏设计方法，优先分析核心循环、战斗循环、数值平衡、成长系统、难度曲线与玩家反馈。"
