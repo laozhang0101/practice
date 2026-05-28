@@ -1,0 +1,29 @@
+{
+  "documents": [
+    {
+      "name": "M98 Boss设计原则与原型方案",
+      "local_markdown": "E:\\laozhang0101_practice\\practice\\001.战斗\\M98 Boss设计原则与原型方案.md",
+      "feishu_doc_id": "JA7ed6SRlopa4OxTDVEcaF0jnde",
+      "feishu_doc_url": "https://www.feishu.cn/wiki/IbO0woQK4iAt0zkdsAvcvWyynNd",
+      "parent_wiki_node": "https://leiting.feishu.cn/wiki/SuuVwkLKvi6KGokYzUtcJIFknod",
+      "sync_rule": "future edits must update both the local markdown file and the Feishu cloud document"
+    },
+    {
+      "name": "M98战斗中挂件、铠甲与怪物互动的阶段结构说明",
+      "local_markdown": "E:\\laozhang0101_practice\\practice\\001.战斗\\M98战斗中挂件、铠甲与怪物互动的阶段结构说明.md",
+      "feishu_doc_id": "BIcudtIAzoV0Ubxz3Z8crnrwnne",
+      "feishu_doc_url": "https://www.feishu.cn/wiki/EYGhwaBuYidXWxkl2QUcwl4on9c",
+      "parent_wiki_node": "https://leiting.feishu.cn/wiki/SuuVwkLKvi6KGokYzUtcJIFknod",
+      "sync_rule": "future edits must update both the local markdown file and the Feishu cloud document"
+    },
+    {
+      "name": "M98战斗被动触发流程图",
+      "local_markdown": "E:\\laozhang0101_practice\\practice\\001.战斗\\M98战斗被动触发流程图.md",
+      "feishu_doc_id": "FtWgdLu0doJKbvxYfudcyP6Anmf",
+      "feishu_doc_url": "https://www.feishu.cn/wiki/NXfVwyko6ij3YTkvQXpccSR1nme",
+      "parent_wiki_node": "https://leiting.feishu.cn/wiki/SuuVwkLKvi6KGokYzUtcJIFknod",
+      "whiteboard_token": "FViVwoCWAhVx3wbcQfucJBRPnTe",
+      "sync_rule": "future edits must update both the local markdown file and the Feishu cloud document"
+    }
+  ]
+}
