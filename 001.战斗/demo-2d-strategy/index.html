@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>M98 2D Strategy Combat Demo</title>
+    <link rel="stylesheet" href="./styles.css?v=player-bar-text-20260615" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="stage-area">
+        <header class="topbar">
+          <div>
+            <h1>M98 2D 回合战斗验证</h1>
+            <p>玩家回合可切换武器并选择技能；技能按武器、攻击部位、单体/AOE 标签分类。</p>
+          </div>
+          <div class="battle-state">
+            <span id="phaseLabel">玩家回合</span>
+            <button id="resetBtn" type="button">重开</button>
+          </div>
+        </header>
+
+        <div class="battle-frame">
+          <canvas id="battleCanvas" width="1366" height="768" aria-label="2D 战斗验证画面"></canvas>
+          <div class="weapon-overlay" id="weaponOverlay">
+            <button class="weapon-toggle" id="weaponToggle" type="button" aria-label="武器切换" aria-expanded="false"></button>
+            <div class="weapon-dock">
+              <div class="weapon-list" id="weaponButtons"></div>
+            </div>
+          </div>
+          <div class="battle-skill-overlay" id="battleSkillOverlay" aria-label="战斗技能栏">
+            <div class="battle-skill-list" id="battleSkillButtons"></div>
+          </div>
+          <button class="soul-armor-button" id="soulArmorButton" type="button" aria-label="灵魂战甲技能">
+            <span class="soul-armor-core">
+              <img src="./assets/part-core.png" alt="" />
+              <strong id="soulArmorCount">0</strong>
+            </span>
+            <span class="soul-armor-dots" aria-hidden="true">
+              <i></i><i></i><i></i><i></i>
+            </span>
+          </button>
+          <div class="video-overlay hidden" id="videoOverlay">
+            <video id="skillVideo" playsinline muted preload="auto"></video>
+            <div class="qte-overlay hidden" id="qteOverlay">
+              <div class="qte-title" id="qteTitle">QTE</div>
+              <div class="qte-copy" id="qteCopy">D 右闪 / W 格挡</div>
+              <div class="qte-bar"><i id="qteGauge"></i></div>
+            </div>
+            <div class="accessory-choice hidden" id="accessoryChoice">
+              <button class="accessory-choice-zone accessory-choice-top" type="button" data-accessory="jet">
+                <span>喷气挂件</span>
+              </button>
+              <button class="accessory-choice-zone accessory-choice-bottom" type="button" data-accessory="drone">
+                <span>无人机挂件</span>
+              </button>
+            </div>
+          </div>
+          <div class="weakpoint-tip hidden" id="weakpointTip">
+            <img src="./assets/tips-avatar.png" alt="队友提示" />
+            <div>
+              <strong>队友提示</strong>
+              <p>胸口核心已暴露，优先攻击弱点。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="timeline">
+          <div>
+            <span>当前回合</span>
+            <div class="turn-pill" id="turnInfo">玩家行动</div>
+          </div>
+          <div>
+            <span>Boss 状态</span>
+            <div class="turn-pill enemy" id="bossInfo">阶段 1</div>
+          </div>
+          <div>
+            <span>熔岩铠甲</span>
+            <div class="bar soul"><i id="soulGauge"></i></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="control-area">
+        <div class="hidden" aria-hidden="true">
+          <strong id="playerHp">--</strong>
+          <strong id="selectedWeapon">--</strong>
+          <strong id="turnState">--</strong>
+          <strong id="currentTarget">--</strong>
+          <strong id="brokenParts">--</strong>
+          <div id="skillButtons"></div>
+          <div id="soulSkillButtons"></div>
+        </div>
+
+        <section class="panel reaction hidden" id="reactionPanel">
+          <h2>敌方攻击</h2>
+          <p id="threatText">Boss 正在发动高威胁动作。</p>
+          <div class="action-grid">
+            <button data-react="block" type="button">W 格挡</button>
+            <button data-react="left" type="button">A 左闪</button>
+            <button data-react="right" type="button">D 右闪</button>
+          </div>
+        </section>
+
+        <section class="panel log-panel">
+          <h2>战斗记录</h2>
+          <ol id="logList"></ol>
+        </section>
+      </aside>
+    </main>
+
+    <script src="./game.js?v=player-bar-text-20260615"></script>
+  </body>
+</html>

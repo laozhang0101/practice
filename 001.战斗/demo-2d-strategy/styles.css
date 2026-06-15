@@ -1,0 +1,941 @@
+:root {
+  color-scheme: dark;
+  --bg: #101114;
+  --surface: #1b1e24;
+  --surface-2: #252a31;
+  --line: #3a414c;
+  --text: #eef2f7;
+  --muted: #aab3c0;
+  --accent: #f0b84f;
+  --accent-2: #58b7ff;
+  --danger: #e86c62;
+  --good: #76d17b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+}
+
+button {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #2a3038;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled),
+button.active {
+  border-color: var(--accent);
+  background: #3a3327;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(720px, 1fr) 300px;
+  gap: 16px;
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.stage-area,
+.control-area {
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+h2 {
+  margin-bottom: 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.topbar p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.battle-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+#phaseLabel {
+  min-width: 96px;
+  text-align: center;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.battle-frame {
+  position: relative;
+}
+
+#battleCanvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1366 / 768;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #15181d;
+}
+
+.weapon-overlay {
+  position: absolute;
+  left: max(14px, 3.5%);
+  bottom: max(14px, 4%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.weapon-toggle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(58px, 5.6vw, 76px);
+  height: clamp(58px, 5.6vw, 76px);
+  min-height: 0;
+  padding: 0;
+  border-color: rgba(240, 184, 79, 0.7);
+  border-radius: 50%;
+  background: radial-gradient(circle at 45% 35%, rgba(50, 57, 68, 0.94), rgba(15, 18, 24, 0.94));
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.15;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+}
+
+.weapon-toggle::after {
+  content: "⇄";
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 221, 137, 0.8);
+  border-radius: 50%;
+  background: rgba(40, 31, 18, 0.96);
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.weapon-toggle img {
+  display: block;
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+}
+
+.weapon-dock {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: width 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+
+.weapon-overlay.expanded .weapon-dock {
+  width: 276px;
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.battle-skill-overlay {
+  position: absolute;
+  left: clamp(395px, 36vw, 540px);
+  bottom: clamp(92px, 14vh, 132px);
+  z-index: 48;
+  width: clamp(286px, 28vw, 360px);
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: perspective(820px) rotateY(-8deg) rotateX(2deg) translateX(-10px);
+  transform-origin: left center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.battle-skill-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: perspective(820px) rotateY(-8deg) rotateX(2deg) translateX(0);
+}
+
+.battle-skill-list {
+  display: grid;
+  gap: clamp(5px, 0.7vw, 7px);
+}
+
+.battle-skill-card {
+  min-height: clamp(50px, 7.4vh, 62px);
+  padding: clamp(6px, 0.75vw, 8px) clamp(7px, 0.9vw, 10px);
+  border-color: rgba(240, 184, 79, 0.28);
+  background: rgba(31, 36, 44, 0.88);
+  box-shadow: 6px 8px 16px rgba(0, 0, 0, 0.22);
+}
+
+.battle-skill-card .skill-copy strong {
+  font-size: clamp(12px, 1.08vw, 14px);
+}
+
+.battle-skill-card .skill-copy small {
+  font-size: clamp(10px, 0.9vw, 12px);
+  line-height: 1.25;
+}
+
+.battle-skill-card:hover:not(:disabled) {
+  transform: translateX(3px);
+}
+
+@media (max-width: 980px) {
+  .battle-skill-overlay {
+    left: auto;
+    right: 18px;
+    bottom: 86px;
+    width: min(320px, 44%);
+  }
+}
+
+@media (max-height: 760px) {
+  .battle-skill-overlay {
+    bottom: 78px;
+    width: clamp(280px, 27vw, 342px);
+  }
+
+  .battle-skill-list {
+    gap: 5px;
+  }
+
+  .battle-skill-card {
+    min-height: 48px;
+    grid-template-columns: 34px 1fr;
+  }
+
+  .battle-skill-card .part-badge {
+    width: 30px;
+    height: 30px;
+  }
+
+  .battle-skill-card .skill-tags {
+    gap: 3px;
+  }
+
+  .battle-skill-card .skill-tag {
+    min-height: 16px;
+    padding: 0 5px;
+    font-size: 10px;
+    line-height: 15px;
+  }
+}
+
+.soul-armor-button {
+  position: absolute;
+  right: clamp(22px, 5vw, 72px);
+  bottom: clamp(74px, 11vh, 112px);
+  z-index: 52;
+  display: grid;
+  place-items: center;
+  width: clamp(58px, 5.7vw, 76px);
+  height: clamp(58px, 5.7vw, 76px);
+  min-height: 0;
+  padding: 0;
+  border: 1px solid rgba(246, 228, 178, 0.45);
+  border-radius: 50%;
+  background: radial-gradient(circle at 45% 38%, #1f2b25, #050706 72%);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.46),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.04);
+}
+
+.soul-armor-button:disabled {
+  opacity: 0.62;
+}
+
+.soul-armor-button.ready {
+  border-color: rgba(240, 184, 79, 0.75);
+}
+
+.soul-armor-button.charging,
+.soul-armor-button.active-charge {
+  box-shadow:
+    0 0 22px rgba(240, 184, 79, 0.5),
+    0 12px 28px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.07);
+}
+
+.soul-armor-core {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 78%;
+  height: 78%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  background: #0c0f0e;
+}
+
+.soul-armor-core img {
+  width: 74%;
+  height: 74%;
+  object-fit: contain;
+  opacity: 0.86;
+  filter: saturate(0.72) brightness(1.08);
+}
+
+.soul-armor-core strong {
+  position: absolute;
+  right: 7px;
+  bottom: 4px;
+  color: #fff7d8;
+  font-size: 17px;
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+.soul-armor-dots {
+  position: absolute;
+  right: -8px;
+  top: 10px;
+  display: grid;
+  gap: 3px;
+}
+
+.soul-armor-dots i {
+  width: 11px;
+  height: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.soul-armor-dots i.filled {
+  background: #f2f2ea;
+}
+
+.soul-armor-dots i.charging {
+  background: #f0b84f;
+  box-shadow: 0 0 10px rgba(240, 184, 79, 0.85);
+}
+
+.video-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #030508;
+}
+
+.video-overlay.hidden {
+  display: none;
+}
+
+.video-overlay video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.accessory-choice {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  pointer-events: auto;
+}
+
+.accessory-choice.hidden {
+  display: none;
+}
+
+.accessory-choice-zone {
+  position: relative;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.video-overlay .accessory-choice-zone:hover:not(:disabled),
+.video-overlay .accessory-choice-zone:focus-visible {
+  outline: 0;
+  border-color: transparent;
+  background: transparent !important;
+}
+
+.accessory-choice-zone::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(240, 184, 79, 0);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.accessory-choice-zone::after {
+  content: "";
+  position: absolute;
+  right: 6.5%;
+  width: 18px;
+  height: 18px;
+  border-top: 2px solid rgba(240, 184, 79, 0);
+  border-right: 2px solid rgba(240, 184, 79, 0);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+}
+
+.accessory-choice-top::after {
+  top: 20%;
+  transform: rotate(-45deg) translateY(4px);
+}
+
+.accessory-choice-bottom::after {
+  bottom: 20%;
+  transform: rotate(135deg) translateY(4px);
+}
+
+.accessory-choice-zone:hover::before,
+.accessory-choice-zone:focus-visible::before {
+  border-color: rgba(240, 184, 79, 0.78);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 245, 216, 0.15),
+    0 0 18px rgba(240, 184, 79, 0.16);
+  opacity: 1;
+}
+
+.accessory-choice-zone:hover::after,
+.accessory-choice-zone:focus-visible::after {
+  border-color: rgba(240, 184, 79, 0.95);
+  opacity: 1;
+}
+
+.accessory-choice-top:hover::after,
+.accessory-choice-top:focus-visible::after {
+  transform: rotate(-45deg) translateY(0);
+}
+
+.accessory-choice-bottom:hover::after,
+.accessory-choice-bottom:focus-visible::after {
+  transform: rotate(135deg) translateY(0);
+}
+
+.accessory-choice-zone span {
+  position: absolute;
+  right: 5%;
+  border: 1px solid rgba(240, 184, 79, 0.7);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(8, 10, 14, 0.68);
+  color: #fff5d8;
+  font-size: 14px;
+  font-weight: 900;
+  opacity: 0.78;
+  transition: opacity 0.14s ease, transform 0.14s ease, border-color 0.14s ease;
+}
+
+.accessory-choice-zone:hover span,
+.accessory-choice-zone:focus-visible span {
+  border-color: rgba(240, 184, 79, 0.95);
+  opacity: 1;
+  transform: translateX(-4px);
+}
+
+.accessory-choice-top span {
+  top: 16%;
+}
+
+.accessory-choice-bottom span {
+  bottom: 16%;
+}
+
+.qte-overlay {
+  position: absolute;
+  left: 50%;
+  bottom: 16%;
+  transform: translateX(-50%);
+  width: min(420px, 74%);
+  border: 1px solid rgba(240, 184, 79, 0.72);
+  border-radius: 8px;
+  background: rgba(12, 14, 18, 0.86);
+  padding: 12px 14px;
+  text-align: center;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+}
+
+.qte-title {
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.qte-copy {
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.qte-bar {
+  height: 9px;
+  overflow: hidden;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: #252b34;
+}
+
+.qte-bar i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #58b7ff, #f0b84f);
+}
+
+.weakpoint-tip {
+  position: absolute;
+  left: auto;
+  right: 18px;
+  top: 9%;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  align-items: center;
+  gap: 10px;
+  width: min(300px, calc(100% - 36px));
+  border: 1px solid rgba(240, 184, 79, 0.72);
+  border-radius: 8px;
+  background: rgba(15, 18, 24, 0.88);
+  padding: 10px 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.46);
+  pointer-events: none;
+}
+
+.weakpoint-tip.hidden {
+  display: none;
+}
+
+.weakpoint-tip img {
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  object-fit: cover;
+  background: #242a32;
+}
+
+.weakpoint-tip strong {
+  display: block;
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.weakpoint-tip p {
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.timeline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.timeline span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bar {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #2b3139;
+}
+
+.bar i {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: var(--accent-2);
+  transition: width 0.2s ease;
+}
+
+.bar.enemy i {
+  background: var(--danger);
+}
+
+.bar.soul i {
+  background: var(--accent);
+}
+
+.turn-pill {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #222831;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.turn-pill.enemy {
+  color: #ffc7c1;
+}
+
+.control-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 8px 10px;
+  font-size: 13px;
+}
+
+.stat-grid span {
+  color: var(--muted);
+}
+
+.segmented,
+.target-list,
+.weapon-list,
+.action-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.segmented {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.target-list {
+  grid-template-columns: 1fr;
+}
+
+.target-button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.target-button small {
+  color: var(--muted);
+}
+
+.target-button.broken {
+  color: var(--good);
+}
+
+.weapon-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.weapon-overlay .weapon-list {
+  display: grid;
+  grid-template-columns: repeat(3, 84px);
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(240, 184, 79, 0.45);
+  border-radius: 8px;
+  background: rgba(20, 23, 29, 0.9);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.44);
+}
+
+.weapon-card {
+  display: grid;
+  grid-template-rows: 48px auto;
+  justify-items: center;
+  gap: 6px;
+  min-height: 76px;
+  padding: 8px;
+  text-align: center;
+}
+
+.weapon-icon-frame {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+}
+
+.weapon-icon-frame img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.weapon-icon-fallback {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #20262e;
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.weapon-card small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.skill-list {
+  display: grid;
+  gap: 8px;
+}
+
+.skill-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.skill-card.has-action-cost {
+  padding-right: 72px;
+}
+
+.part-badge {
+  --skill-color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--skill-color), white 15%);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--skill-color), transparent 74%);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.skill-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.part-icon {
+  display: inline-block;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.part-icon-badge {
+  width: 20px;
+  height: 20px;
+}
+
+.part-badge .part-icon-badge:nth-child(n + 2) {
+  width: 15px;
+  height: 15px;
+}
+
+.skill-copy strong {
+  font-size: 14px;
+}
+
+.skill-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.skill-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.skill-tag {
+  min-height: 18px;
+  border: 1px solid color-mix(in srgb, var(--skill-color), white 10%);
+  border-radius: 999px;
+  padding: 1px 7px;
+  color: #e9edf3;
+  background: color-mix(in srgb, var(--skill-color), transparent 78%);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.action-cost-corner {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  min-width: 54px;
+  min-height: 22px;
+  border: 1px solid color-mix(in srgb, var(--skill-color), white 12%);
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: rgba(14, 17, 22, 0.84);
+  color: #e9edf3;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+
+.soul-skill-card {
+  border-color: color-mix(in srgb, #ff9d42, var(--line) 45%);
+}
+
+.soul-skill-card .part-badge {
+  border-radius: 8px;
+}
+
+.action-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reaction {
+  border-color: var(--accent);
+}
+
+.reaction p {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hidden {
+  display: none;
+}
+
+.log-panel {
+  flex: 1;
+  min-height: 190px;
+}
+
+#logList {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 7px;
+  height: 230px;
+  margin: 0;
+  padding: 0 0 0 18px;
+  overflow: auto;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1040px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .control-area {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .log-panel {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 680px) {
+  .app-shell {
+    padding: 10px;
+  }
+
+  .topbar,
+  .timeline,
+  .control-area {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    display: grid;
+  }
+}

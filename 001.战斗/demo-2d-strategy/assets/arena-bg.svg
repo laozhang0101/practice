@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1366" height="768" viewBox="0 0 1366 768">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12202a"/>
+      <stop offset="0.52" stop-color="#14202a"/>
+      <stop offset="1" stop-color="#05070a"/>
+    </linearGradient>
+    <radialGradient id="mist" cx="50%" cy="36%" r="58%">
+      <stop offset="0" stop-color="#8293a5" stop-opacity=".25"/>
+      <stop offset=".5" stop-color="#2d3b46" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="65%">
+      <stop offset="0" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity=".62"/>
+    </radialGradient>
+    <filter id="lavaGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softBlur">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+  <rect width="1366" height="768" fill="url(#sky)"/>
+  <rect width="1366" height="768" fill="url(#mist)"/>
+  <path d="M0 0 H240 C230 80 214 155 190 230 C145 240 88 285 0 335 Z" fill="#071012" opacity=".88"/>
+  <path d="M1120 0 H1366 V365 C1300 318 1240 282 1180 205 C1155 145 1138 76 1120 0 Z" fill="#071012" opacity=".88"/>
+  <path d="M115 424 C255 378 373 380 495 432 C398 510 214 548 0 535 V474 C34 456 72 440 115 424 Z" fill="#171d20" opacity=".72"/>
+  <path d="M840 420 C1035 365 1230 374 1366 436 V555 C1172 532 1014 536 845 508 Z" fill="#151b1e" opacity=".74"/>
+  <path d="M0 526 C344 500 680 506 1366 486 V768 H0 Z" fill="#11181d"/>
+  <g opacity=".34" stroke="#607077" stroke-width="2" fill="none">
+    <path d="M0 548 C320 515 700 566 1366 526"/>
+    <path d="M0 588 C370 548 740 612 1366 574"/>
+    <path d="M0 640 C360 606 740 670 1366 630"/>
+    <path d="M0 700 C430 658 760 730 1366 682"/>
+    <path d="M120 520 L260 768"/>
+    <path d="M260 515 L410 768"/>
+    <path d="M420 510 L520 768"/>
+    <path d="M590 504 L650 768"/>
+    <path d="M760 502 L810 768"/>
+    <path d="M940 496 L900 768"/>
+    <path d="M1130 492 L1050 768"/>
+    <path d="M1260 488 L1195 768"/>
+  </g>
+  <g filter="url(#lavaGlow)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-10 692 C190 660 356 650 570 636 C742 625 906 657 1095 625 C1194 610 1274 603 1376 594" stroke="#ff4a1a" stroke-width="8"/>
+    <path d="M-10 692 C190 660 356 650 570 636 C742 625 906 657 1095 625 C1194 610 1274 603 1376 594" stroke="#ffc072" stroke-width="2"/>
+    <path d="M585 778 C620 704 642 654 694 600" stroke="#ff5a20" stroke-width="6"/>
+    <path d="M586 778 C620 704 642 654 694 600" stroke="#ffd18b" stroke-width="1.5"/>
+    <path d="M760 778 C732 716 758 663 736 618" stroke="#ff5a20" stroke-width="4"/>
+    <path d="M1080 735 C1160 690 1237 664 1300 650" stroke="#ff5a20" stroke-width="4"/>
+  </g>
+  <g opacity=".32" filter="url(#softBlur)">
+    <ellipse cx="190" cy="460" rx="80" ry="34" fill="#c5c5bd"/>
+    <ellipse cx="985" cy="430" rx="64" ry="28" fill="#c5c5bd"/>
+  </g>
+  <g>
+    <circle cx="220" cy="140" r="1.6" fill="#ffb36b"/>
+    <circle cx="340" cy="214" r="1.3" fill="#ff7a42"/>
+    <circle cx="500" cy="184" r="1.7" fill="#ffb36b"/>
+    <circle cx="650" cy="245" r="1.3" fill="#ffb36b"/>
+    <circle cx="780" cy="155" r="1.6" fill="#ff7a42"/>
+    <circle cx="920" cy="230" r="1.5" fill="#ffb36b"/>
+    <circle cx="1050" cy="198" r="1.2" fill="#ff7a42"/>
+    <circle cx="1180" cy="292" r="1.7" fill="#ffb36b"/>
+    <circle cx="1280" cy="220" r="1.4" fill="#ff7a42"/>
+    <circle cx="102" cy="310" r="1.5" fill="#ffb36b"/>
+    <circle cx="410" cy="330" r="1.2" fill="#ff7a42"/>
+    <circle cx="730" cy="340" r="1.6" fill="#ffb36b"/>
+    <circle cx="1115" cy="365" r="1.4" fill="#ff7a42"/>
+  </g>
+  <rect width="1366" height="768" fill="url(#vignette)"/>
+</svg>
