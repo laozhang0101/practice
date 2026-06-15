@@ -20,11 +20,29 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Show files
+        run: |
+          echo "Current directory:"
+          pwd
+
+          echo "All index.html files:"
+          find . -maxdepth 6 -name index.html -print
+
+          echo "All demo-2d-strategy folders:"
+          find . -maxdepth 6 -type d -name "demo-2d-strategy" -print
+
+          echo "Top-level files:"
+          ls -la
+
       - uses: actions/configure-pages@v5
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: 001.战斗/demo-2d-strategy
+          path: "001.战斗/demo-2d-strategy"
+
       - id: deployment
         uses: actions/deploy-pages@v4
