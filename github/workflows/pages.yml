@@ -30,10 +30,10 @@ jobs:
           pwd
 
           echo "All index.html files:"
-          find . -maxdepth 6 -name index.html -print
+          find . -maxdepth 8 -name index.html -print
 
           echo "All demo-2d-strategy folders:"
-          find . -maxdepth 6 -type d -name "demo-2d-strategy" -print
+          find . -maxdepth 8 -type d -name "demo-2d-strategy" -print
 
           echo "Top-level files:"
           ls -la
