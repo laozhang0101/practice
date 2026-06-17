@@ -1,13 +1,47 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>M98 2D Strategy Combat Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=video-web-20260615" />
+    <link rel="stylesheet" href="./styles.css?v=loadout-ui-fix-20260617" />
   </head>
   <body>
-    <main class="app-shell">
+    <section class="prebattle-screen" id="prebattleScreen" aria-label="战前装备搭配">
+      <div class="prebattle-bg"></div>
+      <header class="prebattle-top">
+        <div class="prebattle-logo">GM</div>
+        <button class="prebattle-icon-button" type="button" aria-label="返回">‹</button>
+        <button class="prebattle-icon-button eye" type="button" aria-label="预览">◈</button>
+      </header>
+
+      <div class="prebattle-left">
+        <button class="scheme-select" type="button">自定义方案2 <span>⌄</span></button>
+        <button class="scheme-edit" type="button" aria-label="编辑方案">✎</button>
+        <label class="shoe-toggle"><input type="checkbox" checked /> 显示鞋子</label>
+      </div>
+
+      <div class="loadout-hero">
+        <img id="loadoutHeroImage" src="./assets/loadout-character-front.png" alt="角色预览" />
+        <img class="loadout-drone" src="./assets/loadout-drone.png" alt="" />
+      </div>
+
+      <nav class="loadout-parts" id="loadoutParts" aria-label="基础部位"></nav>
+
+      <section class="attachment-panel" aria-label="挂件槽位">
+        <div class="attachment-slots" id="attachmentSlots"></div>
+        <p class="attachment-title" id="attachmentTitle">选择挂件</p>
+        <div class="attachment-items" id="attachmentItems"></div>
+      </section>
+
+      <footer class="prebattle-actions">
+        <button class="edit-appearance" type="button">编辑挂件</button>
+        <button class="enter-battle" id="enterBattleBtn" type="button">进入战斗</button>
+        <button class="save-loadout" type="button">保存</button>
+      </footer>
+    </section>
+
+    <main class="app-shell is-hidden" id="battleApp">
       <section class="stage-area">
         <header class="topbar">
           <div>
@@ -75,7 +109,7 @@
             <div class="turn-pill enemy" id="bossInfo">阶段 1</div>
           </div>
           <div>
-            <span>熔岩铠甲</span>
+            <span>灵魂战甲</span>
             <div class="bar soul"><i id="soulGauge"></i></div>
           </div>
         </div>
@@ -109,6 +143,7 @@
       </aside>
     </main>
 
-    <script src="./game.js?v=video-web-20260615"></script>
+    <script src="./game.js?v=loadout-ui-fix-20260617"></script>
   </body>
 </html>
+
