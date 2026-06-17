@@ -38,11 +38,24 @@ jobs:
           echo "Top-level files:"
           ls -la
 
+      - name: Resolve demo path
+        id: demo_path
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEMO_PATH="$(find . -type f -path '*/demo-2d-strategy/index.html' -printf '%h\n' | head -n 1)"
+          if [ -z "$DEMO_PATH" ]; then
+            echo "demo-2d-strategy/index.html not found"
+            exit 1
+          fi
+          echo "Resolved demo path: $DEMO_PATH"
+          echo "path=$DEMO_PATH" >> "$GITHUB_OUTPUT"
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: "001.战斗/demo-2d-strategy"
+          path: ${{ steps.demo_path.outputs.path }}
 
       - id: deployment
         uses: actions/deploy-pages@v4

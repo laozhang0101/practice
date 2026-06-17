@@ -1,5 +1,10 @@
 ﻿const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
+const DEMO_VERSION = "2026.06.17-gourd-heal";
+const DEFAULT_MELEE_CINEMATIC_DURATION = 0.82;
+const GOURD_HEAL_CHANCE = 0.5;
+const GOURD_HEAL_AMOUNT = 10;
+const GOURD_MAX_USES = 3;
 
 const sprites = {
   background: new Image(),
@@ -14,6 +19,7 @@ const sprites = {
   partCore: new Image(),
   partFeet: new Image(),
   armorShield: new Image(),
+  loadoutGourd: new Image(),
 };
 
 sprites.background.src = "./assets/arena-bg.jpeg";
@@ -28,11 +34,13 @@ sprites.partArms.src = "./assets/part-arms.png";
 sprites.partCore.src = "./assets/part-core.png";
 sprites.partFeet.src = "./assets/part-feet.png";
 sprites.armorShield.src = "./assets/armor-shield.png";
+sprites.loadoutGourd.src = "./assets/loadout-gourd.jpeg";
 Object.values(sprites).forEach((image) => {
   image.onload = () => draw();
 });
 
 const ui = {
+  versionLabels: document.querySelectorAll("[data-demo-version]"),
   phaseLabel: document.getElementById("phaseLabel"),
   soulGauge: document.getElementById("soulGauge"),
   playerHp: document.getElementById("playerHp"),
@@ -348,6 +356,7 @@ const attachmentOptions = [
   { name: "修罗鞋子", icon: "♞", trait: "鞋子基础装饰", category: "base", parts: ["shoes"], image: "./assets/loadout-shura-shoes.jpeg" },
   { name: "无人机", icon: "◉", trait: "后背挂件，远程协同", category: "drone", slots: ["后背"], image: "./assets/loadout-drone.png" },
   { name: "喷气式装置", icon: "✦", trait: "肩膀挂件，跃升爆发", category: "jet", slots: ["肩膀"], image: "./assets/loadout-jet.png" },
+  { name: "酒葫芦", icon: "葫", trait: "前腰固定挂件，回合开始概率饮酒回血", category: "gourd", slots: ["前腰"], image: "./assets/loadout-gourd.jpeg" },
   { name: "森然骨刺", icon: "◆", trait: "攻击型装饰", category: "ornament" },
   { name: "冰魄残片", icon: "◇", trait: "防护型装饰", category: "ornament" },
   { name: "戒律圆徽", icon: "✚", trait: "战术型装饰", category: "ornament" },
@@ -382,8 +391,10 @@ function initializeDefaultLoadout() {
   });
   const drone = attachmentOptions.find((option) => option.name === "无人机");
   const jet = attachmentOptions.find((option) => option.name === "喷气式装置");
+  const gourd = attachmentOptions.find((option) => option.name === "酒葫芦");
   if (drone) loadoutState.equipped["torso:后背"] = drone;
   if (jet) loadoutState.equipped["torso:肩膀"] = jet;
+  if (gourd) loadoutState.equipped["pants:前腰"] = gourd;
 }
 
 function createState() {
@@ -396,11 +407,11 @@ function createState() {
   }));
 
   return {
-    phase: "玩家回合",
-    turn: "player",
+    phase: "玩家回合准备",
+    turn: "player_start",
     round: 1,
     selectedWeaponId: "fists",
-    player: { hp: 220, maxHp: 220, soul: 0, ammo: 3, maxAmmo: 3, action: 7, maxAction: 7 },
+    player: { hp: 220, maxHp: 220, soul: 0, ammo: 3, maxAmmo: 3, action: 7, maxAction: 7, gourdUses: 0 },
     enemy: {
       hp: parts.reduce((sum, part) => sum + part.hp, 0),
       maxHp: parts.reduce((sum, part) => sum + part.maxHp, 0),
@@ -443,8 +454,7 @@ function resetGame() {
   renderWeaponToggle();
   showWeakpointTip("胸口核心已暴露，优先攻击弱点。", 1.5);
   log("战斗开始：手部、脚部被硬甲覆盖，胸口核心是裸露弱点。");
-  updateUi();
-  draw();
+  beginPlayerTurn({ initial: true });
 }
 
 function renderPrebattleLoadout() {
@@ -526,6 +536,9 @@ function renderLoadoutItemPreview(item, fallback) {
 function getLoadoutOptions(activePart, slot) {
   if (slot === "base") {
     return attachmentOptions.filter((item) => item.category === "base" && item.parts?.includes(activePart.id));
+  }
+  if (activePart.id === "pants" && slot === "前腰") {
+    return attachmentOptions.filter((item) => item.name === "酒葫芦");
   }
   const exact = attachmentOptions.filter((item) => item.slots?.includes(slot));
   const generic = attachmentOptions.filter((item) => item.category === "ornament");
@@ -825,7 +838,17 @@ function useSkill(skillId) {
     return;
   }
 
+  if (shouldUseDefaultMeleeCinematic(skill)) {
+    startDefaultMeleeSkillFlow(skill, targets);
+    updateUi();
+    return;
+  }
+
   settlePlayerSkill(skill, targets);
+}
+
+function shouldUseDefaultMeleeCinematic(skill) {
+  return ["fists", "greatsword"].includes(skill.weaponId);
 }
 
 function settlePlayerSkill(skill, targets, context = {}) {
@@ -896,6 +919,28 @@ function finishAccessorySkillFlow(effect) {
   hideVideoOverlay();
   state.skillCinematic = null;
   settlePlayerSkill(cinematic.skill, cinematic.targets, { accessoryEffect: effect });
+}
+
+function startDefaultMeleeSkillFlow(skill, targets) {
+  state.skillCinematic = {
+    skill,
+    targets,
+    stage: "default_melee",
+    elapsed: 0,
+    duration: DEFAULT_MELEE_CINEMATIC_DURATION,
+    settled: false,
+  };
+  log(`${skill.name}发动：近身突进打击。`);
+}
+
+function updateDefaultMeleeSkillFlow(delta) {
+  const cinematic = state?.skillCinematic;
+  if (!cinematic || cinematic.stage !== "default_melee") return;
+  cinematic.elapsed += delta;
+  if (cinematic.elapsed < cinematic.duration || cinematic.settled) return;
+  cinematic.settled = true;
+  state.skillCinematic = null;
+  settlePlayerSkill(cinematic.skill, cinematic.targets);
 }
 
 function useSoulArmorSkill(skillId, dots = 1, targetPartId = null) {
@@ -1114,8 +1159,6 @@ function endPlayerTurn() {
 function endEnemyTurn() {
   if (state.result) return;
   state.round += 1;
-  state.turn = "player";
-  state.phase = "玩家回合";
   state.enemy.intent = null;
   state.reactionTimer = 0;
   state.activeSkill = null;
@@ -1123,9 +1166,54 @@ function endEnemyTurn() {
   state.player.ammo = Math.min(state.player.maxAmmo, state.player.ammo + 1);
   state.player.action = Math.min(state.player.maxAction, state.player.action + 2);
   ui.reactionPanel.classList.add("hidden");
-  updatePendingEnemyWarning();
-  log(`第 ${state.round} 回合：玩家行动，弹药恢复 1，行动力恢复 2。`);
+  log(`第 ${state.round} 回合：弹药恢复 1，行动力恢复 2。`);
+  beginPlayerTurn();
+}
+
+function beginPlayerTurn(options = {}) {
+  state.turn = "player_start";
+  state.phase = "玩家回合准备";
+  ui.reactionPanel.classList.add("hidden");
   updateUi();
+  const shouldTryGourd = state.player.gourdUses < GOURD_MAX_USES && state.player.hp < state.player.maxHp;
+  if (shouldTryGourd && Math.random() < GOURD_HEAL_CHANCE) {
+    triggerGourdHeal();
+    return;
+  }
+  enterPlayerActionPhase(options);
+}
+
+function triggerGourdHeal() {
+  state.skillCinematic = { stage: "gourd_heal" };
+  state.phase = "酒葫芦饮用";
+  state.player.gourdUses += 1;
+  log(`酒葫芦触发：饮酒恢复 ${GOURD_HEAL_AMOUNT} 点生命。`);
+  updateUi();
+  playCinematicVideo("./assets/videos/gourd-heal.mp4", false, () => {
+    finishGourdHeal();
+  });
+}
+
+function finishGourdHeal() {
+  if (!state || state.result) return;
+  hideVideoOverlay();
+  state.skillCinematic = null;
+  const before = state.player.hp;
+  state.player.hp = Math.min(state.player.maxHp, state.player.hp + GOURD_HEAL_AMOUNT);
+  const healed = state.player.hp - before;
+  if (healed > 0) {
+    addPlayerHealFloater(healed);
+  }
+  enterPlayerActionPhase();
+}
+
+function enterPlayerActionPhase() {
+  state.turn = "player";
+  state.phase = "玩家回合";
+  updatePendingEnemyWarning();
+  log("玩家行动开始。");
+  updateUi();
+  draw();
 }
 
 function updatePendingEnemyWarning() {
@@ -1526,6 +1614,7 @@ function update(delta) {
   }
   state.actionAnimTimer = Math.max(0, state.actionAnimTimer - delta);
   state.playerHitFlashTimer = Math.max(0, state.playerHitFlashTimer - delta);
+  updateDefaultMeleeSkillFlow(delta);
   floaters = floaters
     .map((floater) => ({ ...floater, y: floater.y - 36 * delta, life: floater.life - delta }))
     .filter((floater) => floater.life > 0);
@@ -1548,6 +1637,7 @@ function draw() {
   drawBackground();
   drawCombatants();
   drawWeakpointEffects();
+  drawDefaultMeleeCinematicEffects();
   drawFloaters();
   drawThreatOverlay();
   drawPlayerDamageFeedback();
@@ -1568,12 +1658,21 @@ function drawBackground() {
 }
 
 function drawCombatants() {
-  const player = { x: 365, footY: 738, height: 455 };
+  const meleeFx = currentDefaultMeleeCinematic();
+  const player = meleeFx ? meleePlayerPose(meleeFx) : { x: 365, footY: 738, height: 455 };
   const bossImage = bossSpriteForState();
   const rockPose = bossImage === sprites.bossRockThrow;
   const boss = rockPose ? { x: 945, bottom: 570, height: 360 } : { x: 938, bottom: 560, height: 330 };
-  drawSprite(sprites.player, player.x, player.footY - player.height, player.height, true);
-  drawSprite(bossImage, boss.x, boss.bottom - boss.height, boss.height, false);
+  if (meleeFx) {
+    drawSprite(bossImage, boss.x, boss.bottom - boss.height, boss.height, false);
+    drawMeleeDashAfterimage(player);
+    drawSprite(sprites.player, player.x, player.footY - player.height, player.height, true);
+    drawPlayerGourd(player);
+  } else {
+    drawSprite(sprites.player, player.x, player.footY - player.height, player.height, true);
+    drawPlayerGourd(player);
+    drawSprite(bossImage, boss.x, boss.bottom - boss.height, boss.height, false);
+  }
   drawPlayerHud(canvas.width - 172, canvas.height - 42);
   const bossHpW = Math.min(360, canvas.width * 0.34);
   const bossHpX = canvas.width / 2 - bossHpW / 2;
@@ -1581,6 +1680,151 @@ function drawCombatants() {
   drawHealthBar(bossHpX, bossHpY, bossHpW, state.enemy.hp / state.enemy.maxHp, "#e86c62");
   drawBarText(bossHpX, bossHpY, bossHpW, 7, `${state.enemy.hp}/${state.enemy.maxHp}`);
   drawArmorStatus(bossHpX, bossHpY + 14, bossHpW);
+}
+
+function drawPlayerGourd(player) {
+  if (!sprites.loadoutGourd.complete || !sprites.loadoutGourd.naturalWidth) return;
+  const size = Math.max(24, player.height * 0.1);
+  const x = player.x - player.height * 0.02;
+  const y = player.footY - player.height * 0.44;
+  ctx.save();
+  ctx.shadowColor = "rgba(255, 176, 74, 0.55)";
+  ctx.shadowBlur = state?.skillCinematic?.stage === "gourd_heal" ? 18 : 5;
+  ctx.translate(x, y);
+  ctx.rotate(-0.12);
+  ctx.drawImage(sprites.loadoutGourd, -size / 2, -size / 2, size, size);
+  ctx.restore();
+}
+
+function currentDefaultMeleeCinematic() {
+  const cinematic = state?.skillCinematic;
+  if (!cinematic || cinematic.stage !== "default_melee") return null;
+  const progress = Math.max(0, Math.min(1, cinematic.elapsed / cinematic.duration));
+  return { ...cinematic, progress };
+}
+
+function meleePlayerPose(meleeFx) {
+  const progress = meleeFx.progress;
+  const arrive = easeOutCubic(Math.min(1, progress / 0.22));
+  const exit = progress > 0.72 ? easeInOutCubic((progress - 0.72) / 0.28) : 0;
+  const nearX = meleeFx.skill.weaponId === "greatsword" ? 760 : 782;
+  const nearFootY = meleeFx.skill.weaponId === "greatsword" ? 642 : 630;
+  const nearHeight = meleeFx.skill.weaponId === "greatsword" ? 340 : 315;
+  const home = { x: 365, footY: 738, height: 455 };
+  const attackLean = Math.sin(Math.min(1, progress / 0.65) * Math.PI) * 18;
+  return {
+    x: lerp(home.x, nearX + attackLean, arrive) + exit * 44,
+    footY: lerp(home.footY, nearFootY, arrive),
+    height: lerp(home.height, nearHeight, arrive),
+  };
+}
+
+function drawMeleeDashAfterimage(player) {
+  const meleeFx = currentDefaultMeleeCinematic();
+  if (!meleeFx || meleeFx.progress > 0.36) return;
+  const alpha = Math.max(0, 0.34 - meleeFx.progress * 0.8);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 3; i += 1) {
+    drawSprite(sprites.player, player.x - 42 - i * 34, player.footY - player.height, player.height, true);
+  }
+  ctx.restore();
+}
+
+function drawDefaultMeleeCinematicEffects() {
+  const meleeFx = currentDefaultMeleeCinematic();
+  if (!meleeFx) return;
+  const targets = meleeFx.targets?.length ? meleeFx.targets : [partById("core")].filter(Boolean);
+  const hitTimings = meleeFx.skill.kind === "aoe" ? [0.34, 0.49, 0.64] : [0.43, 0.58];
+  const color = meleeFx.skill.color || "#f0b84f";
+  targets.forEach((target, targetIndex) => {
+    const pos = partPosition(target.id);
+    hitTimings.forEach((hitTime, hitIndex) => {
+      const offsetTime = hitTime + targetIndex * 0.045;
+      const intensity = hitPulse(meleeFx.progress, offsetTime, 0.09);
+      if (intensity <= 0) return;
+      drawBossHitCard(pos, intensity, color, targetIndex + hitIndex);
+      drawSlashFlash(pos, intensity, color, hitIndex);
+    });
+  });
+}
+
+function drawBossHitCard(pos, intensity, color, index) {
+  const wobble = Math.sin(state.time * 42 + index) * 5 * intensity;
+  const w = 96 + 28 * intensity;
+  const h = 118 + 22 * intensity;
+  ctx.save();
+  ctx.translate(pos.x + wobble, pos.y - 6);
+  ctx.rotate((-0.08 + index * 0.025) * intensity);
+  ctx.globalAlpha = 0.22 + 0.42 * intensity;
+  ctx.fillStyle = "rgba(8, 10, 14, 0.72)";
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2 + 3 * intensity;
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
+  ctx.globalCompositeOperation = "lighter";
+  const gradient = ctx.createRadialGradient(0, 0, 2, 0, 0, w * 0.76);
+  gradient.addColorStop(0, `rgba(255, 255, 255, ${0.72 * intensity})`);
+  gradient.addColorStop(0.22, hexToRgba(color, 0.62 * intensity));
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w * 0.48, h * 0.34, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSlashFlash(pos, intensity, color, index) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = Math.min(1, 0.35 + intensity);
+  ctx.translate(pos.x, pos.y);
+  ctx.rotate(index % 2 === 0 ? -0.52 : 0.44);
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(255,255,255,0.96)";
+  ctx.lineWidth = 9 * intensity + 2;
+  ctx.beginPath();
+  ctx.moveTo(-78 * intensity, -18);
+  ctx.lineTo(88 * intensity, 18);
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 18 * intensity + 5;
+  ctx.globalAlpha = 0.22 + 0.36 * intensity;
+  ctx.beginPath();
+  ctx.moveTo(-90 * intensity, -22);
+  ctx.lineTo(98 * intensity, 22);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function hitPulse(progress, center, width) {
+  const distance = Math.abs(progress - center);
+  if (distance > width) return 0;
+  return 1 - distance / width;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * Math.max(0, Math.min(1, t));
+}
+
+function easeOutCubic(t) {
+  const clamped = Math.max(0, Math.min(1, t));
+  return 1 - Math.pow(1 - clamped, 3);
+}
+
+function easeInOutCubic(t) {
+  const clamped = Math.max(0, Math.min(1, t));
+  return clamped < 0.5 ? 4 * clamped * clamped * clamped : 1 - Math.pow(-2 * clamped + 2, 3) / 2;
+}
+
+function hexToRgba(hex, alpha) {
+  const normalized = hex.replace("#", "");
+  const value = Number.parseInt(normalized.length === 3 ? normalized.replace(/(.)/g, "$1$1") : normalized, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function drawPlayerHud(x, y) {
@@ -1847,13 +2091,24 @@ function drawPlayerDamageFeedback() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.lineWidth = 6;
-    ctx.strokeStyle = "rgba(25, 0, 0, 0.92)";
-    ctx.fillStyle = "#ffebe8";
-    ctx.shadowColor = "rgba(255, 0, 0, 0.55)";
+    const isHeal = floater.type === "heal";
+    ctx.strokeStyle = isHeal ? "rgba(0, 26, 10, 0.92)" : "rgba(25, 0, 0, 0.92)";
+    ctx.fillStyle = isHeal ? "#9cffaf" : "#ffebe8";
+    ctx.shadowColor = isHeal ? "rgba(77, 255, 121, 0.58)" : "rgba(255, 0, 0, 0.55)";
     ctx.shadowBlur = 12;
     ctx.strokeText(floater.text, floater.x, floater.y);
     ctx.fillText(floater.text, floater.x, floater.y);
     ctx.restore();
+  });
+}
+
+function addPlayerHealFloater(amount) {
+  playerHitFloaters.push({
+    type: "heal",
+    text: `酒葫芦恢复 +${amount}`,
+    x: 350,
+    y: 405,
+    life: 1.35,
   });
 }
 
@@ -1889,7 +2144,7 @@ function updateUi() {
   ui.playerHp.textContent = `${state.player.hp} / ${state.player.maxHp}`;
   ui.selectedWeapon.textContent = weapon.name;
   ui.turnState.textContent = state.phase;
-  ui.turnInfo.textContent = `第 ${state.round} 回合：${state.turn === "player" ? "玩家行动" : "敌方行动"}`;
+  ui.turnInfo.textContent = `第 ${state.round} 回合：${turnDisplayName()}`;
   ui.bossInfo.textContent = `阶段 ${state.enemy.stage} / 弹药 ${state.player.ammo} / 行动力 ${state.player.action}`;
   ui.currentTarget.textContent =
     state.activeTarget === "multi" ? "多个部位" : state.activeTarget ? partById(state.activeTarget)?.label || "--" : "--";
@@ -1969,6 +2224,21 @@ window.addEventListener("keydown", (event) => {
   if (action) react(action);
 });
 
+function renderDemoVersion() {
+  ui.versionLabels.forEach((label) => {
+    label.textContent = `Demo ${DEMO_VERSION}`;
+  });
+}
+
+function turnDisplayName() {
+  if (state.turn === "player") return "玩家行动";
+  if (state.turn === "player_start") return "玩家回合准备";
+  if (state.turn === "enemy") return "敌方行动";
+  if (state.turn === "ended") return state.phase;
+  return state.phase;
+}
+
+renderDemoVersion();
 initializeDefaultLoadout();
 renderPrebattleLoadout();
 resetGame();
