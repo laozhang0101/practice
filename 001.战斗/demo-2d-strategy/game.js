@@ -1,6 +1,6 @@
 ﻿const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
-const DEMO_VERSION = "2026.06.17-gourd-heal";
+const DEMO_VERSION = "2026.06.18-boss-part-aligned";
 const DEFAULT_MELEE_CINEMATIC_DURATION = 0.82;
 const GOURD_HEAL_CHANCE = 0.5;
 const GOURD_HEAL_AMOUNT = 10;
@@ -20,6 +20,7 @@ const sprites = {
   partFeet: new Image(),
   armorShield: new Image(),
   loadoutGourd: new Image(),
+  playerAvatar: new Image(),
 };
 
 sprites.background.src = "./assets/arena-bg.jpeg";
@@ -35,6 +36,7 @@ sprites.partCore.src = "./assets/part-core.png";
 sprites.partFeet.src = "./assets/part-feet.png";
 sprites.armorShield.src = "./assets/armor-shield.png";
 sprites.loadoutGourd.src = "./assets/loadout-gourd.jpeg";
+sprites.playerAvatar.src = "./assets/player-avatar.png";
 Object.values(sprites).forEach((image) => {
   image.onload = () => draw();
 });
@@ -332,6 +334,8 @@ let lastTime = performance.now();
 let floaters = [];
 let playerHitFloaters = [];
 let soulHoldTimer = null;
+let hoveredTargetParts = [];
+const bossEdgeMaskCache = new WeakMap();
 
 const loadoutParts = [
   { id: "head", label: "头盔", icon: "♜", slots: ["脸部", "护额"], defaultItem: "修罗头盔" },
@@ -491,7 +495,8 @@ function renderPrebattleLoadout() {
     const equipped = loadoutState.equipped[key];
     const slotEl = document.createElement("button");
     slotEl.type = "button";
-    slotEl.className = `attachment-slot${slot === loadoutState.activeSlot ? " active" : ""}`;
+    const isFixedGourdSlot = activePart.id === "pants" && slot === "前腰";
+    slotEl.className = `attachment-slot${slot === loadoutState.activeSlot ? " active" : ""}${isFixedGourdSlot ? " fixed-gourd" : ""}`;
     slotEl.innerHTML = `
       <span>${slot}</span>
       <span class="attachment-slot-box${equipped ? " equipped" : ""}">
@@ -632,18 +637,19 @@ function createSkillButton(skill, compact) {
   button.type = "button";
   button.className = `skill-card${skill.actionCost > 0 ? " has-action-cost" : ""}${compact ? " battle-skill-card" : ""}`;
   button.dataset.skill = skill.id;
+  button.dataset.targetParts = skill.targetParts.join(",");
   button.innerHTML = `
-    ${skill.actionCost > 0 ? `<span class="action-cost-corner" style="--skill-color:${skill.color}">行动力 ${skill.actionCost}</span>` : ""}
+    ${skill.actionCost > 0 ? `<span class="action-cost-corner" style="--skill-color:${skill.color}"><b>${skill.actionCost}</b></span>` : ""}
     <span class="part-badge${skill.targetParts.length > 1 ? " part-badge-ring" : ""}" style="--skill-color:${skill.color}">${renderPartIconGroup(skill.targetParts, "badge")}</span>
     <span class="skill-copy">
       <strong>${skill.name}</strong>
-      <span class="skill-tags">
-        <span class="skill-tag" style="--skill-color:${skill.color}">${skill.kindLabel}</span>
-        <span class="skill-tag" style="--skill-color:${skill.color}">${skill.armorBreaker ? "破甲" : "输出"}</span>
-      </span>
       <small>${skill.desc} ${skillSummaryText(skill)}</small>
     </span>
   `;
+  button.addEventListener("pointerenter", () => setHoveredTargetParts(skill.targetParts));
+  button.addEventListener("pointerleave", () => clearHoveredTargetParts());
+  button.addEventListener("focus", () => setHoveredTargetParts(skill.targetParts));
+  button.addEventListener("blur", () => clearHoveredTargetParts());
   button.addEventListener("click", () => useSkill(skill.id));
   return button;
 }
@@ -693,6 +699,14 @@ function confirmSoulArmorTarget(partId) {
   buildSkillControls();
   ui.battleSkillOverlay.classList.remove("active");
   useSoulArmorSkill(skill.id, selection.dots, partId);
+}
+
+function setHoveredTargetParts(partIds) {
+  hoveredTargetParts = [...new Set(partIds)];
+}
+
+function clearHoveredTargetParts() {
+  hoveredTargetParts = [];
 }
 
 function skillSummaryText(skill) {
@@ -770,7 +784,12 @@ function renderPartIconGroup(partIds, mode) {
     .map((partId) => {
       const info = partIconInfo(partId);
       if (!info) return "";
-      return `<img class="part-icon part-icon-${mode}" src="${info.src}" alt="${info.label}" title="${info.label}" />`;
+      return `
+        <span class="part-icon-wrap part-icon-${mode}" title="${info.label}">
+          <img class="part-icon" src="${info.src}" alt="${info.label}" />
+          <b>${info.label}</b>
+        </span>
+      `;
     })
     .join("");
 }
@@ -1641,6 +1660,7 @@ function draw() {
   drawFloaters();
   drawThreatOverlay();
   drawPlayerDamageFeedback();
+  drawHoveredTargetHighlights();
 }
 
 function drawBackground() {
@@ -1663,6 +1683,13 @@ function drawCombatants() {
   const bossImage = bossSpriteForState();
   const rockPose = bossImage === sprites.bossRockThrow;
   const boss = rockPose ? { x: 945, bottom: 570, height: 360 } : { x: 938, bottom: 560, height: 330 };
+  state.currentBossDraw = {
+    image: bossImage,
+    x: boss.x,
+    y: boss.bottom - boss.height,
+    height: boss.height,
+    width: bossImage.complete && bossImage.naturalHeight ? boss.height * (bossImage.naturalWidth / bossImage.naturalHeight) : boss.height,
+  };
   if (meleeFx) {
     drawSprite(bossImage, boss.x, boss.bottom - boss.height, boss.height, false);
     drawMeleeDashAfterimage(player);
@@ -1694,6 +1721,243 @@ function drawPlayerGourd(player) {
   ctx.rotate(-0.12);
   ctx.drawImage(sprites.loadoutGourd, -size / 2, -size / 2, size, size);
   ctx.restore();
+}
+
+function drawHoveredTargetHighlights() {
+  if (!hoveredTargetParts.length || !state || state.result) return;
+  const pulse = 0.65 + 0.35 * Math.sin(state.time * 9);
+  const bossDraw = state.currentBossDraw;
+  if (!bossDraw?.image?.complete || !bossDraw.image.naturalWidth) return;
+  hoveredTargetParts.forEach((partId) => {
+    const part = partById(partId);
+    if (!part) return;
+    drawBossPartPixelOutline(bossDraw, partId, pulse);
+  });
+}
+
+function bossPartSourceRegions(image, partId) {
+  const w = image.naturalWidth;
+  const h = image.naturalHeight;
+  if (image === sprites.bossRockThrow) {
+    const regions = {
+      arms: [
+        { x: 0.08 * w, y: 0.3 * h, w: 0.32 * w, h: 0.38 * h },
+        { x: 0.62 * w, y: 0.18 * h, w: 0.34 * w, h: 0.46 * h },
+      ],
+      legs: [
+        { x: 0.31 * w, y: 0.63 * h, w: 0.2 * w, h: 0.34 * h },
+        { x: 0.48 * w, y: 0.62 * h, w: 0.24 * w, h: 0.36 * h },
+      ],
+      core: [{ x: 0.36 * w, y: 0.42 * h, w: 0.28 * w, h: 0.2 * h }],
+    };
+    return regions[partId] || [];
+  }
+  const regions = {
+    arms: [
+      { x: 0.08 * w, y: 0.28 * h, w: 0.25 * w, h: 0.45 * h },
+      { x: 0.68 * w, y: 0.16 * h, w: 0.24 * w, h: 0.5 * h },
+    ],
+    legs: [
+      { x: 0.28 * w, y: 0.55 * h, w: 0.22 * w, h: 0.4 * h },
+      { x: 0.48 * w, y: 0.55 * h, w: 0.24 * w, h: 0.4 * h },
+    ],
+    core: [{ x: 0.34 * w, y: 0.18 * h, w: 0.3 * w, h: 0.38 * h }],
+  };
+  return regions[partId] || [];
+}
+
+function bossPartHighlightColor(partId) {
+  if (partId === "arms") return "#ffdf78";
+  if (partId === "legs") return "#8fd7ff";
+  return "#ff7b54";
+}
+
+function drawBossPartPixelOutline(bossDraw, partId, pulse) {
+  let mask = null;
+  try {
+    mask = getBossEdgeMask(bossDraw.image, partId);
+  } catch (error) {
+    mask = null;
+  }
+  const color = bossPartHighlightColor(partId);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const dx = bossDraw.x - bossDraw.width / 2;
+  if (mask) {
+    ctx.globalAlpha = 0.9;
+    ctx.filter = `drop-shadow(0 0 ${Math.round(14 + pulse * 12)}px ${color})`;
+    ctx.drawImage(mask, dx, bossDraw.y, bossDraw.width, bossDraw.height);
+    ctx.filter = "none";
+    ctx.globalAlpha = 0.48 + pulse * 0.22;
+    ctx.drawImage(mask, dx - 2, bossDraw.y - 2, bossDraw.width + 4, bossDraw.height + 4);
+  }
+  drawPartFallbackContour(bossDraw, partId, pulse, color);
+  ctx.restore();
+}
+
+function drawPartFallbackContour(bossDraw, partId, pulse, color) {
+  const points = bossPartFallbackPoints(bossDraw.image, partId);
+  if (!points.length) return;
+  const sx = bossDraw.width;
+  const sy = bossDraw.height;
+  const dx = bossDraw.x - bossDraw.width / 2;
+  const dy = bossDraw.y;
+  strokePartContour(points, dx, dy, sx, sy, color, 5, 0.88 + pulse * 0.12, 20 + pulse * 16);
+  strokePartContour(points, dx, dy, sx, sy, "#fff6d8", 2, 0.82 + pulse * 0.18, 2);
+}
+
+function strokePartContour(points, dx, dy, sx, sy, color, lineWidth, alpha, shadowBlur) {
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = shadowBlur;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  points.forEach((poly) => {
+    ctx.beginPath();
+    poly.forEach((point, index) => {
+      const x = dx + point[0] * sx;
+      const y = dy + point[1] * sy;
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.stroke();
+  });
+}
+
+function bossPartFallbackPoints(image, partId) {
+  const rock = image === sprites.bossRockThrow;
+  if (partId === "arms") {
+    return rock
+      ? [
+          [[0.12, 0.34], [0.23, 0.29], [0.34, 0.39], [0.32, 0.58], [0.22, 0.68], [0.1, 0.6], [0.06, 0.47]],
+          [[0.65, 0.22], [0.84, 0.17], [0.95, 0.29], [0.93, 0.54], [0.84, 0.65], [0.69, 0.55], [0.61, 0.38]],
+        ]
+      : [
+          [[0.1, 0.32], [0.21, 0.27], [0.31, 0.39], [0.29, 0.62], [0.2, 0.72], [0.1, 0.67], [0.06, 0.5]],
+          [[0.69, 0.22], [0.83, 0.15], [0.91, 0.29], [0.89, 0.56], [0.8, 0.67], [0.7, 0.58], [0.66, 0.38]],
+        ];
+  }
+  if (partId === "legs") {
+    return rock
+      ? [
+          [[0.31, 0.63], [0.46, 0.62], [0.5, 0.78], [0.46, 0.96], [0.32, 0.97], [0.25, 0.82]],
+          [[0.48, 0.62], [0.65, 0.63], [0.73, 0.83], [0.69, 0.98], [0.52, 0.96], [0.45, 0.78]],
+        ]
+      : [
+          [[0.28, 0.56], [0.45, 0.56], [0.5, 0.78], [0.47, 0.94], [0.31, 0.94], [0.24, 0.76]],
+          [[0.48, 0.56], [0.67, 0.57], [0.73, 0.82], [0.67, 0.96], [0.51, 0.93], [0.45, 0.75]],
+        ];
+  }
+  return rock
+    ? [[[0.37, 0.43], [0.49, 0.39], [0.63, 0.45], [0.62, 0.58], [0.48, 0.64], [0.36, 0.58]]]
+    : [[[0.35, 0.2], [0.5, 0.15], [0.64, 0.27], [0.61, 0.47], [0.48, 0.57], [0.34, 0.43]]];
+}
+
+function getBossEdgeMask(image, partId) {
+  let imageCache = bossEdgeMaskCache.get(image);
+  if (!imageCache) {
+    imageCache = {};
+    bossEdgeMaskCache.set(image, imageCache);
+  }
+  if (imageCache[partId]) return imageCache[partId];
+  if (!image.naturalWidth || !image.naturalHeight) return null;
+
+  const source = document.createElement("canvas");
+  source.width = image.naturalWidth;
+  source.height = image.naturalHeight;
+  const sourceCtx = source.getContext("2d", { willReadFrequently: true });
+  sourceCtx.drawImage(image, 0, 0);
+  const sourceData = sourceCtx.getImageData(0, 0, source.width, source.height);
+  const mask = document.createElement("canvas");
+  mask.width = source.width;
+  mask.height = source.height;
+  const maskCtx = mask.getContext("2d");
+  const output = maskCtx.createImageData(mask.width, mask.height);
+  const regions = bossPartSourceRegions(image, partId);
+  regions.forEach((region) => writeEdgeRegion(sourceData, output, region, partId === "core", bossPartHighlightColor(partId)));
+  maskCtx.putImageData(output, 0, 0);
+  imageCache[partId] = mask;
+  return mask;
+}
+
+function writeEdgeRegion(sourceData, output, region, useLavaCore, color) {
+  const width = sourceData.width;
+  const height = sourceData.height;
+  const x0 = Math.max(1, Math.floor(region.x));
+  const y0 = Math.max(1, Math.floor(region.y));
+  const x1 = Math.min(width - 2, Math.ceil(region.x + region.w));
+  const y1 = Math.min(height - 2, Math.ceil(region.y + region.h));
+  const data = sourceData.data;
+  const out = output.data;
+  const isTarget = (x, y) => {
+    const i = (y * width + x) * 4;
+    const alpha = data[i + 3];
+    if (useLavaCore) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      return alpha > 70 && r > 130 && g > 45 && b < 75;
+    }
+    return alpha > 70;
+  };
+
+  for (let y = y0; y <= y1; y += 1) {
+    for (let x = x0; x <= x1; x += 1) {
+      if (!isTarget(x, y)) continue;
+      const edge =
+        !isTarget(x - 1, y) ||
+        !isTarget(x + 1, y) ||
+        !isTarget(x, y - 1) ||
+        !isTarget(x, y + 1) ||
+        localColorEdge(data, width, x, y);
+      if (!edge) continue;
+      writeEdgeDot(out, width, height, x, y, color, useLavaCore ? 2 : 3);
+    }
+  }
+}
+
+function localColorEdge(data, width, x, y) {
+  const center = (y * width + x) * 4;
+  const right = (y * width + x + 1) * 4;
+  const down = ((y + 1) * width + x) * 4;
+  const luma = (i) => data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+  const colorDistance = (a, b) =>
+    Math.abs(data[a] - data[b]) +
+    Math.abs(data[a + 1] - data[b + 1]) +
+    Math.abs(data[a + 2] - data[b + 2]);
+  return Math.abs(luma(center) - luma(right)) > 28 || Math.abs(luma(center) - luma(down)) > 28 || colorDistance(center, right) > 82 || colorDistance(center, down) > 82;
+}
+
+function writeEdgeDot(out, width, height, x, y, color, radius) {
+  const rgb = hexToRgb(color);
+  for (let oy = -radius; oy <= radius; oy += 1) {
+    for (let ox = -radius; ox <= radius; ox += 1) {
+      if (ox * ox + oy * oy > radius * radius) continue;
+      const px = x + ox;
+      const py = y + oy;
+      if (px < 0 || py < 0 || px >= width || py >= height) continue;
+      const distance = Math.sqrt(ox * ox + oy * oy);
+      const alpha = Math.round(255 * Math.max(0.35, 1 - distance / (radius + 0.8)));
+      const oi = (py * width + px) * 4;
+      out[oi] = rgb.r;
+      out[oi + 1] = rgb.g;
+      out[oi + 2] = rgb.b;
+      out[oi + 3] = Math.max(out[oi + 3], alpha);
+    }
+  }
+}
+
+function hexToRgb(hex) {
+  const normalized = hex.replace("#", "");
+  const value = Number.parseInt(normalized.length === 3 ? normalized.replace(/(.)/g, "$1$1") : normalized, 16);
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255,
+  };
 }
 
 function currentDefaultMeleeCinematic() {
@@ -1829,12 +2093,80 @@ function hexToRgba(hex, alpha) {
 
 function drawPlayerHud(x, y) {
   ctx.save();
-  ctx.fillStyle = "rgba(3, 5, 8, 0.46)";
-  ctx.fillRect(x - 8, y - 8, 156, 42);
-  drawHealthBar(x, y, 140, state.player.hp / state.player.maxHp, "#76d17b", 12);
-  drawBarText(x, y, 140, 12, `${state.player.hp}/${state.player.maxHp}`);
-  drawHealthBar(x, y + 17, 140, state.player.action / state.player.maxAction, "#58b7ff", 12);
-  drawBarText(x, y + 17, 140, 12, `${state.player.action}/${state.player.maxAction}`);
+  const panelX = x - 50;
+  const panelY = y - 42;
+  const avatarSize = 42;
+  const barX = panelX + avatarSize + 8;
+  const barW = 156;
+  ctx.fillStyle = "rgba(3, 5, 8, 0.54)";
+  roundedRect(panelX - 8, panelY - 8, 224, 66, 8);
+  ctx.fill();
+  drawHudAvatar(panelX, panelY, avatarSize);
+  drawPlayerHpStrip(barX, panelY + 3, barW);
+  drawPlayerActionCells(barX, panelY + 28, barW);
+  ctx.restore();
+}
+
+function drawHudAvatar(x, y, size) {
+  ctx.save();
+  ctx.fillStyle = "rgba(20, 24, 30, 0.9)";
+  roundedRect(x, y, size, size, 6);
+  ctx.fill();
+  if (sprites.playerAvatar.complete && sprites.playerAvatar.naturalWidth) {
+    ctx.save();
+    roundedRect(x, y, size, size, 6);
+    ctx.clip();
+    drawCoverImage(sprites.playerAvatar, x, y, size, size);
+    ctx.restore();
+  }
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+  ctx.restore();
+}
+
+function drawPlayerHpStrip(x, y, width) {
+  const ratio = Math.max(0, Math.min(1, state.player.hp / state.player.maxHp));
+  ctx.save();
+  ctx.fillStyle = "rgba(7, 10, 14, 0.88)";
+  roundedRect(x, y, width, 18, 3);
+  ctx.fill();
+  const gradient = ctx.createLinearGradient(x, y, x + width, y);
+  gradient.addColorStop(0, "#c9dde7");
+  gradient.addColorStop(0.52, "#eef6f9");
+  gradient.addColorStop(1, "#93aab5");
+  ctx.fillStyle = gradient;
+  roundedRect(x + 2, y + 2, Math.max(0, (width - 4) * ratio), 14, 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.strokeRect(x + 0.5, y + 0.5, width - 1, 17);
+  drawBarText(x, y, width, 18, `${state.player.hp}/${state.player.maxHp}`);
+  ctx.restore();
+}
+
+function drawPlayerActionCells(x, y, width) {
+  const cells = state.player.maxAction;
+  const gap = 3;
+  const cellW = (width - gap * (cells - 1)) / cells;
+  ctx.save();
+  for (let i = 0; i < cells; i += 1) {
+    const cx = x + i * (cellW + gap);
+    const filled = i < state.player.action;
+    ctx.fillStyle = filled ? "#2f8fff" : "rgba(18, 28, 40, 0.82)";
+    roundedRect(cx, y, cellW, 13, 2);
+    ctx.fill();
+    if (filled) {
+      ctx.fillStyle = "rgba(164, 218, 255, 0.55)";
+      roundedRect(cx + 1, y + 1, cellW - 2, 3, 1);
+      ctx.fill();
+    }
+    ctx.strokeStyle = filled ? "rgba(180, 224, 255, 0.62)" : "rgba(90, 119, 142, 0.44)";
+    ctx.strokeRect(cx + 0.5, y + 0.5, cellW - 1, 12);
+  }
+  ctx.fillStyle = "#d9f0ff";
+  ctx.font = "900 11px Microsoft YaHei, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(`${state.player.action}`, x - 14, y + 7);
   ctx.restore();
 }
 
@@ -1868,6 +2200,21 @@ function drawHealthBar(x, y, w, ratio, color, h = 7) {
   ctx.fillRect(x, y, w * Math.max(0, Math.min(1, ratio)), h);
   ctx.strokeStyle = "rgba(255,255,255,0.55)";
   ctx.strokeRect(x, y, w, h);
+}
+
+function roundedRect(x, y, w, h, r) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
 }
 
 function drawBarText(x, y, w, h, text) {
