@@ -1,6 +1,6 @@
 ﻿const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
-const DEMO_VERSION = "2026.06.18-quiver-buffs-pierce";
+const DEMO_VERSION = "2026.06.18-rock-throw-unavoidable";
 const DEFAULT_MELEE_CINEMATIC_DURATION = 0.82;
 const NORMAL_ATTACK_DAMAGE = 22;
 const GOURD_HEAL_CHANCE = 0.5;
@@ -479,8 +479,8 @@ function createState() {
       hp: 220,
       maxHp: 220,
       soul: 0,
-      ammo: 3,
-      maxAmmo: 3,
+      ammo: 10,
+      maxAmmo: 10,
       action: 4,
       maxAction: 7,
       gourdUses: 0,
@@ -495,6 +495,7 @@ function createState() {
       attackIndex: 0,
       pendingAttack: null,
       extraDamage: 0,
+      aoeHpCompensation: 0,
       parts,
     },
     activeSkill: null,
@@ -807,8 +808,51 @@ function createSkillButton(skill, compact) {
   button.addEventListener("pointerleave", () => clearHoveredTargetParts());
   button.addEventListener("focus", () => setHoveredTargetParts(skill.targetParts));
   button.addEventListener("blur", () => clearHoveredTargetParts());
+  button.querySelectorAll("[data-skill-tag]").forEach((tagButton) => {
+    tagButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      showSkillTagBubble(tagButton, skill, tagButton.dataset.skillTag);
+    });
+  });
   button.addEventListener("click", () => useSkill(skill.id));
   return button;
+}
+
+function showSkillTagBubble(anchor, skill, tag) {
+  let bubble = document.getElementById("skillTagBubble");
+  if (!bubble) {
+    bubble = document.createElement("aside");
+    bubble.id = "skillTagBubble";
+    bubble.className = "skill-tag-bubble";
+    document.querySelector(".battle-frame")?.appendChild(bubble);
+  }
+  const copy = tag === "连击" && skill.comboChance
+    ? `连击率增加 ${Math.round(skill.comboChance * 100)}%，技能命中后有概率追加一次普通攻击。`
+    : `${tag}效果已生效。`;
+  bubble.innerHTML = `<strong>${tag}</strong><span>${copy}</span>`;
+  positionSkillTagBubble(bubble, anchor);
+  bubble.classList.add("active");
+  window.clearTimeout(bubble._hideTimer);
+  bubble._hideTimer = window.setTimeout(() => bubble.classList.remove("active"), 2200);
+}
+
+function hideSkillTagBubble() {
+  const bubble = document.getElementById("skillTagBubble");
+  if (!bubble) return;
+  window.clearTimeout(bubble._hideTimer);
+  bubble.classList.remove("active");
+}
+
+function positionSkillTagBubble(bubble, anchor) {
+  const frame = document.querySelector(".battle-frame");
+  if (!frame || !anchor) return;
+  const frameRect = frame.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+  const width = 230;
+  const left = Math.min(frameRect.width - width - 12, Math.max(12, anchorRect.left - frameRect.left + anchorRect.width / 2 - width / 2));
+  const top = Math.max(12, anchorRect.top - frameRect.top - 68);
+  bubble.style.left = `${left}px`;
+  bubble.style.top = `${top}px`;
 }
 
 function showSoulArmorTargetSelection(skill, dots) {
@@ -872,7 +916,6 @@ function skillSummaryText(skill) {
   if (skill.maxDots) pieces[0] = `每档伤害 ${skill.damage}`;
   const armorDamage = effectiveArmorDamage(skill);
   if (skill.armorBreaker && armorDamage > 0) pieces.push(`破甲 ${armorDamage}`);
-  if (skill.comboChance) pieces.push(`连击率 ${Math.round(skill.comboChance * 100)}%`);
   if (skill.ammoCost) pieces.push(`弹药 ${skill.ammoCost}`);
   return `（${pieces.join(" / ")}）`;
 }
@@ -880,12 +923,17 @@ function skillSummaryText(skill) {
 function renderSkillTags(skill) {
   const tags = [];
   if (skill.armorBreaker) tags.push("破甲");
-  if (hasQuiverPierceBuff(skill)) tags.push("箭袋破甲");
   if (skill.comboChance) tags.push("连击");
   if (!tags.length) return "";
   return `<span class="skill-tags skill-tags-visible">${tags
-    .map((tag) => `<span class="skill-tag" style="--skill-color:${skill.color}">${tag}</span>`)
+    .map((tag) => `<button class="skill-tag ${skillTagClass(tag)}" type="button" data-skill-tag="${tag}">${tag}</button>`)
     .join("")}</span>`;
+}
+
+function skillTagClass(tag) {
+  if (tag === "连击") return "skill-tag-combo";
+  if (tag.includes("破甲")) return "skill-tag-break";
+  return "skill-tag-generic";
 }
 
 function hasQuiverPierceBuff(skill) {
@@ -989,7 +1037,7 @@ function livingParts() {
 
 function totalEnemyHp() {
   const partHp = state.enemy.parts.reduce((sum, part) => sum + Math.max(0, part.hp), 0);
-  return Math.max(0, partHp - (state.enemy.extraDamage || 0));
+  return Math.max(0, partHp - (state.enemy.extraDamage || 0) + (state.enemy.aoeHpCompensation || 0));
 }
 
 function canUseSkill(skill) {
@@ -1066,8 +1114,14 @@ function activateGreatswordCounterStance(skill) {
   state.player.nextDamageBonus = Math.max(state.player.nextDamageBonus || 0, 0.2);
   state.activeTarget = "core";
   state.actionAnimTimer = 0.45;
+  state.skillCinematic = {
+    skill,
+    stage: "greatsword_stance",
+    elapsed: 0,
+    duration: 0.86,
+    settled: false,
+  };
   log(`${skill.name}：进入大剑防守蓄势。受到怪物攻击后有 70% 概率反击，下次出手伤害提高 20%。`);
-  endPlayerTurn();
 }
 
 function startCinematicSkillVideo(skill, targets) {
@@ -1093,15 +1147,10 @@ function settlePlayerSkill(skill, targets, context = {}) {
     log(`蓄势兑现：${skill.name} 伤害提高 ${Math.round((nextDamageMultiplier - 1) * 100)}%。`);
     state.player.nextDamageBonus = 0;
   }
+  normalizeAoeBossHpDamage(skill, summary);
   const interruptedAttack = checkPendingAttackInterrupt(targets);
-  const comboResult = resolveComboFollowUp(skill, targets);
   updateStage();
   logSkillSummary(skill, summary);
-  if (comboResult?.triggered) {
-    log(`连击触发：${skill.name}追加一次普通攻击，造成 ${comboResult.damage} 点伤害。`);
-  } else if (comboResult) {
-    log(`连击未触发：${skill.name}本次没有追加普通攻击。`);
-  }
   if (interruptedAttack) {
     log(`打断成功：${interruptedAttack.label} 被手部攻击中断。`);
     showWeakpointTip("手部被击中，巨石投掷已被打断。", 1.8);
@@ -1113,19 +1162,58 @@ function settlePlayerSkill(skill, targets, context = {}) {
     state.turn = "ended";
     log("Boss 被击败，战斗胜利。");
   } else {
+    const comboRoll = rollComboFollowUp(skill, targets);
+    if (comboRoll?.triggered) {
+      startComboFollowUpFlow(skill, comboRoll.target);
+      updateUi();
+      return;
+    }
+    if (comboRoll) {
+      log(`连击未触发：${skill.name}本次没有追加普通攻击。`);
+    }
     endPlayerTurn();
   }
 
   updateUi();
 }
 
-function resolveComboFollowUp(skill, targets) {
+function normalizeAoeBossHpDamage(skill, summary) {
+  if (skill.kind !== "aoe" || summary.length <= 1) return;
+  const hpImpacts = summary.map((result) => Math.max(0, (result.damage || 0) + (result.globalChipDamage || 0)));
+  const totalImpact = hpImpacts.reduce((sum, value) => sum + value, 0);
+  const allowedImpact = Math.round(totalImpact / hpImpacts.length);
+  const compensation = Math.max(0, totalImpact - allowedImpact);
+  if (compensation <= 0) return;
+  state.enemy.aoeHpCompensation = (state.enemy.aoeHpCompensation || 0) + compensation;
+  state.enemy.hp = totalEnemyHp();
+  log(`AOE结算：${skill.name} 对Boss总血量计入 ${allowedImpact} 点平均伤害，其余用于部位压制。`);
+}
+
+function rollComboFollowUp(skill, targets) {
   if (!skill.comboChance || !targets.length || state.enemy.hp <= 0) return null;
   const target = targets[0];
   if (!target) return null;
   if (Math.random() > skill.comboChance) {
     return { triggered: false, damage: 0 };
   }
+  return { triggered: true, target };
+}
+
+function startComboFollowUpFlow(skill, target) {
+  state.skillCinematic = {
+    skill,
+    target,
+    targets: [target],
+    stage: "combo_followup",
+    elapsed: 0,
+    duration: 0.72,
+    settled: false,
+  };
+  state.phase = "连击追打";
+  log(`连击触发：${skill.name}追加一次普通攻击。`);
+}
+
+function applyComboFollowUpDamage(skill, target) {
   const comboSkill = { name: "连击追打", color: skill.color };
   const baseDamage = skill.comboDamage || NORMAL_ATTACK_DAMAGE;
   let damage = baseDamage;
@@ -1143,7 +1231,9 @@ function resolveComboFollowUp(skill, targets) {
   if (!target.broken && target.hp <= 0) {
     breakPart(target);
   }
-  return { triggered: true, damage, target };
+  updateStage();
+  log(`连击追打：造成 ${damage} 点普通攻击伤害。`);
+  return { damage, target };
 }
 
 function checkPendingAttackInterrupt(targets) {
@@ -1208,11 +1298,24 @@ function startDefaultMeleeSkillFlow(skill, targets) {
 
 function updateDefaultMeleeSkillFlow(delta) {
   const cinematic = state?.skillCinematic;
-  if (!cinematic || cinematic.stage !== "default_melee") return;
+  if (!cinematic || !["default_melee", "combo_followup"].includes(cinematic.stage)) return;
   cinematic.elapsed += delta;
   if (cinematic.elapsed < cinematic.duration || cinematic.settled) return;
   cinematic.settled = true;
   state.skillCinematic = null;
+  if (cinematic.stage === "combo_followup") {
+    applyComboFollowUpDamage(cinematic.skill, cinematic.target);
+    if (state.enemy.hp <= 0) {
+      state.result = "victory";
+      state.phase = "胜利";
+      state.turn = "ended";
+      log("Boss 被连击追打击败，战斗胜利。");
+    } else {
+      endPlayerTurn();
+    }
+    updateUi();
+    return;
+  }
   settlePlayerSkill(cinematic.skill, cinematic.targets);
 }
 
@@ -1409,6 +1512,7 @@ function breakPart(target) {
   state.player.soul = Math.min(100, state.player.soul + 18);
   state.enemy.hp = totalEnemyHp();
   log(`部位破坏：${target.label}。效果：${target.effect}。`);
+  showWeakpointTip(`太好了，${target.label}部位已破坏`, 2.2);
 }
 
 function updateStage() {
@@ -1437,10 +1541,9 @@ function endEnemyTurn() {
   state.reactionTimer = 0;
   state.activeSkill = null;
   state.activeTarget = null;
-  state.player.ammo = Math.min(state.player.maxAmmo, state.player.ammo + 1);
   state.player.action = Math.min(state.player.maxAction, state.player.action + 2);
   ui.reactionPanel.classList.add("hidden");
-  log(`第 ${state.round} 回合：弹药恢复 1，行动力恢复 2。`);
+  log(`第 ${state.round} 回合：行动力恢复 2。`);
   beginPlayerTurn();
 }
 
@@ -1595,6 +1698,7 @@ function releaseDelayedEnemyAttack(attack) {
 
   state.enemy.intent = attack;
   state.phase = "敌方释放";
+  state.qte = { active: false, locked: true, reason: "unavoidable" };
   log(`Boss 释放：${attack.label}。该攻击无法闪避或格挡。`);
   playCinematicVideo(attack.releaseVideo, false, () => {
     finishDelayedEnemyAttack(attack);
@@ -1602,7 +1706,7 @@ function releaseDelayedEnemyAttack(attack) {
   updateUi();
 }
 
-function applyPlayerDamage(attack, damage) {
+function applyPlayerDamage(attack, damage, options = {}) {
   if (damage <= 0) return;
   state.player.hp = Math.max(0, state.player.hp - damage);
   state.playerHitFlashTimer = 0.42;
@@ -1613,7 +1717,9 @@ function applyPlayerDamage(attack, damage) {
     life: 1.25,
   });
   log(`受到${attack.label}攻击，损失${damage}点血量。`);
-  resolveGreatswordCounterAfterHit(attack);
+  if (options.allowCounter !== false) {
+    resolveGreatswordCounterAfterHit(attack);
+  }
 }
 
 function resolveGreatswordCounterAfterHit(attack) {
@@ -1652,7 +1758,8 @@ function applyGuardCounterDamage(attack, damage = 10, counterName = "格挡反�
 function finishDelayedEnemyAttack(attack) {
   hideVideoOverlay();
   const damage = attack.damageOnRelease;
-  applyPlayerDamage(attack, damage);
+  state.qte = null;
+  applyPlayerDamage(attack, damage, { allowCounter: false });
   state.enemy.pendingAttack = null;
   state.enemy.intent = null;
   advanceEnemyAttack();
@@ -1671,6 +1778,10 @@ function finishDelayedEnemyAttack(attack) {
 
 function react(type) {
   if (!state.enemy.intent || state.turn !== "enemy" || state.result) return;
+  if (state.qte?.locked || state.enemy.intent.type === "delayed_unblockable") {
+    log(`${state.enemy.intent.label}无法通过${reactionLabel(type)}规避。`);
+    return;
+  }
   if (state.qte && state.qte.active) {
     const success = state.qte.validResponses.includes(type);
     if (state.videoAttack) {
@@ -1813,6 +1924,13 @@ function resolveVideoQte(result, responseType = null) {
   playVideo(success ? attack.successVideo : attack.failVideo, () => finishVideoEnemyAttack(success));
 }
 
+function reactionLabel(type) {
+  if (type === "left") return "左闪";
+  if (type === "right") return "右闪";
+  if (type === "block") return "格挡";
+  return "反应";
+}
+
 function finishVideoEnemyAttack(success) {
   if (!state.videoAttack) return;
   const attack = state.videoAttack.attack;
@@ -1917,6 +2035,7 @@ function update(delta) {
   }
   state.actionAnimTimer = Math.max(0, state.actionAnimTimer - delta);
   state.playerHitFlashTimer = Math.max(0, state.playerHitFlashTimer - delta);
+  updateGreatswordStanceFlow(delta);
   updateDefaultMeleeSkillFlow(delta);
   floaters = floaters
     .map((floater) => ({ ...floater, y: floater.y - 36 * delta, life: floater.life - delta }))
@@ -1935,11 +2054,22 @@ function update(delta) {
   }
 }
 
+function updateGreatswordStanceFlow(delta) {
+  const cinematic = state?.skillCinematic;
+  if (!cinematic || cinematic.stage !== "greatsword_stance") return;
+  cinematic.elapsed += delta;
+  if (cinematic.elapsed < cinematic.duration || cinematic.settled) return;
+  cinematic.settled = true;
+  state.skillCinematic = null;
+  endPlayerTurn();
+}
+
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawBackground();
   drawCombatants();
   drawWeakpointEffects();
+  drawGreatswordStanceEffects();
   drawDefaultMeleeCinematicEffects();
   drawFloaters();
   drawThreatOverlay();
@@ -2004,6 +2134,49 @@ function drawPlayerGourd(player) {
   ctx.translate(x, y);
   ctx.rotate(-0.12);
   ctx.drawImage(sprites.loadoutGourd, -size / 2, -size / 2, size, size);
+  ctx.restore();
+}
+
+function drawGreatswordStanceEffects() {
+  const cinematic = state?.skillCinematic;
+  if (!cinematic || cinematic.stage !== "greatsword_stance") return;
+  const progress = Math.max(0, Math.min(1, cinematic.elapsed / cinematic.duration));
+  const pulse = 0.55 + 0.45 * Math.sin(state.time * 34);
+  const x = 365 + Math.sin(state.time * 92) * (2 + pulse * 3);
+  const footY = 738;
+  const bodyY = footY - 230;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const aura = ctx.createRadialGradient(x, bodyY, 10, x, bodyY, 190 + pulse * 28);
+  aura.addColorStop(0, `rgba(255, 230, 190, ${0.25 + pulse * 0.2})`);
+  aura.addColorStop(0.28, `rgba(255, 46, 28, ${0.3 + pulse * 0.22})`);
+  aura.addColorStop(1, "rgba(255, 0, 0, 0)");
+  ctx.fillStyle = aura;
+  ctx.beginPath();
+  ctx.ellipse(x, bodyY, 126 + pulse * 18, 188 + pulse * 22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(255, 68, 42, ${0.55 + pulse * 0.28})`;
+  ctx.lineWidth = 4 + pulse * 3;
+  ctx.beginPath();
+  ctx.ellipse(x, footY - 18, 84 + progress * 26, 22 + pulse * 5, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  for (let i = 0; i < 9; i += 1) {
+    const angle = state.time * 5 + i * 0.7;
+    const px = x + Math.cos(angle) * (48 + i * 7);
+    const py = bodyY + Math.sin(angle * 1.4) * 90;
+    ctx.fillStyle = `rgba(255, ${90 + i * 8}, 42, ${0.32 + pulse * 0.24})`;
+    ctx.beginPath();
+    ctx.arc(px, py, 3 + pulse * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.font = "900 22px Microsoft YaHei, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "rgba(32, 0, 0, 0.88)";
+  ctx.fillStyle = "#ffcf8a";
+  ctx.strokeText("蓄势", x, bodyY - 178);
+  ctx.fillText("蓄势", x, bodyY - 178);
   ctx.restore();
 }
 
@@ -2231,22 +2404,23 @@ function hexToRgb(hex) {
 
 function currentDefaultMeleeCinematic() {
   const cinematic = state?.skillCinematic;
-  if (!cinematic || cinematic.stage !== "default_melee") return null;
+  if (!cinematic || !["default_melee", "combo_followup"].includes(cinematic.stage)) return null;
   const progress = Math.max(0, Math.min(1, cinematic.elapsed / cinematic.duration));
   return { ...cinematic, progress };
 }
 
 function meleePlayerPose(meleeFx) {
   const progress = meleeFx.progress;
-  const arrive = easeOutCubic(Math.min(1, progress / 0.22));
-  const exit = progress > 0.72 ? easeInOutCubic((progress - 0.72) / 0.28) : 0;
-  const nearX = meleeFx.skill.weaponId === "greatsword" ? 760 : 782;
-  const nearFootY = meleeFx.skill.weaponId === "greatsword" ? 642 : 630;
-  const nearHeight = meleeFx.skill.weaponId === "greatsword" ? 340 : 315;
+  const isCombo = meleeFx.stage === "combo_followup";
+  const arrive = easeOutCubic(Math.min(1, progress / (isCombo ? 0.16 : 0.22)));
+  const exit = progress > (isCombo ? 0.68 : 0.72) ? easeInOutCubic((progress - (isCombo ? 0.68 : 0.72)) / (isCombo ? 0.32 : 0.28)) : 0;
+  const nearX = isCombo ? 812 : meleeFx.skill.weaponId === "greatsword" ? 760 : 782;
+  const nearFootY = isCombo ? 622 : meleeFx.skill.weaponId === "greatsword" ? 642 : 630;
+  const nearHeight = isCombo ? 302 : meleeFx.skill.weaponId === "greatsword" ? 340 : 315;
   const home = { x: 365, footY: 738, height: 455 };
-  const attackLean = Math.sin(Math.min(1, progress / 0.65) * Math.PI) * 18;
+  const attackLean = Math.sin(Math.min(1, progress / (isCombo ? 0.5 : 0.65)) * Math.PI) * (isCombo ? 28 : 18);
   return {
-    x: lerp(home.x, nearX + attackLean, arrive) + exit * 44,
+    x: lerp(home.x, nearX + attackLean, arrive) + exit * (isCombo ? 70 : 44),
     footY: lerp(home.footY, nearFootY, arrive),
     height: lerp(home.height, nearHeight, arrive),
   };
@@ -2269,10 +2443,13 @@ function drawDefaultMeleeCinematicEffects() {
   const meleeFx = currentDefaultMeleeCinematic();
   if (!meleeFx) return;
   const targets = meleeFx.targets?.length ? meleeFx.targets : [partById("core")].filter(Boolean);
-  const hitTimings = meleeFx.skill.kind === "aoe" ? [0.34, 0.49, 0.64] : [0.43, 0.58];
+  const hitTimings = meleeFx.stage === "combo_followup" ? [0.4, 0.55] : meleeFx.skill.kind === "aoe" ? [0.34, 0.49, 0.64] : [0.43, 0.58];
   const color = meleeFx.skill.color || "#f0b84f";
   targets.forEach((target, targetIndex) => {
     const pos = partPosition(target.id);
+    if (meleeFx.stage === "combo_followup" && targetIndex === 0) {
+      drawComboFollowupMark(pos, meleeFx.progress, color);
+    }
     hitTimings.forEach((hitTime, hitIndex) => {
       const offsetTime = hitTime + targetIndex * 0.045;
       const intensity = hitPulse(meleeFx.progress, offsetTime, 0.09);
@@ -2281,6 +2458,33 @@ function drawDefaultMeleeCinematicEffects() {
       drawSlashFlash(pos, intensity, color, hitIndex);
     });
   });
+}
+
+function drawComboFollowupMark(pos, progress, color) {
+  const appear = easeOutCubic(Math.min(1, progress / 0.18));
+  const fade = progress > 0.72 ? 1 - easeOutCubic((progress - 0.72) / 0.28) : 1;
+  const pulse = Math.max(hitPulse(progress, 0.4, 0.16), hitPulse(progress, 0.55, 0.16));
+  const alpha = Math.max(0, appear * fade);
+  if (alpha <= 0.01) return;
+  ctx.save();
+  ctx.translate(pos.x, pos.y - 112 - pulse * 16);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "rgba(8, 16, 14, 0.72)";
+  ctx.strokeStyle = hexToRgba(color, 0.9);
+  ctx.lineWidth = 2;
+  roundedRect(-66, -19, 132, 38, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.font = "900 20px Microsoft YaHei, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "rgba(0, 20, 8, 0.85)";
+  ctx.fillStyle = "#d8ffe6";
+  ctx.strokeText("连击追打", 0, 1);
+  ctx.fillText("连击追打", 0, 1);
+  ctx.restore();
 }
 
 function drawBossHitCard(pos, intensity, color, index) {
@@ -2367,12 +2571,14 @@ function drawPlayerHud(x, y) {
   const avatarSize = 42;
   const barX = panelX + avatarSize + 8;
   const barW = 156;
+  const showAmmo = state.selectedWeaponId === "bow";
   ctx.fillStyle = "rgba(3, 5, 8, 0.54)";
-  roundedRect(panelX - 8, panelY - 8, 224, 66, 8);
+  roundedRect(panelX - 8, panelY - 8, 224, showAmmo ? 82 : 66, 8);
   ctx.fill();
   drawHudAvatar(panelX, panelY, avatarSize);
   drawPlayerHpStrip(barX, panelY + 3, barW);
   drawPlayerActionCells(barX, panelY + 28, barW);
+  if (showAmmo) drawPlayerAmmoStrip(barX, panelY + 47, barW);
   ctx.restore();
 }
 
@@ -2432,6 +2638,29 @@ function drawPlayerActionCells(x, y, width) {
     ctx.strokeRect(cx + 0.5, y + 0.5, cellW - 1, 12);
   }
   drawBarText(x, y, width, 13, `${state.player.action}/${state.player.maxAction}`);
+  ctx.restore();
+}
+
+function drawPlayerAmmoStrip(x, y, width) {
+  const cells = state.player.maxAmmo;
+  const gap = 4;
+  const cellW = (width - gap * (cells - 1)) / cells;
+  ctx.save();
+  for (let i = 0; i < cells; i += 1) {
+    const cx = x + i * (cellW + gap);
+    const filled = i < state.player.ammo;
+    ctx.fillStyle = filled ? "#d7a94d" : "rgba(45, 32, 16, 0.82)";
+    roundedRect(cx, y, cellW, 12, 2);
+    ctx.fill();
+    if (filled) {
+      ctx.fillStyle = "rgba(255, 232, 165, 0.55)";
+      roundedRect(cx + 1, y + 1, cellW - 2, 3, 1);
+      ctx.fill();
+    }
+    ctx.strokeStyle = filled ? "rgba(255, 222, 140, 0.7)" : "rgba(148, 112, 58, 0.44)";
+    ctx.strokeRect(cx + 0.5, y + 0.5, cellW - 1, 11);
+  }
+  drawBarText(x, y, width, 12, `弹药 ${state.player.ammo}/${state.player.maxAmmo}`);
   ctx.restore();
 }
 
@@ -2822,6 +3051,10 @@ function loop(now) {
 ui.resetBtn.addEventListener("click", resetGame);
 document.getElementById("enterBattleBtn")?.addEventListener("click", enterBattleFromLoadout);
 ui.weaponToggle.addEventListener("click", toggleWeaponOverlay);
+document.addEventListener("click", (event) => {
+  if (event.target.closest?.("[data-skill-tag]") || event.target.closest?.("#skillTagBubble")) return;
+  hideSkillTagBubble();
+});
 ui.soulArmorButton.addEventListener("pointerdown", startSoulArmorHold);
 ui.soulArmorButton.addEventListener("pointerup", releaseSoulArmorHold);
 ui.soulArmorButton.addEventListener("pointerleave", cancelSoulArmorHold);
