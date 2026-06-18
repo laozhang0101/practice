@@ -1,7 +1,8 @@
 ﻿const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
-const DEMO_VERSION = "2026.06.18-boss-part-aligned";
+const DEMO_VERSION = "2026.06.18-quiver-buffs-pierce";
 const DEFAULT_MELEE_CINEMATIC_DURATION = 0.82;
+const NORMAL_ATTACK_DAMAGE = 22;
 const GOURD_HEAL_CHANCE = 0.5;
 const GOURD_HEAL_AMOUNT = 10;
 const GOURD_MAX_USES = 3;
@@ -118,10 +119,10 @@ const skills = [
     kind: "single",
     kindLabel: "单体",
     armorBreaker: true,
-    damage: 24,
-    armorDamage: 55,
+    damage: 68,
+    armorDamage: 86,
     exposedBonus: 1.18,
-    actionCost: 0,
+    actionCost: 3,
     soulGain: 13,
     color: "#f0b84f",
     desc: "重型破甲，优先剥离手部硬甲。",
@@ -135,10 +136,10 @@ const skills = [
     kind: "single",
     kindLabel: "单体",
     armorBreaker: true,
-    damage: 42,
-    armorDamage: 78,
+    damage: 74,
+    armorDamage: 96,
     exposedBonus: 1.2,
-    actionCost: 1,
+    actionCost: 3,
     soulGain: 13,
     color: "#f0b84f",
     desc: "重型破甲，打开脚部硬甲。",
@@ -146,19 +147,21 @@ const skills = [
   {
     id: "gs_sweep",
     weaponId: "greatsword",
-    name: "横扫碎甲",
-    targetParts: ["core", "arms", "legs"],
-    targetLabel: "胸部+手部+脚部",
-    kind: "aoe",
-    kindLabel: "AOE",
-    armorBreaker: true,
-    damage: 30,
-    armorDamage: 52,
-    exposedBonus: 1.05,
-    actionCost: 3,
-    soulGain: 16,
+    name: "蓄势",
+    targetParts: ["core"],
+    targetLabel: "胸部",
+    kind: "stance",
+    kindLabel: "蓄势",
+    armorBreaker: false,
+    damage: 0,
+    armorDamage: 0,
+    exposedBonus: 1,
+    actionCost: 0,
+    soulGain: 8,
     color: "#f0b84f",
-    desc: "范围破甲，同时压制胸部、手部和脚部。",
+    stance: "greatsword_counter",
+    summaryOverride: "反击率 70% / 下次伤害 +20%",
+    desc: "默认瞄准躯干蓄势，受击后有概率反击。",
   },
   {
     id: "fist_arm_rush",
@@ -169,18 +172,20 @@ const skills = [
     kind: "single",
     kindLabel: "单体",
     armorBreaker: false,
-    damage: 42,
+    damage: 24,
     armorDamage: 8,
     exposedBonus: 1.65,
     actionCost: 0,
     soulGain: 15,
     color: "#76d17b",
+    comboChance: 0.5,
+    comboDamage: NORMAL_ATTACK_DAMAGE,
     desc: "近战爆发，直击胸口核心弱点。",
     accessoryFlow: {
       introVideo: "./assets/videos/fist-skill-1-attack-web.mp4",
       selectLoopVideo: "./assets/videos/accessory-select-loop-web.mp4",
       effects: {
-        jet: { label: "喷气挂件", video: "./assets/videos/jet-accessory-effect-web.mp4", damageMultiplier: 1.35 },
+        jet: { label: "喷气挂件", video: "./assets/videos/jet-accessory-effect-web.mp4", damageMultiplier: 1.5 },
         drone: { label: "无人机挂件", video: "./assets/videos/drone-accessory-effect-web.mp4", damageMultiplier: 1.18 },
       },
     },
@@ -194,13 +199,16 @@ const skills = [
     kind: "single",
     kindLabel: "单体",
     armorBreaker: false,
-    damage: 62,
+    damage: 44,
     armorDamage: 8,
     exposedBonus: 1.6,
     actionCost: 1,
     soulGain: 14,
     color: "#76d17b",
+    comboChance: 0.5,
+    comboDamage: NORMAL_ATTACK_DAMAGE,
     desc: "打裸露脚部收益高，硬甲状态收益低。",
+    cinematicVideo: "./assets/videos/fist-leg-drive.mp4",
   },
   {
     id: "fist_flurry",
@@ -211,7 +219,7 @@ const skills = [
     kind: "aoe",
     kindLabel: "AOE",
     armorBreaker: false,
-    damage: 46,
+    damage: 56,
     armorDamage: 6,
     exposedBonus: 1.35,
     actionCost: 3,
@@ -228,7 +236,7 @@ const skills = [
     kind: "single",
     kindLabel: "单体",
     armorBreaker: false,
-    damage: 92,
+    damage: 76,
     armorDamage: 0,
     exposedBonus: 1.55,
     actionCost: 2,
@@ -246,7 +254,7 @@ const skills = [
     kind: "single",
     kindLabel: "单体",
     armorBreaker: true,
-    damage: 34,
+    damage: 38,
     armorDamage: 68,
     exposedBonus: 1.28,
     actionCost: 1,
@@ -259,19 +267,19 @@ const skills = [
     id: "bow_volley",
     weaponId: "bow",
     name: "压制箭雨",
-    targetParts: ["core", "arms", "legs"],
-    targetLabel: "胸部+手部+脚部",
-    kind: "aoe",
-    kindLabel: "AOE",
+    targetParts: ["legs"],
+    targetLabel: "脚部",
+    kind: "single",
+    kindLabel: "单体",
     armorBreaker: false,
-    damage: 52,
+    damage: 84,
     armorDamage: 0,
     exposedBonus: 1.25,
     actionCost: 3,
     ammoCost: 2,
     soulGain: 13,
     color: "#58b7ff",
-    desc: "远程 AOE，同时压制胸部、手部和脚部。",
+    desc: "远程压制，将箭雨集中倾泻到脚部。",
   },
 ];
 
@@ -358,12 +366,62 @@ const attachmentOptions = [
   { name: "修罗下装", icon: "♟", trait: "腿部基础装饰", category: "base", parts: ["pants"], image: "./assets/loadout-shura-pants.jpeg" },
   { name: "修罗护腕", icon: "◒", trait: "护腕基础装饰", category: "base", parts: ["bracer"], image: "./assets/loadout-shura-bracer.jpeg" },
   { name: "修罗鞋子", icon: "♞", trait: "鞋子基础装饰", category: "base", parts: ["shoes"], image: "./assets/loadout-shura-shoes.jpeg" },
-  { name: "无人机", icon: "◉", trait: "后背挂件，远程协同", category: "drone", slots: ["后背"], image: "./assets/loadout-drone.png" },
-  { name: "喷气式装置", icon: "✦", trait: "肩膀挂件，跃升爆发", category: "jet", slots: ["肩膀"], image: "./assets/loadout-jet.png" },
-  { name: "酒葫芦", icon: "葫", trait: "前腰固定挂件，回合开始概率饮酒回血", category: "gourd", slots: ["前腰"], image: "./assets/loadout-gourd.jpeg" },
-  { name: "森然骨刺", icon: "◆", trait: "攻击型装饰", category: "ornament" },
-  { name: "冰魄残片", icon: "◇", trait: "防护型装饰", category: "ornament" },
-  { name: "戒律圆徽", icon: "✚", trait: "战术型装饰", category: "ornament" },
+  {
+    name: "无人机",
+    icon: "◉",
+    trait: "上臂挂件，远程协同",
+    category: "drone",
+    slots: ["上臂"],
+    image: "./assets/loadout-drone.png",
+    tacticalInfo: {
+      title: "无人机",
+      role: "远程协同攻击",
+      trigger: "使用拳套攻击怪物躯干时，有概率触发。",
+      effect: "无人机会从角色身后展开火力，对当前躯干目标追加协同攻击。",
+    },
+  },
+  {
+    name: "箭袋",
+    icon: "箭",
+    trait: "后背挂件，强化穿臂箭破甲",
+    category: "quiver",
+    slots: ["后背"],
+    image: "./assets/loadout-quiver.jpeg",
+    tacticalInfo: {
+      title: "箭袋",
+      role: "弓弩破甲强化",
+      trigger: "装备在后背时生效。",
+      effect: "使原有穿臂箭获得箭袋破甲效果，更容易击穿怪物手部硬甲。",
+    },
+  },
+  {
+    name: "喷气式装置",
+    icon: "✦",
+    trait: "肩膀挂件，跃升爆发",
+    category: "jet",
+    slots: ["肩膀"],
+    image: "./assets/loadout-jet.png",
+    tacticalInfo: {
+      title: "喷气式装置",
+      role: "力量增幅",
+      trigger: "释放近战攻击时可作为挂件效果介入。",
+      effect: "增强手部力量，使本次攻击伤害增加 50%。",
+    },
+  },
+  {
+    name: "酒葫芦",
+    icon: "葫",
+    trait: "前腰固定挂件，回合开始概率饮酒回血",
+    category: "gourd",
+    slots: ["前腰"],
+    image: "./assets/loadout-gourd.jpeg",
+    tacticalInfo: {
+      title: "酒葫芦",
+      role: "回合恢复",
+      trigger: "每回合开始时自动判定。",
+      effect: "有 50% 概率饮酒恢复 10 点血量，最多饮用 3 次。",
+    },
+  },
 ];
 
 const loadoutFocusMap = {
@@ -394,9 +452,11 @@ function initializeDefaultLoadout() {
     }
   });
   const drone = attachmentOptions.find((option) => option.name === "无人机");
+  const quiver = attachmentOptions.find((option) => option.name === "箭袋");
   const jet = attachmentOptions.find((option) => option.name === "喷气式装置");
   const gourd = attachmentOptions.find((option) => option.name === "酒葫芦");
-  if (drone) loadoutState.equipped["torso:后背"] = drone;
+  if (drone) loadoutState.equipped["torso:上臂"] = drone;
+  if (quiver) loadoutState.equipped["torso:后背"] = quiver;
   if (jet) loadoutState.equipped["torso:肩膀"] = jet;
   if (gourd) loadoutState.equipped["pants:前腰"] = gourd;
 }
@@ -415,7 +475,18 @@ function createState() {
     turn: "player_start",
     round: 1,
     selectedWeaponId: "fists",
-    player: { hp: 220, maxHp: 220, soul: 0, ammo: 3, maxAmmo: 3, action: 7, maxAction: 7, gourdUses: 0 },
+    player: {
+      hp: 220,
+      maxHp: 220,
+      soul: 0,
+      ammo: 3,
+      maxAmmo: 3,
+      action: 4,
+      maxAction: 7,
+      gourdUses: 0,
+      guardCounterChance: 0,
+      nextDamageBonus: 0,
+    },
     enemy: {
       hp: parts.reduce((sum, part) => sum + part.hp, 0),
       maxHp: parts.reduce((sum, part) => sum + part.maxHp, 0),
@@ -497,6 +568,7 @@ function renderPrebattleLoadout() {
     slotEl.type = "button";
     const isFixedGourdSlot = activePart.id === "pants" && slot === "前腰";
     slotEl.className = `attachment-slot${slot === loadoutState.activeSlot ? " active" : ""}${isFixedGourdSlot ? " fixed-gourd" : ""}`;
+    slotEl.dataset.slotKey = key;
     slotEl.innerHTML = `
       <span>${slot}</span>
       <span class="attachment-slot-box${equipped ? " equipped" : ""}">
@@ -507,6 +579,12 @@ function renderPrebattleLoadout() {
       loadoutState.activeSlot = slot;
       loadoutState.isFocusing = true;
       renderPrebattleLoadout();
+      const currentSlot = findLoadoutSlotButton(key);
+      if (equipped?.tacticalInfo) {
+        showLoadoutTacticalInfo(equipped, currentSlot);
+      } else {
+        hideLoadoutTacticalInfo();
+      }
     });
     slotsEl.appendChild(slotEl);
   });
@@ -520,6 +598,7 @@ function renderPrebattleLoadout() {
     const card = document.createElement("button");
     card.type = "button";
     card.className = `attachment-card${active ? " active" : ""}`;
+    card.dataset.itemName = item.name;
     card.innerHTML = `
       <span class="attachment-card-preview">${renderLoadoutItemPreview(item, item.icon)}</span>
       <span>${item.name}</span>
@@ -528,9 +607,84 @@ function renderPrebattleLoadout() {
     card.addEventListener("click", () => {
       loadoutState.equipped[key] = item;
       renderPrebattleLoadout();
+      if (item.tacticalInfo) {
+        showLoadoutTacticalInfo(item, findLoadoutSlotButton(key));
+      } else {
+        hideLoadoutTacticalInfo();
+      }
     });
     itemsEl.appendChild(card);
   });
+  if (!itemsEl.children.length) {
+    const empty = document.createElement("p");
+    empty.className = "attachment-empty";
+    empty.textContent = "该槽位暂无可装配挂件";
+    itemsEl.appendChild(empty);
+  }
+}
+
+function showLoadoutTacticalInfo(item, anchor) {
+  const info = item.tacticalInfo;
+  if (!info) return;
+  let panel = document.getElementById("loadoutTacticalInfo");
+  if (!panel) {
+    panel = document.createElement("aside");
+    panel.id = "loadoutTacticalInfo";
+    panel.className = "loadout-tactical-info";
+    panel.setAttribute("aria-live", "polite");
+    document.getElementById("prebattleScreen")?.appendChild(panel);
+  }
+  panel.innerHTML = `
+    <button class="loadout-tactical-close" type="button" aria-label="关闭">×</button>
+    <div class="loadout-tactical-head">
+      <span class="loadout-tactical-icon">${renderLoadoutItemPreview(item, item.icon)}</span>
+      <div>
+        <strong>${info.title}</strong>
+        <small>${info.role}</small>
+      </div>
+    </div>
+    <dl>
+      <div>
+        <dt>触发</dt>
+        <dd>${info.trigger}</dd>
+      </div>
+      <div>
+        <dt>效果</dt>
+        <dd>${info.effect}</dd>
+      </div>
+    </dl>
+  `;
+  panel.querySelector(".loadout-tactical-close")?.addEventListener("click", hideLoadoutTacticalInfo);
+  positionLoadoutTacticalInfo(panel, anchor);
+  panel.classList.add("active");
+}
+
+function hideLoadoutTacticalInfo() {
+  document.getElementById("loadoutTacticalInfo")?.classList.remove("active");
+}
+
+function positionLoadoutTacticalInfo(panel, anchor) {
+  const screen = document.getElementById("prebattleScreen");
+  if (!screen || !anchor) return;
+  const screenRect = screen.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+  const bubbleW = 300;
+  const bubbleH = 174;
+  const anchorCenter = anchorRect.left - screenRect.left + anchorRect.width / 2;
+  const left = Math.min(screenRect.width - bubbleW - 18, Math.max(18, anchorCenter - bubbleW / 2));
+  const canShowAbove = anchorRect.top - screenRect.top > bubbleH + 26;
+  const top = canShowAbove
+    ? anchorRect.top - screenRect.top - bubbleH - 14
+    : anchorRect.bottom - screenRect.top + 14;
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+  panel.style.setProperty("--bubble-arrow-left", `${Math.max(22, Math.min(bubbleW - 22, anchorCenter - left))}px`);
+  panel.classList.toggle("below", !canShowAbove);
+  panel.classList.toggle("above", canShowAbove);
+}
+
+function findLoadoutSlotButton(key) {
+  return [...document.querySelectorAll(".attachment-slot")].find((button) => button.dataset.slotKey === key) || null;
 }
 
 function renderLoadoutItemPreview(item, fallback) {
@@ -545,9 +699,7 @@ function getLoadoutOptions(activePart, slot) {
   if (activePart.id === "pants" && slot === "前腰") {
     return attachmentOptions.filter((item) => item.name === "酒葫芦");
   }
-  const exact = attachmentOptions.filter((item) => item.slots?.includes(slot));
-  const generic = attachmentOptions.filter((item) => item.category === "ornament");
-  return [...exact, ...generic];
+  return attachmentOptions.filter((item) => item.slots?.includes(slot));
 }
 
 function updateLoadoutFocus(activePart) {
@@ -581,7 +733,11 @@ function updatePlayerSpriteForWeapon() {
 function currentSkills() {
   return skills
     .filter((skill) => skill.weaponId === state.selectedWeaponId)
-    .sort((a, b) => (a.actionCost || 0) - (b.actionCost || 0));
+    .sort((a, b) => (a.actionCost || 0) - (b.actionCost || 0) || a.name.localeCompare(b.name, "zh-Hans-CN"));
+}
+
+function isLoadoutItemEquipped(itemName) {
+  return Object.values(loadoutState.equipped).some((item) => item?.name === itemName);
 }
 
 function buildWeaponControls() {
@@ -643,6 +799,7 @@ function createSkillButton(skill, compact) {
     <span class="part-badge${skill.targetParts.length > 1 ? " part-badge-ring" : ""}" style="--skill-color:${skill.color}">${renderPartIconGroup(skill.targetParts, "badge")}</span>
     <span class="skill-copy">
       <strong>${skill.name}</strong>
+      ${renderSkillTags(skill)}
       <small>${skill.desc} ${skillSummaryText(skill)}</small>
     </span>
   `;
@@ -710,11 +867,33 @@ function clearHoveredTargetParts() {
 }
 
 function skillSummaryText(skill) {
+  if (skill.summaryOverride) return `（${skill.summaryOverride}）`;
   const pieces = [`伤害 ${skill.damage}`];
   if (skill.maxDots) pieces[0] = `每档伤害 ${skill.damage}`;
-  if (skill.armorBreaker && skill.armorDamage > 0) pieces.push(`破甲 ${skill.armorDamage}`);
+  const armorDamage = effectiveArmorDamage(skill);
+  if (skill.armorBreaker && armorDamage > 0) pieces.push(`破甲 ${armorDamage}`);
+  if (skill.comboChance) pieces.push(`连击率 ${Math.round(skill.comboChance * 100)}%`);
   if (skill.ammoCost) pieces.push(`弹药 ${skill.ammoCost}`);
   return `（${pieces.join(" / ")}）`;
+}
+
+function renderSkillTags(skill) {
+  const tags = [];
+  if (skill.armorBreaker) tags.push("破甲");
+  if (hasQuiverPierceBuff(skill)) tags.push("箭袋破甲");
+  if (skill.comboChance) tags.push("连击");
+  if (!tags.length) return "";
+  return `<span class="skill-tags skill-tags-visible">${tags
+    .map((tag) => `<span class="skill-tag" style="--skill-color:${skill.color}">${tag}</span>`)
+    .join("")}</span>`;
+}
+
+function hasQuiverPierceBuff(skill) {
+  return skill.id === "bow_arm_pierce" && isLoadoutItemEquipped("箭袋");
+}
+
+function effectiveArmorDamage(skill) {
+  return hasQuiverPierceBuff(skill) ? 120 : skill.armorDamage;
 }
 
 function toggleWeaponOverlay() {
@@ -851,8 +1030,20 @@ function useSkill(skillId) {
     state.player.action = Math.max(0, state.player.action - skill.actionCost);
   }
 
+  if (skill.stance === "greatsword_counter") {
+    activateGreatswordCounterStance(skill);
+    updateUi();
+    return;
+  }
+
   if (skill.accessoryFlow) {
     startAccessorySkillFlow(skill, targets);
+    updateUi();
+    return;
+  }
+
+  if (skill.cinematicVideo) {
+    startCinematicSkillVideo(skill, targets);
     updateUi();
     return;
   }
@@ -870,11 +1061,47 @@ function shouldUseDefaultMeleeCinematic(skill) {
   return ["fists", "greatsword"].includes(skill.weaponId);
 }
 
+function activateGreatswordCounterStance(skill) {
+  state.player.guardCounterChance = 0.7;
+  state.player.nextDamageBonus = Math.max(state.player.nextDamageBonus || 0, 0.2);
+  state.activeTarget = "core";
+  state.actionAnimTimer = 0.45;
+  log(`${skill.name}：进入大剑防守蓄势。受到怪物攻击后有 70% 概率反击，下次出手伤害提高 20%。`);
+  endPlayerTurn();
+}
+
+function startCinematicSkillVideo(skill, targets) {
+  state.skillCinematic = { skill, targets, stage: "skill_video" };
+  log(`${skill.name}发动：播放专属表现。`);
+  playCinematicVideo(skill.cinematicVideo, false, () => {
+    finishCinematicSkillVideo();
+  });
+}
+
+function finishCinematicSkillVideo() {
+  const cinematic = state?.skillCinematic;
+  if (!cinematic || cinematic.stage !== "skill_video") return;
+  hideVideoOverlay();
+  state.skillCinematic = null;
+  settlePlayerSkill(cinematic.skill, cinematic.targets);
+}
+
 function settlePlayerSkill(skill, targets, context = {}) {
-  const summary = targets.map((target) => applySkillToPart(target, skill, context));
+  const nextDamageMultiplier = state.player.nextDamageBonus && skill.damage > 0 ? 1 + state.player.nextDamageBonus : 1;
+  const summary = targets.map((target) => applySkillToPart(target, skill, { ...context, nextDamageMultiplier }));
+  if (nextDamageMultiplier > 1) {
+    log(`蓄势兑现：${skill.name} 伤害提高 ${Math.round((nextDamageMultiplier - 1) * 100)}%。`);
+    state.player.nextDamageBonus = 0;
+  }
   const interruptedAttack = checkPendingAttackInterrupt(targets);
+  const comboResult = resolveComboFollowUp(skill, targets);
   updateStage();
   logSkillSummary(skill, summary);
+  if (comboResult?.triggered) {
+    log(`连击触发：${skill.name}追加一次普通攻击，造成 ${comboResult.damage} 点伤害。`);
+  } else if (comboResult) {
+    log(`连击未触发：${skill.name}本次没有追加普通攻击。`);
+  }
   if (interruptedAttack) {
     log(`打断成功：${interruptedAttack.label} 被手部攻击中断。`);
     showWeakpointTip("手部被击中，巨石投掷已被打断。", 1.8);
@@ -890,6 +1117,33 @@ function settlePlayerSkill(skill, targets, context = {}) {
   }
 
   updateUi();
+}
+
+function resolveComboFollowUp(skill, targets) {
+  if (!skill.comboChance || !targets.length || state.enemy.hp <= 0) return null;
+  const target = targets[0];
+  if (!target) return null;
+  if (Math.random() > skill.comboChance) {
+    return { triggered: false, damage: 0 };
+  }
+  const comboSkill = { name: "连击追打", color: skill.color };
+  const baseDamage = skill.comboDamage || NORMAL_ATTACK_DAMAGE;
+  let damage = baseDamage;
+  if (target.broken) {
+    damage = Math.round(baseDamage * 1.2);
+    state.enemy.extraDamage = (state.enemy.extraDamage || 0) + damage;
+  } else if (target.armorState === "armored") {
+    damage = Math.max(1, Math.round(baseDamage * 0.2));
+    state.enemy.extraDamage = (state.enemy.extraDamage || 0) + damage;
+  } else {
+    target.hp = Math.max(0, target.hp - damage);
+  }
+  state.enemy.hp = totalEnemyHp();
+  addSkillResultFloater(comboSkill, damage, "damage", { x: partPosition(target.id).x + 22, y: partPosition(target.id).y + 22 }, skill.color);
+  if (!target.broken && target.hp <= 0) {
+    breakPart(target);
+  }
+  return { triggered: true, damage, target };
 }
 
 function checkPendingAttackInterrupt(targets) {
@@ -1058,15 +1312,16 @@ function clearSoulHoldTimer() {
 
 function applySkillToPart(target, skill, context = {}) {
   let damage = skill.damage;
-  let armorDamage = skill.armorDamage;
+  let armorDamage = effectiveArmorDamage(skill);
   let armorDamageDone = 0;
   let globalChipDamage = 0;
   let bounced = false;
   let exposedNow = false;
   const accessoryMultiplier = context.accessoryEffect?.damageMultiplier || 1;
+  const damageMultiplier = accessoryMultiplier * (context.nextDamageMultiplier || 1);
 
   if (target.broken) {
-    damage = Math.round(damage * accessoryMultiplier * 1.2 * (target.weakpoint ? skill.exposedBonus : Math.max(1, skill.exposedBonus)));
+    damage = Math.round(damage * damageMultiplier * 1.2 * (target.weakpoint ? skill.exposedBonus : Math.max(1, skill.exposedBonus)));
     state.enemy.extraDamage = (state.enemy.extraDamage || 0) + damage;
     state.player.soul = Math.min(100, state.player.soul + skill.soulGain + 4);
     state.enemy.hp = totalEnemyHp();
@@ -1090,12 +1345,12 @@ function applySkillToPart(target, skill, context = {}) {
         exposedNow = exposePart(target);
       }
     }
-    globalChipDamage = Math.max(1, Math.round(damage * accessoryMultiplier * 0.2));
+    globalChipDamage = Math.max(1, Math.round(damage * damageMultiplier * 0.2));
     state.enemy.extraDamage = (state.enemy.extraDamage || 0) + globalChipDamage;
     damage = 0;
   } else {
     damage = Math.round(damage * (target.weakpoint ? skill.exposedBonus : Math.max(1, skill.exposedBonus)));
-    damage = Math.round(damage * accessoryMultiplier);
+    damage = Math.round(damage * damageMultiplier);
     target.hp = Math.max(0, target.hp - damage);
   }
   state.player.soul = Math.min(100, state.player.soul + skill.soulGain + (bounced ? 0 : 4));
@@ -1358,13 +1613,24 @@ function applyPlayerDamage(attack, damage) {
     life: 1.25,
   });
   log(`受到${attack.label}攻击，损失${damage}点血量。`);
+  resolveGreatswordCounterAfterHit(attack);
 }
 
-function applyGuardCounterDamage(attack) {
+function resolveGreatswordCounterAfterHit(attack) {
+  const chance = state.player.guardCounterChance || 0;
+  if (chance <= 0 || state.result) return;
+  state.player.guardCounterChance = 0;
+  if (Math.random() <= chance) {
+    applyGuardCounterDamage(attack, 18, "大剑蓄势反击");
+    return;
+  }
+  log("大剑蓄势反击未触发。");
+}
+
+function applyGuardCounterDamage(attack, damage = 10, counterName = "格挡反击") {
   const target = partById("core") || livingParts()[0];
   if (!target) return;
-  const damage = 10;
-  const counterSkill = { name: "格挡反击", color: "#ffe08a" };
+  const counterSkill = { name: counterName, color: "#ffe08a" };
   if (target.broken) {
     state.enemy.extraDamage = (state.enemy.extraDamage || 0) + damage;
   } else {
@@ -1372,7 +1638,11 @@ function applyGuardCounterDamage(attack) {
   }
   state.enemy.hp = totalEnemyHp();
   addSkillResultFloater(counterSkill, damage, "damage", partPosition(target.id), counterSkill.color);
-  log(`格挡反击：化解${attack.label}后，对${target.label}造成 ${damage} 点伤害。`);
+  if (counterName === "格挡反击") {
+    log(`格挡反击：化解${attack.label}后，对${target.label}造成 ${damage} 点伤害。`);
+  } else {
+    log(`${counterName}：承受${attack.label}后，对${target.label}造成 ${damage} 点伤害。`);
+  }
   if (!target.broken && target.hp <= 0) {
     breakPart(target);
     updateStage();
@@ -1607,6 +1877,20 @@ function partPosition(id) {
   return map[id] || map.core;
 }
 
+function partEffectPositions(id) {
+  if (id !== "arms") return [partPosition(id)];
+  const rockPose = currentPendingEnemyAttack()?.id === "rock_throw";
+  return rockPose
+    ? [
+        { x: 854, y: 418 },
+        { x: 1062, y: 388 },
+      ]
+    : [
+        { x: 830, y: 405 },
+        { x: 1045, y: 382 },
+      ];
+}
+
 function bossSpriteForState() {
   const pendingRockThrow = currentPendingEnemyAttack()?.id === "rock_throw";
   if (pendingRockThrow && !state.enemy.pendingAttack?.interrupted && !isPartBroken("arms") && sprites.bossRockThrow.complete) {
@@ -1773,24 +2057,9 @@ function bossPartHighlightColor(partId) {
 }
 
 function drawBossPartPixelOutline(bossDraw, partId, pulse) {
-  let mask = null;
-  try {
-    mask = getBossEdgeMask(bossDraw.image, partId);
-  } catch (error) {
-    mask = null;
-  }
   const color = bossPartHighlightColor(partId);
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  const dx = bossDraw.x - bossDraw.width / 2;
-  if (mask) {
-    ctx.globalAlpha = 0.9;
-    ctx.filter = `drop-shadow(0 0 ${Math.round(14 + pulse * 12)}px ${color})`;
-    ctx.drawImage(mask, dx, bossDraw.y, bossDraw.width, bossDraw.height);
-    ctx.filter = "none";
-    ctx.globalAlpha = 0.48 + pulse * 0.22;
-    ctx.drawImage(mask, dx - 2, bossDraw.y - 2, bossDraw.width + 4, bossDraw.height + 4);
-  }
   drawPartFallbackContour(bossDraw, partId, pulse, color);
   ctx.restore();
 }
@@ -2162,11 +2431,7 @@ function drawPlayerActionCells(x, y, width) {
     ctx.strokeStyle = filled ? "rgba(180, 224, 255, 0.62)" : "rgba(90, 119, 142, 0.44)";
     ctx.strokeRect(cx + 0.5, y + 0.5, cellW - 1, 12);
   }
-  ctx.fillStyle = "#d9f0ff";
-  ctx.font = "900 11px Microsoft YaHei, sans-serif";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText(`${state.player.action}`, x - 14, y + 7);
+  drawBarText(x, y, width, 13, `${state.player.action}/${state.player.maxAction}`);
   ctx.restore();
 }
 
@@ -2250,7 +2515,9 @@ function drawWeakpointEffects() {
   const arms = partById("arms");
   const handWarning = state.pendingHandWarning || currentPendingEnemyAttack()?.id === "rock_throw";
   if (arms && !arms.broken && handWarning) {
-    drawCoreWeakpointGlow(partPosition("arms"), 18 + pulse * 3, pulse, true, true);
+    partEffectPositions("arms").forEach((pos) => {
+      drawCoreWeakpointGlow(pos, 15 + pulse * 3, pulse, true, true);
+    });
   }
 }
 
