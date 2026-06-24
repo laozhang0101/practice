@@ -1,6 +1,6 @@
 ﻿const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
-const DEMO_VERSION = "2026.06.18-rock-throw-unavoidable";
+const DEMO_VERSION = "2026.06.24-skip-broken-rock-throw";
 const DEFAULT_MELEE_CINEMATIC_DURATION = 0.82;
 const NORMAL_ATTACK_DAMAGE = 22;
 const GOURD_HEAL_CHANCE = 0.5;
@@ -343,6 +343,7 @@ let floaters = [];
 let playerHitFloaters = [];
 let soulHoldTimer = null;
 let hoveredTargetParts = [];
+let activeVideoSkipHandler = null;
 const bossEdgeMaskCache = new WeakMap();
 
 const loadoutParts = [
@@ -494,6 +495,7 @@ function createState() {
       intent: null,
       attackIndex: 0,
       pendingAttack: null,
+      skippedAttackNotices: [],
       extraDamage: 0,
       aoeHpCompensation: 0,
       parts,
@@ -1601,8 +1603,8 @@ function updatePendingEnemyWarning() {
     state.pendingWeakpointWarning = false;
     return;
   }
-  const nextAttack = enemyAttackSequence[state.enemy.attackIndex % enemyAttackSequence.length];
-  state.pendingWeakpointWarning = nextAttack.id === "lava_burst";
+  const nextAttack = peekNextAvailableEnemyAttack();
+  state.pendingWeakpointWarning = nextAttack?.id === "lava_burst";
   if (state.pendingWeakpointWarning) {
     showWeakpointTip(nextAttack.warningText, 2.4);
   }
@@ -1611,10 +1613,23 @@ function updatePendingEnemyWarning() {
 function createEnemyThreat() {
   const pendingAttack = currentPendingEnemyAttack();
   if (pendingAttack) {
+    if (!isEnemyAttackAvailable(pendingAttack)) {
+      logDisabledEnemyAttack(pendingAttack);
+      state.enemy.pendingAttack = null;
+      state.enemy.intent = null;
+      advanceEnemyAttack();
+      createEnemyThreat();
+      return;
+    }
     releaseDelayedEnemyAttack(pendingAttack);
     return;
   }
-  const attack = enemyAttackSequence[state.enemy.attackIndex % enemyAttackSequence.length];
+  const attack = getNextAvailableEnemyAttack({ logSkip: true });
+  if (!attack) {
+    log("Boss 当前没有可用技能，结束行动。");
+    endEnemyTurn();
+    return;
+  }
   if (attack.type === "delayed_unblockable") {
     startDelayedEnemyAttackPrepare(attack);
     return;
@@ -1649,15 +1664,54 @@ function isPartBroken(partId) {
   return !!partById(partId)?.broken;
 }
 
+function enemyAttackDisabledReason(attack) {
+  if (attack.type === "delayed_unblockable" && attack.sourcePart && isPartBroken(attack.sourcePart)) {
+    const part = partById(attack.sourcePart);
+    return `${part?.label || "对应部位"}已破坏`;
+  }
+  return "";
+}
+
+function isEnemyAttackAvailable(attack) {
+  return !enemyAttackDisabledReason(attack);
+}
+
+function logDisabledEnemyAttack(attack) {
+  const reason = enemyAttackDisabledReason(attack);
+  if (!reason) return;
+  state.enemy.skippedAttackNotices ||= [];
+  if (state.enemy.skippedAttackNotices.includes(attack.id)) return;
+  state.enemy.skippedAttackNotices.push(attack.id);
+  log(`${attack.label}已从循环中移除：${reason}。Boss 将继续使用剩余技能。`);
+}
+
+function peekNextAvailableEnemyAttack() {
+  for (let offset = 0; offset < enemyAttackSequence.length; offset += 1) {
+    const attack = enemyAttackSequence[(state.enemy.attackIndex + offset) % enemyAttackSequence.length];
+    if (isEnemyAttackAvailable(attack)) return attack;
+  }
+  return null;
+}
+
+function getNextAvailableEnemyAttack({ logSkip = false } = {}) {
+  for (let checked = 0; checked < enemyAttackSequence.length; checked += 1) {
+    const attack = enemyAttackSequence[state.enemy.attackIndex % enemyAttackSequence.length];
+    if (isEnemyAttackAvailable(attack)) return attack;
+    if (logSkip) logDisabledEnemyAttack(attack);
+    advanceEnemyAttack();
+  }
+  return null;
+}
+
 function advanceEnemyAttack() {
   state.enemy.attackIndex += 1;
 }
 
 function startDelayedEnemyAttackPrepare(attack) {
   if (isPartBroken(attack.sourcePart)) {
-    log(`Boss 行动：${attack.label}。但手部已被破坏，技能无法释放。`);
+    logDisabledEnemyAttack(attack);
     advanceEnemyAttack();
-    endEnemyTurn();
+    createEnemyThreat();
     return;
   }
   state.enemy.intent = attack;
@@ -1687,8 +1741,17 @@ function releaseDelayedEnemyAttack(attack) {
   state.videoAttack = null;
   ui.reactionPanel.classList.add("hidden");
 
-  if (pending?.interrupted || isPartBroken(attack.sourcePart)) {
-    log(`${attack.label}释放失败：手部被破坏或准备动作被打断。`);
+  if (isPartBroken(attack.sourcePart)) {
+    logDisabledEnemyAttack(attack);
+    state.enemy.pendingAttack = null;
+    state.enemy.intent = null;
+    advanceEnemyAttack();
+    createEnemyThreat();
+    return;
+  }
+
+  if (pending?.interrupted) {
+    log(`${attack.label}释放失败：准备动作被打断。`);
     state.enemy.pendingAttack = null;
     state.enemy.intent = null;
     advanceEnemyAttack();
@@ -1841,8 +1904,11 @@ function playVideo(src, onEnded) {
   ui.skillVideo.onerror = null;
   ui.skillVideo.src = src;
   ui.skillVideo.currentTime = 0;
-  ui.skillVideo.onended = onEnded;
+  const finish = () => finishActiveVideo(onEnded);
+  activeVideoSkipHandler = finish;
+  ui.skillVideo.onended = finish;
   ui.skillVideo.onerror = () => {
+    activeVideoSkipHandler = null;
     log("视频播放失败，使用默认失败结算。");
     if (state?.videoAttack) {
       resolveVideoQte("fail");
@@ -1851,6 +1917,7 @@ function playVideo(src, onEnded) {
   const playPromise = ui.skillVideo.play();
   if (playPromise?.catch) {
     playPromise.catch(() => {
+      activeVideoSkipHandler = null;
       log("浏览器阻止了视频自动播放，使用默认失败结算。");
       if (state?.videoAttack) {
         resolveVideoQte("fail");
@@ -1867,18 +1934,41 @@ function playCinematicVideo(src, loop = false, onEnded = null) {
   ui.skillVideo.loop = loop;
   ui.skillVideo.src = src;
   ui.skillVideo.currentTime = 0;
-  ui.skillVideo.onended = loop ? null : onEnded;
+  const finish = () => finishActiveVideo(onEnded);
+  activeVideoSkipHandler = loop || !onEnded ? null : finish;
+  ui.skillVideo.onended = loop ? null : finish;
   ui.skillVideo.onerror = () => {
+    activeVideoSkipHandler = null;
     log("技能表现视频播放失败，跳过当前表现。");
     if (onEnded) onEnded();
   };
   const playPromise = ui.skillVideo.play();
   if (playPromise?.catch) {
     playPromise.catch(() => {
+      activeVideoSkipHandler = null;
       log("浏览器阻止了技能表现视频自动播放，跳过当前表现。");
       if (onEnded) onEnded();
     });
   }
+}
+
+function finishActiveVideo(onEnded) {
+  activeVideoSkipHandler = null;
+  ui.skillVideo.onended = null;
+  ui.skillVideo.onerror = null;
+  if (onEnded) onEnded();
+}
+
+function skipCurrentVideo() {
+  if (!activeVideoSkipHandler || ui.videoOverlay.classList.contains("hidden")) return false;
+  const finish = activeVideoSkipHandler;
+  activeVideoSkipHandler = null;
+  ui.skillVideo.onended = null;
+  ui.skillVideo.onerror = null;
+  ui.skillVideo.pause();
+  log("已跳过当前视频，进入结算。");
+  finish();
+  return true;
 }
 
 function maybeOpenVideoQte() {
@@ -1975,6 +2065,7 @@ function finishVideoEnemyAttack(success) {
 }
 
 function hideVideoOverlay() {
+  activeVideoSkipHandler = null;
   ui.skillVideo.onended = null;
   ui.skillVideo.onerror = null;
   ui.skillVideo.loop = false;
@@ -3066,6 +3157,12 @@ document.querySelectorAll("[data-react]").forEach((button) => {
   button.addEventListener("click", () => react(button.dataset.react));
 });
 window.addEventListener("keydown", (event) => {
+  if (event.key.toLowerCase() === "m") {
+    if (skipCurrentVideo()) {
+      event.preventDefault();
+    }
+    return;
+  }
   const keyMap = { a: "left", w: "block", d: "right" };
   const action = keyMap[event.key.toLowerCase()];
   if (action) react(action);
