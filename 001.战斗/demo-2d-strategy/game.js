@@ -1,6 +1,6 @@
 ﻿const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
-const DEMO_VERSION = "2026.06.24-skip-broken-rock-throw";
+const DEMO_VERSION = "2026.06.26-module-bingo";
 const DEFAULT_MELEE_CINEMATIC_DURATION = 0.82;
 const NORMAL_ATTACK_DAMAGE = 22;
 const GOURD_HEAL_CHANCE = 0.5;
@@ -74,12 +74,114 @@ const ui = {
   turnInfo: document.getElementById("turnInfo"),
   bossInfo: document.getElementById("bossInfo"),
   logList: document.getElementById("logList"),
+  prebattleScreen: document.getElementById("prebattleScreen"),
+  prebattleStepButtons: document.querySelectorAll("[data-prebattle-step]"),
+  characterTabButtons: document.querySelectorAll("[data-character-tab]"),
+  nextLoadoutBtn: document.getElementById("nextLoadoutBtn"),
+  nextLoadoutFromCharacterBtn: document.getElementById("nextLoadoutFromCharacterBtn"),
+  nextSkillBtn: document.getElementById("nextSkillBtn"),
+  nextSkillFromWeaponBtn: document.getElementById("nextSkillFromWeaponBtn"),
+  backToBossBtn: document.getElementById("backToBossBtn"),
+  backToBossFromCharacterBtn: document.getElementById("backToBossFromCharacterBtn"),
+  backToCharacterFromWeaponBtn: document.getElementById("backToCharacterFromWeaponBtn"),
+  backToLoadoutBtn: document.getElementById("backToLoadoutBtn"),
+  characterStyleCard: document.getElementById("characterStyleCard"),
+  characterTabPanel: document.getElementById("characterTabPanel"),
+  bossCards: document.getElementById("bossCards"),
+  bossIntel: document.getElementById("bossIntel"),
+  weaponCarrySlots: document.getElementById("weaponCarrySlots"),
+  weaponSelectionTitle: document.getElementById("weaponSelectionTitle"),
+  weaponGallery: document.getElementById("weaponGallery"),
+  weaponDetailPanel: document.getElementById("weaponDetailPanel"),
+  skillLoadoutWeapons: document.getElementById("skillLoadoutWeapons"),
+  skillSourceTabs: document.getElementById("skillSourceTabs"),
+  skillConfigList: document.getElementById("skillConfigList"),
+  skillEditor: document.getElementById("skillEditor"),
+  enterBattleBtn: document.getElementById("enterBattleBtn"),
 };
 
 const partBlueprint = [
   { id: "arms", label: "手部", armor: "armored", maxHp: 130, maxArmor: 95, effect: "破坏后削弱 Boss 近战攻击" },
   { id: "core", label: "胸口核心", armor: "exposed", weakpoint: true, maxHp: 170, maxArmor: 0, effect: "裸露弱点，适合爆发输出" },
   { id: "legs", label: "脚部", armor: "armored", maxHp: 120, maxArmor: 85, effect: "破坏后降低 Boss 稳定性" },
+];
+
+const bossBlueprints = [
+  {
+    id: "lava_golem",
+    name: "熔岩石头人",
+    title: "巨型熔岩构装体",
+    threatLevel: "高威胁",
+    image: "./assets/boss.png",
+    summary: "硬甲覆盖全身，胸口核心裸露。手部投石有明显蓄力，可被打断。",
+    ecology: "古代熔岩坑中苏醒的巨型构装体，行动迟缓，但正面压迫感极强。",
+    habitat: "熔岩坑 / 古代遗迹",
+    habitLine: "不追击弱小目标，会缓慢逼近并用巨石压制空间。",
+    habitTags: ["迟缓压迫", "硬甲护体", "蓄力投石", "核心外露"],
+    attributeTendencies: [
+      { label: "水", value: "偏弱", trend: "down" },
+      { label: "火", value: "极强", trend: "up" },
+      { label: "电", value: "一般", trend: "flat" },
+      { label: "冰", value: "偏弱", trend: "down" },
+      { label: "光", value: "不明", trend: "flat" },
+      { label: "暗", value: "略低", trend: "down" },
+    ],
+    abilityProfile: [
+      { label: "体力", value: 8 },
+      { label: "攻击", value: 9 },
+      { label: "速度", value: 3 },
+      { label: "防御", value: 8 },
+    ],
+    partIntel: [
+      { partId: "core", label: "躯干核心", state: "裸露弱点", hint: "可直接压低总血量。" },
+      { partId: "arms", label: "双臂", state: "硬甲 / 投石", hint: "准备投石时打手部可中断。" },
+      { partId: "legs", label: "双腿", state: "硬甲支撑", hint: "破甲后适合压制稳定性。" },
+    ],
+    startTip: "怪物全身硬甲，躯干核心裸露；看到手部举石时，攻击手部可以打断投石。",
+    recommendedPlan: "先判断武器是否具备破甲能力：破甲武器处理硬甲部位，爆发技能优先压低躯干核心。",
+    intel: [
+      {
+        iconSrc: "./assets/armor-shield.png",
+        title: "全身硬甲",
+        tip: "除躯干核心外，全身其他部位都被硬甲覆盖。普通输出收益低，破甲后再打更有效。",
+      },
+      {
+        partId: "core",
+        title: "躯干核心裸露",
+        tip: "躯干处不是硬甲，可直接攻击，是压低总血量的主要突破口。",
+      },
+      {
+        partId: "arms",
+        title: "手部投石可打断",
+        tip: "投石前会举起巨石。准备回合攻击手部，可中断这次高威胁技能。",
+      },
+    ],
+    mysteries: ["生命降低后的新动作尚未记录"],
+  },
+  {
+    id: "frost_behemoth",
+    name: "冰脊巨兽",
+    title: "极寒重甲异兽",
+    threatLevel: "未开放",
+    short: "冰",
+    locked: true,
+  },
+  {
+    id: "storm_wyvern",
+    name: "风暴翼龙",
+    title: "高速飞行型 Boss",
+    threatLevel: "未开放",
+    short: "翼",
+    locked: true,
+  },
+  {
+    id: "sand_colossus",
+    name: "荒砂巨像",
+    title: "范围压制型 Boss",
+    threatLevel: "未开放",
+    short: "砂",
+    locked: true,
+  },
 ];
 
 const weapons = [
@@ -106,6 +208,27 @@ const weapons = [
     icon: "./assets/weapon-bow.png",
     playerSprite: "./assets/player-bow.png",
     role: "远程点破",
+  },
+  {
+    id: "hammer",
+    name: "战锤",
+    short: "锤",
+    role: "重装震击",
+    locked: true,
+  },
+  {
+    id: "spear",
+    name: "长枪",
+    short: "枪",
+    role: "中距突刺",
+    locked: true,
+  },
+  {
+    id: "staff",
+    name: "法杖",
+    short: "杖",
+    role: "能量操控",
+    locked: true,
   },
 ];
 
@@ -354,12 +477,48 @@ const loadoutParts = [
   { id: "shoes", label: "鞋子", icon: "♞", slots: ["小腿前", "小腿后", "小腿侧", "脚部"], defaultItem: "修罗鞋子" },
 ];
 
+const weaponLoadoutSlots = [
+  { id: "weaponA", label: "武器A" },
+  { id: "weaponB", label: "武器B" },
+];
+const WEAPON_SKILL_SLOT_COUNT = 3;
+
 const loadoutState = {
+  prebattleStep: "boss",
+  selectedBossId: "lava_golem",
+  selectedWeaponIds: ["fists", "greatsword"],
+  activeWeaponSlot: 0,
+  activeWeaponDetailId: "fists",
+  weaponDetailOpen: false,
+  weaponSkillLoadout: {},
+  weaponSkillPickerOpen: false,
+  activeWeaponSkillSlot: 0,
+  armorFactorLoadout: {},
+  armorFactorBoardSlots: {},
+  armorFactorPickerOpen: false,
+  activeArmorFactorSlot: 0,
+  activeSkillGroupId: "weapon",
+  activeSkillSourceId: "",
+  activeSkillEditorId: "",
+  skillGroupExpanded: { weapon: true, armor: false, accessory: false },
+  activeCharacterTab: "weapons",
   activePartId: "head",
   activeSlot: "base",
   isFocusing: false,
   equipped: {},
 };
+
+const armorThemeLoadoutOptions = [
+  { name: "岩铠", icon: "岩", trait: "重甲型基础装饰" },
+  { name: "疾影", icon: "影", trait: "敏捷型基础装饰" },
+  { name: "猎手", icon: "猎", trait: "技巧型基础装饰" },
+].flatMap((theme) => loadoutParts.map((part) => ({
+  name: `${theme.name}${part.label}`,
+  icon: theme.icon,
+  trait: theme.trait,
+  category: "base",
+  parts: [part.id],
+})));
 
 const attachmentOptions = [
   { name: "修罗头盔", icon: "♜", trait: "头部基础装饰", category: "base", parts: ["head"], image: "./assets/loadout-shura-head.jpeg" },
@@ -367,6 +526,7 @@ const attachmentOptions = [
   { name: "修罗下装", icon: "♟", trait: "腿部基础装饰", category: "base", parts: ["pants"], image: "./assets/loadout-shura-pants.jpeg" },
   { name: "修罗护腕", icon: "◒", trait: "护腕基础装饰", category: "base", parts: ["bracer"], image: "./assets/loadout-shura-bracer.jpeg" },
   { name: "修罗鞋子", icon: "♞", trait: "鞋子基础装饰", category: "base", parts: ["shoes"], image: "./assets/loadout-shura-shoes.jpeg" },
+  ...armorThemeLoadoutOptions,
   {
     name: "无人机",
     icon: "◉",
@@ -425,6 +585,361 @@ const attachmentOptions = [
   },
 ];
 
+const armorStatProfiles = {
+  head: { attack: 4, defense: 2, hp: 10 },
+  torso: { attack: 0, defense: 10, hp: 35 },
+  pants: { attack: 0, defense: 5, hp: 25 },
+  bracer: { attack: 7, defense: 3, hp: 10 },
+  shoes: { attack: 2, defense: 2, hp: 15 },
+};
+
+const armorFactorTypes = {
+  resource: { label: "资源", short: "源", tone: "blue" },
+  weapon: { label: "武装", short: "武", tone: "red" },
+  assist: { label: "辅助", short: "辅", tone: "cyan" },
+  survival: { label: "生存", short: "生", tone: "gold" },
+};
+
+const armorFactorSlots = {
+  head: 0,
+  bracer: 2,
+  torso: 4,
+  pants: 6,
+  shoes: 8,
+};
+
+const armorFactorProfiles = {
+  shura: {
+    name: "修罗",
+    head: "assist",
+    torso: "resource",
+    pants: "survival",
+    bracer: "weapon",
+    shoes: "assist",
+  },
+  guardian: {
+    name: "岩铠",
+    head: "survival",
+    torso: "resource",
+    pants: "survival",
+    bracer: "weapon",
+    shoes: "survival",
+  },
+  shadow: {
+    name: "疾影",
+    head: "assist",
+    torso: "resource",
+    pants: "assist",
+    bracer: "weapon",
+    shoes: "assist",
+  },
+  hunter: {
+    name: "猎手",
+    head: "assist",
+    torso: "resource",
+    pants: "survival",
+    bracer: "weapon",
+    shoes: "assist",
+  },
+};
+
+const armorEnergyProfiles = {
+  shura: {
+    head: 3,
+    torso: 6,
+    pants: 4,
+    bracer: 5,
+    shoes: 3,
+  },
+  guardian: {
+    head: 4,
+    torso: 10,
+    pants: 8,
+    bracer: 8,
+    shoes: 5,
+  },
+  shadow: {
+    head: 3,
+    torso: 4,
+    pants: 5,
+    bracer: 4,
+    shoes: 6,
+  },
+  hunter: {
+    head: 5,
+    torso: 5,
+    pants: 4,
+    bracer: 6,
+    shoes: 4,
+  },
+};
+
+const armorFactorCatalog = [
+  {
+    id: "tech_focus",
+    type: "assist",
+    name: "弱点扫描",
+    cost: 3,
+    tier: "标准",
+    effect: "标记裸露核心和可打断部位，提高应对效率。",
+  },
+  {
+    id: "guard_core",
+    type: "survival",
+    name: "护盾核心",
+    cost: 6,
+    tier: "强化",
+    effect: "提供护盾与抗打断收益，提高承压能力。",
+  },
+  {
+    id: "agility_drive",
+    type: "assist",
+    name: "无人机链路",
+    cost: 4,
+    tier: "标准",
+    effect: "强化协同攻击、追击和辅助判定。",
+  },
+  {
+    id: "power_servo",
+    type: "weapon",
+    name: "破甲臂甲",
+    cost: 5,
+    tier: "强化",
+    effect: "强化手部武装和破甲攻击收益。",
+  },
+  {
+    id: "speed_joint",
+    type: "assist",
+    name: "机动喷口",
+    cost: 3,
+    tier: "标准",
+    effect: "提高闪避、位移和行动窗口。",
+  },
+  {
+    id: "burst_reactor",
+    type: "resource",
+    name: "胸口反应堆",
+    cost: 10,
+    tier: "高耗",
+    effect: "提供高额能量，支持激光、喷气和无人机模块。",
+  },
+  {
+    id: "soul_converter",
+    type: "resource",
+    name: "魂能转换器",
+    cost: 8,
+    tier: "高耗",
+    effect: "提供魂能充能资源，强化灵魂战甲释放。",
+  },
+  {
+    id: "light_weight",
+    type: "survival",
+    name: "应急酒囊",
+    cost: 1,
+    tier: "轻量",
+    effect: "提供低占用续航模块，适合补足生存能力。",
+  },
+];
+
+const defaultArmorFactorLoadout = {
+  head: "tech_focus",
+  torso: "burst_reactor",
+  pants: "light_weight",
+  bracer: "power_servo",
+  shoes: "speed_joint",
+};
+
+const defaultArmorFactorBoardSlots = Object.fromEntries(
+  Object.entries(armorFactorSlots).map(([partId, slotIndex]) => [
+    slotIndex,
+    defaultArmorFactorLoadout[partId],
+  ]),
+);
+
+const armorFactorLineIndices = [
+  [0, 1, 2],
+  [3, 4, 5],
+  [6, 7, 8],
+  [0, 3, 6],
+  [1, 4, 7],
+  [2, 5, 8],
+  [0, 4, 8],
+  [2, 4, 6],
+];
+
+const armorFactorLineRecipes = {
+  "resource-resource-resource": {
+    name: "补给循环",
+    effect: "能量、弹药和充能类模块的供给效率提高。",
+    statBonus: { technique: 0.6, burst: 0.6 },
+  },
+  "weapon-weapon-weapon": {
+    name: "火力联动",
+    effect: "武装模块伤害和破甲收益提高。",
+    statBonus: { power: 1.2, burst: 0.8 },
+  },
+  "assist-assist-assist": {
+    name: "协同网络",
+    effect: "无人机、瞄准、打断提示和追击收益提高。",
+    statBonus: { technique: 1.1, speed: 0.6 },
+  },
+  "survival-survival-survival": {
+    name: "续航防线",
+    effect: "护盾、回血、减伤和抗打断收益提高。",
+    statBonus: { defense: 1.5 },
+  },
+};
+
+const armorFactorBingoRewards = [
+  {
+    count: 1,
+    title: "1 Bingo",
+    effect: "激活首条模块连线，对应模块体系获得加成。",
+  },
+  {
+    count: 3,
+    title: "3 Bingo",
+    effect: "模块形成稳定构型，战甲获得额外战术收益。",
+  },
+  {
+    count: 5,
+    title: "5 Bingo",
+    effect: "形成完整改造体系，解锁高阶套装奖励。",
+  },
+];
+
+const armorSkillProfiles = Object.fromEntries(
+  loadoutParts.map((part) => {
+    const stats = armorStatProfiles[part.id] || { attack: 0, defense: 0, hp: 0 };
+    return [
+      part.id,
+      {
+        name: `${part.label}属性`,
+        targetParts: [],
+        targetLabel: "自身",
+        kind: "stat",
+        kindLabel: "基础属性",
+        statBonus: stats,
+        damage: 0,
+        armorDamage: 0,
+        actionCost: 0,
+        color: "#9aa8ba",
+        desc: `${part.label}提供基础属性加成。`,
+      },
+    ];
+  })
+);
+
+const accessorySkillProfiles = [
+  {
+    itemName: "无人机",
+    sourceId: "accessory_drone",
+    fallbackIcon: "机",
+    role: "上臂挂件",
+    skill: {
+      id: "accessory_drone_support",
+      name: "无人机协同",
+      targetParts: ["core"],
+      targetLabel: "胸部",
+      kind: "accessory",
+      kindLabel: "挂件",
+      damage: 0,
+      armorDamage: 0,
+      actionCost: 0,
+      color: "#58b7ff",
+      summaryOverride: "拳套攻击躯干时概率协同",
+      desc: "使用拳套攻击胸口核心时，无人机有概率从侧翼追加远程射击。",
+      previewVideo: "./assets/videos/drone-accessory-effect-web.mp4",
+      previewVideoLabel: "挂件功能预览",
+    },
+  },
+  {
+    itemName: "喷气式装置",
+    sourceId: "accessory_jet",
+    fallbackIcon: "喷",
+    role: "肩膀挂件",
+    skill: {
+      id: "accessory_jet_boost",
+      name: "喷气跃升",
+      targetParts: ["arms"],
+      targetLabel: "手部",
+      kind: "accessory",
+      kindLabel: "挂件",
+      damage: 0,
+      armorDamage: 0,
+      actionCost: 0,
+      color: "#ffb15f",
+      summaryOverride: "近战攻击伤害 +50%",
+      desc: "近战出手时点燃喷气装置，改变攻击表现并显著提高本次伤害。",
+      previewVideo: "./assets/videos/jet-accessory-effect-web.mp4",
+      previewVideoLabel: "挂件功能预览",
+    },
+  },
+  {
+    itemName: "酒葫芦",
+    sourceId: "accessory_gourd",
+    fallbackIcon: "葫",
+    role: "前腰挂件",
+    skill: {
+      id: "accessory_gourd_heal",
+      name: "烈酒回气",
+      targetParts: ["core"],
+      targetLabel: "自身",
+      kind: "accessory",
+      kindLabel: "挂件",
+      damage: 0,
+      armorDamage: 0,
+      actionCost: 0,
+      color: "#76d17b",
+      summaryOverride: "回合开始 50% 概率回血",
+      desc: "自己的回合开始时有概率饮酒恢复生命，最多触发三次。",
+      previewVideo: "./assets/videos/gourd-heal.mp4",
+      previewVideoLabel: "挂件功能预览",
+    },
+  },
+  {
+    itemName: "箭袋",
+    sourceId: "accessory_quiver",
+    fallbackIcon: "箭",
+    role: "后背挂件",
+    skill: {
+      id: "accessory_quiver_pierce",
+      name: "穿甲箭备装",
+      targetParts: ["arms"],
+      targetLabel: "手部",
+      kind: "accessory",
+      kindLabel: "挂件",
+      armorBreaker: true,
+      damage: 0,
+      armorDamage: 0,
+      actionCost: 0,
+      color: "#9ed5ff",
+      summaryOverride: "穿臂箭获得强化破甲",
+      desc: "装备箭袋后，原有穿臂箭获得更高破甲收益，更适合击穿手部硬甲。",
+    },
+  },
+  {
+    itemName: "戒律圆徽",
+    sourceId: "accessory_sigils",
+    fallbackIcon: "徽",
+    role: "暂定挂件位",
+    skill: {
+      id: "accessory_sigils_tune",
+      name: "魂能调律",
+      targetParts: ["core"],
+      targetLabel: "胸部",
+      kind: "accessory",
+      kindLabel: "挂件",
+      damage: 0,
+      armorDamage: 0,
+      actionCost: 0,
+      color: "#d8b4ff",
+      summaryOverride: "提高灵魂战甲充能效率",
+      desc: "暂定第五挂件位，用于表达后续可扩展的灵魂战甲充能流派。",
+    },
+  },
+];
+
 const loadoutFocusMap = {
   脸部: "head",
   护额: "head",
@@ -462,7 +977,181 @@ function initializeDefaultLoadout() {
   if (gourd) loadoutState.equipped["pants:前腰"] = gourd;
 }
 
+function isBossUnlocked(boss) {
+  return boss && !boss.locked;
+}
+
+function isWeaponUnlocked(weapon) {
+  return weapon && !weapon.locked;
+}
+
+function currentBossBlueprint() {
+  return bossBlueprints.find((boss) => boss.id === loadoutState.selectedBossId && isBossUnlocked(boss))
+    || bossBlueprints.find(isBossUnlocked)
+    || bossBlueprints[0];
+}
+
+function carriedWeapons() {
+  const selected = loadoutState.selectedWeaponIds || [];
+  const ordered = selected.map((id) => weapons.find((weapon) => weapon.id === id && isWeaponUnlocked(weapon))).filter(Boolean);
+  return ordered.length ? ordered : weapons.filter(isWeaponUnlocked).slice(0, 1);
+}
+
+function weaponSkillPool(weaponId) {
+  return skills
+    .filter((skill) => skill.weaponId === weaponId)
+    .sort((a, b) => (a.actionCost || 0) - (b.actionCost || 0) || a.name.localeCompare(b.name, "zh-Hans-CN"));
+}
+
+function ensureWeaponSkillLoadout() {
+  if (!loadoutState.weaponSkillLoadout) loadoutState.weaponSkillLoadout = {};
+  weapons.filter(isWeaponUnlocked).forEach((weapon) => {
+    const validIds = weaponSkillPool(weapon.id).map((skill) => skill.id);
+    const current = Array.isArray(loadoutState.weaponSkillLoadout[weapon.id])
+      ? loadoutState.weaponSkillLoadout[weapon.id].filter((id) => validIds.includes(id))
+      : validIds.slice(0, WEAPON_SKILL_SLOT_COUNT);
+    loadoutState.weaponSkillLoadout[weapon.id] = current.slice(0, WEAPON_SKILL_SLOT_COUNT);
+  });
+}
+
+function configuredWeaponSkillIds(weaponId) {
+  ensureWeaponSkillLoadout();
+  return loadoutState.weaponSkillLoadout[weaponId] || [];
+}
+
+function configuredWeaponSkills(weaponId) {
+  const equippedIds = configuredWeaponSkillIds(weaponId);
+  const pool = weaponSkillPool(weaponId);
+  return equippedIds
+    .map((id) => pool.find((skill) => skill.id === id))
+    .filter(Boolean)
+    .sort((a, b) => (a.actionCost || 0) - (b.actionCost || 0) || a.name.localeCompare(b.name, "zh-Hans-CN"));
+}
+
+function availableWeaponSkills(weaponId) {
+  const equipped = new Set(configuredWeaponSkillIds(weaponId));
+  return weaponSkillPool(weaponId).filter((skill) => !equipped.has(skill.id));
+}
+
+function equipSkillToWeapon(weaponId, skillId) {
+  ensureWeaponSkillLoadout();
+  const pool = weaponSkillPool(weaponId);
+  if (!pool.some((skill) => skill.id === skillId)) return;
+  const current = configuredWeaponSkillIds(weaponId);
+  if (current.includes(skillId) || current.length >= WEAPON_SKILL_SLOT_COUNT) return;
+  loadoutState.weaponSkillLoadout[weaponId] = [...current, skillId];
+  loadoutState.activeWeaponDetailId = weaponId;
+  loadoutState.weaponDetailOpen = true;
+  loadoutState.weaponSkillPickerOpen = false;
+  renderPrebattleWeapons();
+}
+
+function unequipSkillFromWeapon(weaponId, skillId) {
+  ensureWeaponSkillLoadout();
+  const current = configuredWeaponSkillIds(weaponId);
+  if (!current.includes(skillId)) return;
+  loadoutState.weaponSkillLoadout[weaponId] = current.filter((id) => id !== skillId);
+  loadoutState.activeWeaponDetailId = weaponId;
+  loadoutState.weaponDetailOpen = true;
+  loadoutState.weaponSkillPickerOpen = false;
+  renderPrebattleWeapons();
+}
+
+function equippedArmorStats() {
+  return loadoutParts.reduce(
+    (total, part) => {
+      const hasBaseArmor = Boolean(loadoutState.equipped[`${part.id}:base`]);
+      if (!hasBaseArmor) return total;
+      const stats = armorStatProfiles[part.id] || {};
+      total.attack += stats.attack || 0;
+      total.defense += stats.defense || 0;
+      total.hp += stats.hp || 0;
+      return total;
+    },
+    { attack: 0, defense: 0, hp: 0 }
+  );
+}
+
+function clampPercent(value, max) {
+  if (!max) return 0;
+  return Math.max(0, Math.min(100, (value / max) * 100));
+}
+
+function renderMeter(label, value, max, className = "") {
+  const percent = clampPercent(value, max);
+  return `
+    <div class="ui-meter ${className}" style="--meter-value:${percent}%">
+      <span><b>${label}</b><em>${value} / ${max}</em></span>
+      <i><u></u></i>
+    </div>
+  `;
+}
+
+function renderEnergyDots(value, max, className = "") {
+  const total = Math.max(1, Math.min(12, Number(max) || 1));
+  const filled = Math.max(0, Math.min(total, Math.round((Number(value) || 0) / Math.max(1, Number(max) || 1) * total)));
+  return `
+    <span class="energy-dot-row ${className}" aria-hidden="true">
+      ${Array.from({ length: total }, (_, index) => `<i${index < filled ? " class=\"filled\"" : ""}></i>`).join("")}
+    </span>
+  `;
+}
+
+function renderFactorCostBadge(cost, className = "") {
+  return `<em class="factor-cost-badge ${className}">占用 ${cost}</em>`;
+}
+
+function isWeaponCarried(weaponId) {
+  return carriedWeapons().some((weapon) => weapon.id === weaponId);
+}
+
+function toggleLoadoutWeapon(weaponId) {
+  const targetWeapon = weapons.find((weapon) => weapon.id === weaponId);
+  if (!isWeaponUnlocked(targetWeapon)) return;
+  const selected = [...(loadoutState.selectedWeaponIds || [])];
+  const slotIndex = Math.max(0, Math.min(1, loadoutState.activeWeaponSlot || 0));
+  while (selected.length < 2) {
+    const fallback = weapons.find((weapon) => isWeaponUnlocked(weapon) && !selected.includes(weapon.id));
+    selected.push(fallback?.id || weapons.find(isWeaponUnlocked)?.id || weapons[0].id);
+  }
+  if (selected[slotIndex] === weaponId) {
+    return;
+  }
+  const existingIndex = selected.findIndex((id, index) => id === weaponId && index !== slotIndex);
+  if (existingIndex >= 0) {
+    const previous = selected[slotIndex];
+    selected[slotIndex] = weaponId;
+    selected[existingIndex] = previous;
+  } else {
+    selected[slotIndex] = weaponId;
+  }
+  loadoutState.selectedWeaponIds = selected.slice(0, 2);
+  loadoutState.activeWeaponDetailId = weaponId;
+  loadoutState.weaponSkillPickerOpen = false;
+  if (loadoutState.prebattleStep === "weapons") {
+    renderPrebattleWeapons();
+  } else {
+    renderPrebattleLoadout();
+  }
+}
+
+function removeLoadoutWeapon(weaponId) {
+  const selected = [...(loadoutState.selectedWeaponIds || [])];
+  const equippedIndex = selected.indexOf(weaponId);
+  if (equippedIndex < 0) return;
+  selected.splice(equippedIndex, 1);
+  loadoutState.selectedWeaponIds = selected;
+  loadoutState.activeWeaponSlot = Math.min(equippedIndex, Math.max(0, selected.length - 1));
+  loadoutState.activeWeaponDetailId = weaponId;
+  loadoutState.weaponSkillPickerOpen = false;
+  renderPrebattleWeapons();
+}
+
 function createState() {
+  const boss = currentBossBlueprint();
+  const equippedWeapons = carriedWeapons();
+  const armorStats = equippedArmorStats();
+  const playerMaxHp = 220 + armorStats.hp;
   const parts = partBlueprint.map((part) => ({
     ...part,
     hp: part.maxHp,
@@ -475,10 +1164,12 @@ function createState() {
     phase: "玩家回合准备",
     turn: "player_start",
     round: 1,
-    selectedWeaponId: "fists",
+    selectedWeaponId: equippedWeapons[0]?.id || weapons[0].id,
     player: {
-      hp: 220,
-      maxHp: 220,
+      hp: playerMaxHp,
+      maxHp: playerMaxHp,
+      attack: armorStats.attack,
+      defense: armorStats.defense,
       soul: 0,
       ammo: 10,
       maxAmmo: 10,
@@ -489,6 +1180,8 @@ function createState() {
       nextDamageBonus: 0,
     },
     enemy: {
+      bossId: boss.id,
+      name: boss.name,
       hp: parts.reduce((sum, part) => sum + part.hp, 0),
       maxHp: parts.reduce((sum, part) => sum + part.maxHp, 0),
       stage: 1,
@@ -523,6 +1216,9 @@ function createState() {
 function resetGame() {
   hideVideoOverlay();
   state = createState();
+  const boss = currentBossBlueprint();
+  const weaponNames = carriedWeapons().map((weapon) => weapon.name).join(" / ");
+  const armorStats = equippedArmorStats();
   floaters = [];
   playerHitFloaters = [];
   buildWeaponControls();
@@ -530,9 +1226,69 @@ function resetGame() {
   buildSoulSkillControls();
   updatePlayerSpriteForWeapon();
   renderWeaponToggle();
-  showWeakpointTip("胸口核心已暴露，优先攻击弱点。", 1.5);
-  log("战斗开始：手部、脚部被硬甲覆盖，胸口核心是裸露弱点。");
+  showWeakpointTip(boss.startTip || "胸口核心已暴露，优先攻击弱点。", 1.5);
+  log(`挑战开始：${boss.name}。${boss.summary}`);
+  log(`携带武器：${weaponNames}。`);
+  log(`战甲属性：攻击 +${armorStats.attack} / 防御 +${armorStats.defense} / 生命 +${armorStats.hp}。`);
   beginPlayerTurn({ initial: true });
+}
+
+function loadoutNavigationItems() {
+  return loadoutParts;
+}
+
+function renderArmorEnergyBadge(part, item) {
+  const currentItem = equippedArmorItemForPart(part);
+  const currentCapacity = armorEnergyCapacityForItem(part, currentItem);
+  const nextCapacity = armorEnergyCapacityForItem(part, item);
+  const delta = nextCapacity - currentCapacity;
+  const deltaText = delta === 0 ? "±0" : delta > 0 ? `+${delta}` : `${delta}`;
+  const deltaClass = delta > 0 ? "up" : delta < 0 ? "down" : "same";
+  return `
+    <em class="attachment-energy ${deltaClass}">
+      模块容量 ${nextCapacity}
+      <b>${deltaText}</b>
+    </em>
+  `;
+}
+
+function renderArmorStatMeter(label, value, max, className) {
+  return renderMeter(label, value, max, `armor-stat-meter ${className}`);
+}
+
+function renderLoadoutArmorSummary(activePart) {
+  const panel = document.getElementById("loadoutArmorSummary");
+  if (!panel) return;
+  const stats = equippedArmorStats();
+  const board = buildArmorFactorBoard();
+  const activeCapacity = armorEnergyCapacityForPart(activePart);
+  const activeFactor = armorFactorForPart(activePart);
+  panel.innerHTML = `
+    <span>战甲图解</span>
+    <div class="loadout-summary-grid">
+      ${renderArmorStatMeter("攻击", stats.attack, 24, "attack")}
+      ${renderArmorStatMeter("防御", stats.defense, 32, "defense")}
+      ${renderArmorStatMeter("生命", stats.hp, 95, "hp")}
+    </div>
+    <div class="loadout-energy-graphic">
+      <span>
+        <b>改造容量</b>
+        <em>${board.capacityUsed} / ${board.capacityTotal}</em>
+      </span>
+      <div class="loadout-energy-bar" style="--energy-value:${clampPercent(board.capacityUsed, board.capacityTotal)}%">
+        <i></i>
+      </div>
+      ${renderEnergyDots(board.capacityUsed, board.capacityTotal, "loadout-energy-dots")}
+    </div>
+    <div class="loadout-active-part-energy">
+      <span>
+        <b>${activePart.label}容量</b>
+        <em>${activeCapacity}</em>
+      </span>
+      ${renderEnergyDots(activeCapacity, 10, "part-capacity-dots")}
+      <small>${activeFactor ? `当前模块：${activeFactor.factorName}` : "当前未装入模块"}</small>
+    </div>
+  `;
 }
 
 function renderPrebattleLoadout() {
@@ -542,26 +1298,35 @@ function renderPrebattleLoadout() {
   const titleEl = document.getElementById("attachmentTitle");
   if (!partNav || !slotsEl || !itemsEl || !titleEl) return;
 
-  const activePart = loadoutParts.find((part) => part.id === loadoutState.activePartId) || loadoutParts[0];
+  renderPrebattleFlow();
+  renderBossSelection();
+
+  const navItems = loadoutNavigationItems();
+  let activeTab = navItems.find((part) => part.id === loadoutState.activePartId) || loadoutParts[0];
+  const activePart = loadoutParts.find((part) => part.id === activeTab.id) || loadoutParts[0];
   if (loadoutState.activeSlot !== "base" && !activePart.slots.includes(loadoutState.activeSlot)) {
     loadoutState.activeSlot = activePart.slots[0];
   }
+  renderLoadoutArmorSummary(activePart);
 
   partNav.innerHTML = "";
-  loadoutParts.forEach((part) => {
+  navItems.forEach((part) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `loadout-part-button${part.id === activePart.id ? " active" : ""}`;
+    button.className = `loadout-part-button${part.id === activeTab.id ? " active" : ""}`;
     button.dataset.part = part.id;
     button.innerHTML = `<span class="loadout-part-icon">${part.icon}</span><span>${part.label}</span>`;
     button.addEventListener("click", () => {
       loadoutState.activePartId = part.id;
       loadoutState.activeSlot = "base";
       loadoutState.isFocusing = false;
+      hideLoadoutTacticalInfo();
       renderPrebattleLoadout();
     });
     partNav.appendChild(button);
   });
+
+  itemsEl.classList.remove("weapon-selection-grid");
 
   slotsEl.innerHTML = "";
   activePart.slots.forEach((slot) => {
@@ -602,10 +1367,12 @@ function renderPrebattleLoadout() {
     card.type = "button";
     card.className = `attachment-card${active ? " active" : ""}`;
     card.dataset.itemName = item.name;
+    const energyBadge = loadoutState.activeSlot === "base" ? renderArmorEnergyBadge(activePart, item) : "";
     card.innerHTML = `
       <span class="attachment-card-preview">${renderLoadoutItemPreview(item, item.icon)}</span>
       <span>${item.name}</span>
       <small>${item.trait}</small>
+      ${energyBadge}
     `;
     card.addEventListener("click", () => {
       loadoutState.equipped[key] = item;
@@ -624,6 +1391,1432 @@ function renderPrebattleLoadout() {
     empty.textContent = "该槽位暂无可装配挂件";
     itemsEl.appendChild(empty);
   }
+  updateEnterBattleState();
+}
+
+function renderWeaponLoadoutTab(slotsEl, itemsEl, titleEl) {
+  const selected = loadoutState.selectedWeaponIds || [];
+  const activeSlot = Math.max(0, Math.min(1, loadoutState.activeWeaponSlot || 0));
+  titleEl.textContent = `选择携带武器：${weaponLoadoutSlots[activeSlot].label}`;
+  slotsEl.innerHTML = "";
+  weaponLoadoutSlots.forEach((slot, index) => {
+    const weapon = weapons.find((item) => item.id === selected[index]);
+    const slotEl = document.createElement("button");
+    slotEl.type = "button";
+    slotEl.className = `attachment-slot weapon-carry-slot${index === activeSlot ? " active" : ""}`;
+    slotEl.dataset.weaponSlot = slot.id;
+    slotEl.innerHTML = `
+      <span>${slot.label}</span>
+      <span class="attachment-slot-box${weapon ? " equipped" : ""}">
+        ${renderWeaponPreview(weapon, "+")}
+      </span>
+    `;
+    slotEl.addEventListener("click", () => {
+      loadoutState.activeWeaponSlot = index;
+      renderPrebattleLoadout();
+    });
+    slotsEl.appendChild(slotEl);
+  });
+  itemsEl.innerHTML = "";
+  weapons.forEach((weapon) => {
+    const equippedIndex = selected.indexOf(weapon.id);
+    const active = selected[activeSlot] === weapon.id;
+    const locked = !isWeaponUnlocked(weapon);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `loadout-weapon-card${active ? " active" : ""}${equippedIndex >= 0 && !active ? " in-other-slot" : ""}${locked ? " locked" : ""}`;
+    button.dataset.weapon = weapon.id;
+    button.disabled = locked;
+    button.innerHTML = `
+      <span class="loadout-weapon-icon">
+        ${renderWeaponPreview(weapon, weapon.short)}
+      </span>
+      <span>
+        <strong>${weapon.name}</strong>
+        <small>${weapon.role}</small>
+        ${locked ? "<em>未解锁</em>" : equippedIndex >= 0 && !active ? `<em>已装入${weaponLoadoutSlots[equippedIndex].label}</em>` : ""}
+      </span>
+    `;
+    button.addEventListener("click", () => toggleLoadoutWeapon(weapon.id));
+    itemsEl.appendChild(button);
+  });
+}
+
+function renderWeaponPreview(weapon, fallback) {
+  if (weapon?.icon) return `<img src="${weapon.icon}" alt="${weapon.name}" />`;
+  return `<strong>${weapon?.short || fallback}</strong>`;
+}
+
+function renderWeaponSkillTags(skill) {
+  const tags = [];
+  if (skill.armorBreaker) tags.push("破甲");
+  if (skill.comboChance) tags.push("连击");
+  if (skill.kindLabel) tags.push(skill.kindLabel);
+  return tags.map((tag) => `<i class="${skillTagClass(tag)}">${tag}</i>`).join("");
+}
+
+function renderWeaponSkillCard(skill, weaponId, mode = "equipped", slotIndex = 0) {
+  if (!skill) {
+    return `
+      <button class="weapon-skill-slot empty" type="button" data-open-skill-picker="${weaponId}" data-skill-slot="${slotIndex}">
+        <b>+</b>
+        <span>空技能槽</span>
+        <small>点击选择技能</small>
+      </button>
+    `;
+  }
+  return `
+    <article class="weapon-skill-slot ${mode}">
+      <span class="weapon-skill-target${skill.targetParts.length > 1 ? " multi" : ""}" style="--skill-color:${skill.color}">
+        ${renderPartIconGroup(skill.targetParts || [], "badge")}
+      </span>
+      <span class="weapon-skill-copy">
+        <span class="weapon-skill-title-line">
+          <strong>${skill.name}</strong>
+          <em class="weapon-skill-cost">${skill.actionCost > 0 ? `行动力 ${skill.actionCost}` : "0费"}</em>
+        </span>
+        <span class="weapon-skill-tag-row">${renderWeaponSkillTags(skill)}</span>
+        <small>${skill.desc} ${skillSummaryText(skill)}</small>
+      </span>
+      ${mode === "equipped"
+        ? `<button class="weapon-skill-remove" type="button" data-remove-skill="${skill.id}" data-weapon="${weaponId}" aria-label="卸下${skill.name}">卸下</button>`
+        : `<button class="weapon-skill-equip" type="button" data-equip-skill="${skill.id}" data-weapon="${weaponId}" aria-label="装配${skill.name}">装配</button>`}
+    </article>
+  `;
+}
+
+function renderWeaponSkillPicker(weapon) {
+  const equippedCount = configuredWeaponSkillIds(weapon.id).length;
+  const available = availableWeaponSkills(weapon.id);
+  if (!loadoutState.weaponSkillPickerOpen || equippedCount >= WEAPON_SKILL_SLOT_COUNT) return "";
+  const slotIndex = Math.max(0, Math.min(WEAPON_SKILL_SLOT_COUNT - 1, Number(loadoutState.activeWeaponSkillSlot) || equippedCount));
+  return `
+    <section class="weapon-skill-picker-panel" role="dialog" aria-label="选择武器技能">
+      <div class="weapon-detail-section-head">
+        <strong>选择技能</strong>
+        <small>技能槽 ${slotIndex + 1}</small>
+        <button class="weapon-skill-picker-close" type="button" data-close-skill-picker aria-label="关闭技能选择">×</button>
+      </div>
+      <div class="weapon-skill-candidates">
+        ${available.length
+          ? available.map((skill) => renderWeaponSkillCard(skill, weapon.id, "candidate")).join("")
+          : `<p>当前没有未装配技能。</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderWeaponDetailPanel(weapon) {
+  if (!ui.weaponDetailPanel || !weapon) return;
+  const shouldShow = loadoutState.weaponDetailOpen && isWeaponUnlocked(weapon);
+  ui.weaponDetailPanel.classList.toggle("open", shouldShow);
+  ui.prebattleScreen?.classList.toggle("weapon-detail-open", shouldShow);
+  if (!shouldShow) {
+    ui.weaponDetailPanel.innerHTML = "";
+    return;
+  }
+  ensureWeaponSkillLoadout();
+  const selected = loadoutState.selectedWeaponIds || [];
+  const activeSlot = Math.max(0, Math.min(1, loadoutState.activeWeaponSlot || 0));
+  const equippedIndex = selected.indexOf(weapon.id);
+  const equippedSkills = configuredWeaponSkills(weapon.id);
+  const skillSlots = Array.from({ length: WEAPON_SKILL_SLOT_COUNT }, (_, index) => equippedSkills[index] || null);
+  const locked = !isWeaponUnlocked(weapon);
+  if (equippedSkills.length >= WEAPON_SKILL_SLOT_COUNT) {
+    loadoutState.weaponSkillPickerOpen = false;
+  }
+  ui.weaponDetailPanel.innerHTML = `
+    <header class="weapon-detail-head">
+      <span class="weapon-detail-icon">${renderWeaponPreview(weapon, weapon.short)}</span>
+      <span>
+        <small>${equippedIndex >= 0 ? `已装配：${weaponLoadoutSlots[equippedIndex]?.label || "武器槽"}` : "未装配"}</small>
+        <strong>${weapon.name}</strong>
+        <em>${weapon.role}</em>
+      </span>
+    </header>
+
+    <section class="weapon-detail-skills">
+      <div class="weapon-skill-equipped-list">
+        ${skillSlots.map((skill, index) => renderWeaponSkillCard(skill, weapon.id, "equipped", index)).join("")}
+      </div>
+      ${renderWeaponSkillPicker(weapon)}
+    </section>
+
+    <footer class="weapon-detail-actions">
+      <button class="weapon-detail-equip" type="button" data-equip-weapon="${weapon.id}" ${locked || selected[activeSlot] === weapon.id ? "disabled" : ""}>
+        装配到${weaponLoadoutSlots[activeSlot].label}
+      </button>
+      <button class="weapon-detail-remove" type="button" data-remove-weapon="${weapon.id}" ${equippedIndex < 0 ? "disabled" : ""}>
+        卸下
+      </button>
+    </footer>
+  `;
+
+  ui.weaponDetailPanel.querySelectorAll("[data-open-skill-picker]").forEach((button) => {
+    button.addEventListener("click", () => {
+      loadoutState.activeWeaponDetailId = button.dataset.openSkillPicker;
+      loadoutState.activeWeaponSkillSlot = Number(button.dataset.skillSlot) || 0;
+      loadoutState.weaponDetailOpen = true;
+      loadoutState.weaponSkillPickerOpen = true;
+      renderPrebattleWeapons();
+    });
+  });
+  ui.weaponDetailPanel.querySelector("[data-close-skill-picker]")?.addEventListener("click", () => {
+    loadoutState.weaponSkillPickerOpen = false;
+    renderPrebattleWeapons();
+  });
+  ui.weaponDetailPanel.querySelectorAll("[data-equip-skill]").forEach((button) => {
+    button.addEventListener("click", () => equipSkillToWeapon(button.dataset.weapon, button.dataset.equipSkill));
+  });
+  ui.weaponDetailPanel.querySelectorAll("[data-remove-skill]").forEach((button) => {
+    button.addEventListener("click", () => unequipSkillFromWeapon(button.dataset.weapon, button.dataset.removeSkill));
+  });
+  ui.weaponDetailPanel.querySelector("[data-equip-weapon]")?.addEventListener("click", () => toggleLoadoutWeapon(weapon.id));
+  ui.weaponDetailPanel.querySelector("[data-remove-weapon]")?.addEventListener("click", () => removeLoadoutWeapon(weapon.id));
+}
+
+function renderPrebattleWeapons() {
+  if (!ui.weaponCarrySlots || !ui.weaponGallery) return;
+  ensureWeaponSkillLoadout();
+  renderPrebattleFlow();
+  updateEnterBattleState();
+  const selected = loadoutState.selectedWeaponIds || [];
+  const activeSlot = Math.max(0, Math.min(1, loadoutState.activeWeaponSlot || 0));
+  const detailWeapon = weapons.find((weapon) => weapon.id === loadoutState.activeWeaponDetailId)
+    || weapons.find((weapon) => weapon.id === selected[activeSlot])
+    || weapons.find(isWeaponUnlocked)
+    || weapons[0];
+  loadoutState.activeWeaponDetailId = detailWeapon?.id || "";
+  if (ui.weaponSelectionTitle) {
+    ui.weaponSelectionTitle.textContent = `当前装配槽：${weaponLoadoutSlots[activeSlot].label}`;
+  }
+
+  ui.weaponCarrySlots.innerHTML = "";
+  weaponLoadoutSlots.forEach((slot, index) => {
+    const weapon = weapons.find((item) => item.id === selected[index]);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `weapon-carry-card${index === activeSlot ? " active" : ""}`;
+    button.dataset.weaponSlot = slot.id;
+    button.innerHTML = `
+      <span>${slot.label}</span>
+      <span class="weapon-carry-box${weapon ? " equipped" : ""}">
+        ${renderWeaponPreview(weapon, "+")}
+      </span>
+    `;
+    button.addEventListener("click", () => {
+      loadoutState.activeWeaponSlot = index;
+      if (weapon) loadoutState.activeWeaponDetailId = weapon.id;
+      loadoutState.weaponDetailOpen = Boolean(weapon);
+      loadoutState.weaponSkillPickerOpen = false;
+      renderPrebattleWeapons();
+    });
+    ui.weaponCarrySlots.appendChild(button);
+  });
+
+  ui.weaponGallery.innerHTML = "";
+  weapons.forEach((weapon) => {
+    const equippedIndex = selected.indexOf(weapon.id);
+    const active = selected[activeSlot] === weapon.id;
+    const locked = !isWeaponUnlocked(weapon);
+    const statusLabel = locked ? "未解锁" : "";
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `weapon-gallery-card${weapon.id === detailWeapon.id ? " active" : ""}${equippedIndex >= 0 ? " equipped" : ""}${locked ? " locked" : ""}`;
+    card.disabled = locked;
+    card.dataset.weapon = weapon.id;
+    card.innerHTML = `
+      <span class="weapon-gallery-art">${renderWeaponPreview(weapon, weapon.short)}</span>
+      <span class="weapon-gallery-name">${weapon.name}</span>
+      <small>${statusLabel || (equippedIndex >= 0 ? `已装配：${weaponLoadoutSlots[equippedIndex]?.label}` : weapon.role)}</small>
+    `;
+    card.addEventListener("click", () => {
+      loadoutState.activeWeaponDetailId = weapon.id;
+      loadoutState.weaponDetailOpen = true;
+      loadoutState.weaponSkillPickerOpen = false;
+      renderPrebattleWeapons();
+    });
+    ui.weaponGallery.appendChild(card);
+  });
+
+  renderWeaponDetailPanel(detailWeapon);
+}
+
+function renderBossTrendIcon(trend) {
+  if (trend === "up") return "↑";
+  if (trend === "down") return "↓";
+  return "–";
+}
+
+function renderBossTendencies(items = []) {
+  return items
+    .map((item) => `
+      <span class="boss-tendency ${item.trend || "flat"}">
+        <b>${item.label}</b>
+        <em>${item.value}</em>
+        <i>${renderBossTrendIcon(item.trend)}</i>
+      </span>
+    `)
+    .join("");
+}
+
+function renderBossScale(value = 0, max = 10) {
+  const filled = Math.max(0, Math.min(max, value));
+  return Array.from({ length: max }, (_, index) => `<i${index < filled ? " class=\"filled\"" : ""}></i>`).join("");
+}
+
+function renderBossAbilityProfile(items = []) {
+  return items
+    .map((item) => `
+      <div class="boss-ability-row">
+        <span>${item.label}</span>
+        <b>${renderBossScale(item.value)}</b>
+      </div>
+    `)
+    .join("");
+}
+
+function renderBossPartIntel(items = [], mysteries = []) {
+  const knownRows = items
+    .map((item) => {
+      const part = item.partId ? partIconInfo(item.partId) : null;
+      const icon = part ? `<img src="${part.src}" alt="${part.label}" />` : "?";
+      return `
+        <article class="boss-part-row">
+          <span class="boss-part-name">
+            <span class="boss-part-icon">${icon}</span>
+            <strong>${item.label}</strong>
+          </span>
+          <span class="boss-part-advice">
+            <em>${item.state}</em>
+            <small>${item.hint}</small>
+          </span>
+        </article>
+      `;
+    })
+    .join("");
+  const hiddenRows = (mysteries || [])
+    .map((label) => `
+      <article class="boss-part-row mystery-note">
+        <span class="boss-part-name">
+          <span class="boss-part-icon">?</span>
+          <strong>未披露</strong>
+        </span>
+        <span class="boss-part-advice">
+          <em>未知情报</em>
+          <small>${label}</small>
+        </span>
+      </article>
+    `)
+    .join("");
+  return `
+    <div class="boss-part-table">
+      <div class="boss-part-table-head">
+        <span>部位</span>
+        <span>情报与应对</span>
+      </div>
+      ${knownRows}${hiddenRows}
+    </div>
+  `;
+}
+
+function renderBossSelection() {
+  if (!ui.bossCards || !ui.bossIntel) return;
+  const boss = currentBossBlueprint();
+  ui.bossCards.innerHTML = "";
+  bossBlueprints.forEach((item) => {
+    const locked = !isBossUnlocked(item);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `boss-card-button${item.id === boss.id ? " active" : ""}${locked ? " locked" : ""}`;
+    button.dataset.boss = item.id;
+    button.disabled = locked;
+    button.innerHTML = `
+      <span class="boss-card-art">${item.image ? `<img src="${item.image}" alt="${item.name}" />` : `<strong>${item.short || "?"}</strong>`}</span>
+      <span class="boss-card-copy">
+        <strong>${item.name}</strong>
+        <small>${item.title}</small>
+        <em>${locked ? "未开放" : item.threatLevel}</em>
+      </span>
+    `;
+    if (!locked) {
+      button.addEventListener("click", () => {
+        loadoutState.selectedBossId = item.id;
+        renderPrebattleLoadout();
+      });
+    }
+    ui.bossCards.appendChild(button);
+  });
+  ui.bossIntel.innerHTML = `
+    <div class="boss-bestiary">
+      <div class="boss-bestiary-copy">
+        <span class="boss-bestiary-kicker">${boss.habitat || boss.title}</span>
+        <h2>${boss.name}</h2>
+        <section class="boss-note-panel compact">
+          <strong>属性倾向</strong>
+          <div class="boss-tendency-grid">${renderBossTendencies(boss.attributeTendencies)}</div>
+        </section>
+        <section class="boss-note-panel compact boss-ability-panel">
+          <strong>能力倾向</strong>
+          <div class="boss-ability-list">${renderBossAbilityProfile(boss.abilityProfile)}</div>
+        </section>
+      </div>
+      <div class="boss-bestiary-art">
+        <img src="${boss.image}" alt="${boss.name}" />
+      </div>
+      <aside class="boss-bestiary-danger">
+        <section class="boss-part-notes">
+          <strong>形态·部位信息</strong>
+          <div class="boss-part-list">${renderBossPartIntel(boss.partIntel, boss.mysteries)}</div>
+        </section>
+      </aside>
+    </div>
+  `;
+}
+
+function armorThemeForItem(item) {
+  const name = item?.name || "";
+  if (name.includes("岩") || name.includes("铠") || name.includes("重")) return "guardian";
+  if (name.includes("疾") || name.includes("影") || name.includes("忍")) return "shadow";
+  if (name.includes("猎") || name.includes("弓")) return "hunter";
+  return "shura";
+}
+
+function armorFactorById(factorId) {
+  return armorFactorCatalog.find((factor) => factor.id === factorId) || armorFactorCatalog[0];
+}
+
+function ensureArmorFactorLoadout() {
+  if (!loadoutState.armorFactorLoadout) loadoutState.armorFactorLoadout = {};
+  loadoutParts.forEach((part) => {
+    if (!loadoutState.armorFactorLoadout[part.id]) {
+      loadoutState.armorFactorLoadout[part.id] = defaultArmorFactorLoadout[part.id] || armorFactorCatalog[0].id;
+    }
+  });
+  if (!loadoutState.armorFactorBoardSlots || typeof loadoutState.armorFactorBoardSlots !== "object") {
+    loadoutState.armorFactorBoardSlots = {};
+  }
+  Object.entries(defaultArmorFactorBoardSlots).forEach(([slotIndex, factorId]) => {
+    if (!Object.prototype.hasOwnProperty.call(loadoutState.armorFactorBoardSlots, slotIndex)) {
+      loadoutState.armorFactorBoardSlots[slotIndex] = factorId;
+    }
+  });
+}
+
+function armorFactorPartForSlot(slotIndex) {
+  const normalized = Number(slotIndex);
+  return loadoutParts.find((part) => armorFactorSlots[part.id] === normalized) || null;
+}
+
+function armorFactorSlotCapacity(slotIndex) {
+  const part = armorFactorPartForSlot(slotIndex);
+  if (part) return armorEnergyCapacityForPart(part);
+  const totalCapacity = loadoutParts.reduce((sum, item) => sum + armorEnergyCapacityForPart(item), 0);
+  return Math.max(3, Math.min(7, Math.round(totalCapacity / 5)));
+}
+
+function armorFactorCapacityTotal() {
+  ensureArmorFactorLoadout();
+  return Array.from({ length: 9 }, (_, index) => armorFactorSlotCapacity(index))
+    .reduce((sum, capacity) => sum + capacity, 0);
+}
+
+function armorFactorCostUsed(excludedSlotIndex = null) {
+  ensureArmorFactorLoadout();
+  const excluded = excludedSlotIndex === null ? null : Number(excludedSlotIndex);
+  return Object.entries(loadoutState.armorFactorBoardSlots || {}).reduce((sum, [slotIndex, factorId]) => {
+    const normalized = Number(slotIndex);
+    if (!factorId || normalized === excluded) return sum;
+    return sum + armorFactorById(factorId).cost;
+  }, 0);
+}
+
+function canEquipArmorFactorSlot(slotIndex, factorId) {
+  const normalized = Number(slotIndex);
+  const factor = armorFactorById(factorId);
+  if (!Number.isInteger(normalized) || normalized < 0 || normalized > 8 || !factor) return false;
+  return armorFactorCostUsed(normalized) + factor.cost <= armorFactorCapacityTotal();
+}
+
+function armorEnergyCapacityForItem(part, item) {
+  const themeId = armorThemeForItem(item);
+  const profile = armorEnergyProfiles[themeId] || armorEnergyProfiles.shura;
+  return profile[part.id] ?? armorEnergyProfiles.shura[part.id] ?? 0;
+}
+
+function equippedArmorItemForPart(part) {
+  return loadoutState.equipped[`${part.id}:base`]
+    || attachmentOptions.find((item) => item.name === part.defaultItem)
+    || null;
+}
+
+function armorEnergyCapacityForPart(part) {
+  return armorEnergyCapacityForItem(part, equippedArmorItemForPart(part));
+}
+
+function equipArmorFactor(partId, factorId) {
+  ensureArmorFactorLoadout();
+  const part = loadoutParts.find((item) => item.id === partId);
+  const factor = armorFactorById(factorId);
+  if (!part || !factor) return;
+  const slotIndex = armorFactorSlots[partId];
+  if (slotIndex !== undefined && !canEquipArmorFactorSlot(slotIndex, factor.id)) return;
+  loadoutState.armorFactorLoadout[partId] = factor.id;
+  if (slotIndex !== undefined) loadoutState.armorFactorBoardSlots[slotIndex] = factor.id;
+  loadoutState.armorFactorPickerOpen = false;
+  renderPrebattleSkillConfig();
+}
+
+function equipArmorFactorSlot(slotIndex, factorId) {
+  ensureArmorFactorLoadout();
+  const normalized = Number(slotIndex);
+  const factor = armorFactorById(factorId);
+  if (!Number.isInteger(normalized) || normalized < 0 || normalized > 8 || !factor) return;
+  if (!canEquipArmorFactorSlot(normalized, factor.id)) return;
+  loadoutState.armorFactorBoardSlots[normalized] = factor.id;
+  const part = armorFactorPartForSlot(normalized);
+  if (part) loadoutState.armorFactorLoadout[part.id] = factor.id;
+  loadoutState.activeArmorFactorSlot = normalized;
+  loadoutState.armorFactorPickerOpen = false;
+  renderPrebattleSkillConfig();
+}
+
+function clearArmorFactorSlot(slotIndex) {
+  ensureArmorFactorLoadout();
+  const normalized = Number(slotIndex);
+  if (!Number.isInteger(normalized) || normalized < 0 || normalized > 8) return;
+  loadoutState.armorFactorBoardSlots[normalized] = null;
+  loadoutState.activeArmorFactorSlot = normalized;
+  loadoutState.armorFactorPickerOpen = false;
+  renderPrebattleSkillConfig();
+}
+
+function moveArmorFactorSlot(fromSlot, toSlot) {
+  ensureArmorFactorLoadout();
+  const from = Number(fromSlot);
+  const to = Number(toSlot);
+  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from > 8 || to < 0 || to > 8 || from === to) return;
+  const fromFactor = loadoutState.armorFactorBoardSlots[from];
+  if (!fromFactor) return;
+  const toFactor = loadoutState.armorFactorBoardSlots[to] || null;
+  loadoutState.armorFactorBoardSlots[to] = fromFactor;
+  loadoutState.armorFactorBoardSlots[from] = toFactor;
+  Object.entries(armorFactorSlots).forEach(([partId, slotIndex]) => {
+    const factorId = loadoutState.armorFactorBoardSlots[slotIndex];
+    loadoutState.armorFactorLoadout[partId] = factorId || null;
+  });
+  loadoutState.activeArmorFactorSlot = to;
+  loadoutState.armorFactorPickerOpen = false;
+  renderPrebattleSkillConfig();
+}
+
+function armorFactorForPart(part) {
+  ensureArmorFactorLoadout();
+  const equipped = equippedArmorItemForPart(part);
+  if (!equipped) return null;
+  const themeId = armorThemeForItem(equipped);
+  const theme = armorEnergyProfiles[themeId] || armorEnergyProfiles.shura;
+  const slotIndex = armorFactorSlots[part.id];
+  const boardSlots = loadoutState.armorFactorBoardSlots || {};
+  const hasBoardSlot = Object.prototype.hasOwnProperty.call(boardSlots, slotIndex);
+  const factorId = hasBoardSlot
+    ? boardSlots[slotIndex]
+    : (loadoutState.armorFactorLoadout[part.id] || defaultArmorFactorLoadout[part.id]);
+  if (!factorId) return null;
+  const factor = armorFactorById(factorId);
+  const capacity = armorEnergyCapacityForPart(part);
+  const typeId = factor.type || "resource";
+  const type = armorFactorTypes[typeId] || armorFactorTypes.resource;
+  return {
+    partId: part.id,
+    partLabel: part.label,
+    itemName: equipped.name,
+    themeId,
+    themeName: armorFactorProfiles[themeId]?.name || themeId,
+    typeId,
+    factorId: factor.id,
+    factorName: factor.name,
+    factorTier: factor.tier,
+    factorEffect: factor.effect,
+    cost: factor.cost,
+    capacity,
+    canEquip: true,
+    ...type,
+  };
+}
+
+function armorFactorForSlot(slotIndex) {
+  ensureArmorFactorLoadout();
+  const normalized = Number(slotIndex);
+  const factorId = loadoutState.armorFactorBoardSlots?.[normalized];
+  if (!factorId) return null;
+  const factor = armorFactorById(factorId);
+  const typeId = factor.type || "resource";
+  const type = armorFactorTypes[typeId] || armorFactorTypes.resource;
+  const capacity = armorFactorSlotCapacity(normalized);
+  return {
+    index: normalized,
+    typeId,
+    factorId: factor.id,
+    factorName: factor.name,
+    factorTier: factor.tier,
+    factorEffect: factor.effect,
+    cost: factor.cost,
+    capacity,
+    canEquip: true,
+    ...type,
+  };
+}
+
+function armorFactorLineKey(factors) {
+  const ids = factors.map((factor) => factor.typeId);
+  if (ids.every((id) => id === ids[0])) return `${ids[0]}-${ids[0]}-${ids[0]}`;
+  return "";
+}
+
+function buildArmorFactorBoard() {
+  ensureArmorFactorLoadout();
+  const cells = Array.from({ length: 9 }, (_, index) => {
+    const factor = armorFactorForSlot(index);
+    if (!factor) {
+      return {
+        index,
+        empty: true,
+        capacity: armorFactorSlotCapacity(index),
+      };
+    }
+    return {
+      index,
+      empty: false,
+      ...factor,
+    };
+  });
+
+  const capacityUsed = cells.filter((cell) => !cell.empty).reduce((sum, cell) => sum + cell.cost, 0);
+  const capacityTotal = armorFactorCapacityTotal();
+  const overCapacity = capacityUsed > capacityTotal;
+  const activeLines = armorFactorLineIndices
+    .map((indices) => {
+      const factors = indices.map((index) => cells[index]).filter((cell) => !cell.empty && !overCapacity);
+      if (factors.length !== 3) return null;
+      const recipe = armorFactorLineRecipes[armorFactorLineKey(factors)];
+      if (!recipe) return null;
+      return { indices, factors, ...recipe };
+    })
+    .filter(Boolean);
+  const activeIndices = new Set(activeLines.flatMap((line) => line.indices));
+  return {
+    cells,
+    activeLines,
+    activeIndices,
+    capacityUsed,
+    capacityTotal,
+    overCapacity,
+    title: "战甲模块盘",
+  };
+}
+
+function factorLineCenter(index) {
+  const col = index % 3;
+  const row = Math.floor(index / 3);
+  return {
+    x: 16.667 + col * 33.333,
+    y: 16.667 + row * 33.333,
+  };
+}
+
+function renderArmorFactorLines(activeLines) {
+  if (!activeLines.length) return "";
+  return `
+    <svg class="armor-factor-lines" viewBox="0 0 100 100" aria-hidden="true">
+      ${activeLines.map((line, index) => {
+        const start = factorLineCenter(line.indices[0]);
+        const end = factorLineCenter(line.indices[2]);
+        return `<line class="factor-line-${index % 3}" x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}"></line>`;
+      }).join("")}
+    </svg>
+  `;
+}
+
+function renderArmorFactorPicker() {
+  if (!loadoutState.armorFactorPickerOpen) return "";
+  const slotIndex = Math.max(0, Math.min(8, Number(loadoutState.activeArmorFactorSlot) || 0));
+  const current = armorFactorForSlot(slotIndex);
+  const board = buildArmorFactorBoard();
+  const usedWithoutCurrent = armorFactorCostUsed(slotIndex);
+  const remaining = Math.max(0, board.capacityTotal - usedWithoutCurrent);
+  return `
+    <div class="armor-factor-modal-layer" role="presentation">
+      <div class="armor-factor-modal-backdrop" data-close-factor-picker aria-label="关闭模块列表"></div>
+      <section class="armor-factor-picker-panel" role="dialog" aria-modal="true" aria-label="选择战甲模块">
+        <div class="armor-factor-picker-head">
+          <span>
+            <b>选择模块</b>
+            <small>剩余改造容量 ${remaining} / ${board.capacityTotal}${current ? ` · 当前 ${current.factorName}` : ""}</small>
+          </span>
+          <button type="button" data-close-factor-picker aria-label="关闭模块列表">×</button>
+        </div>
+        <div class="armor-factor-choice-list">
+          ${armorFactorCatalog.map((factor) => {
+            const type = armorFactorTypes[factor.type] || armorFactorTypes.resource;
+            const disabled = usedWithoutCurrent + factor.cost > board.capacityTotal;
+            const active = current?.factorId === factor.id;
+            return `
+              <button class="armor-factor-choice factor-${type.tone}${active ? " active" : ""}" type="button" data-factor-slot="${slotIndex}" data-factor-id="${factor.id}" ${disabled ? "disabled" : ""}>
+                <i>${type.short}</i>
+                <span>
+                <strong>${factor.name}</strong>
+                <small>${type.label}模块 · ${factor.tier}</small>
+              </span>
+              <span class="factor-choice-energy">
+                ${renderFactorCostBadge(factor.cost)}
+              </span>
+            </button>
+          `;
+          }).join("")}
+        </div>
+        <button class="armor-factor-clear" type="button" data-clear-factor-slot="${slotIndex}" ${current ? "" : "disabled"}>清空该槽</button>
+      </section>
+    </div>
+  `;
+}
+
+function renderArmorFactorContent() {
+  const board = buildArmorFactorBoard();
+  const bingoCount = board.activeLines.length;
+  const maxBingo = armorFactorBingoRewards[armorFactorBingoRewards.length - 1]?.count || 0;
+  return `
+    <span>战甲模块盘</span>
+    <strong>${bingoCount} Bingo</strong>
+    <div class="armor-factor-capacity-summary">
+      ${renderMeter("改造容量", board.capacityUsed, board.capacityTotal, "factor-energy-meter")}
+      <span class="factor-bingo-count">
+        <b>Bingo</b>
+        <em>${bingoCount} / ${maxBingo}</em>
+      </span>
+    </div>
+    <div class="armor-factor-board">
+      ${renderArmorFactorLines(board.activeLines)}
+      ${board.cells.map((cell) => {
+        if (cell.empty) {
+          return `
+            <button class="armor-factor-cell empty" type="button" data-open-factor-picker="${cell.index}" data-factor-drop="${cell.index}" aria-label="装填模块槽位${cell.index + 1}">
+              <i>+</i>
+              <b>空槽</b>
+              <em class="factor-cost-badge muted">点击装填</em>
+            </button>
+          `;
+        }
+        return `
+          <button class="armor-factor-cell factor-${cell.tone}${board.activeIndices.has(cell.index) ? " linked" : ""}${board.overCapacity ? " overloaded" : ""}" type="button" draggable="true" data-factor-drag="${cell.index}" data-factor-drop="${cell.index}" data-open-factor-picker="${cell.index}" aria-label="替换${cell.factorName}">
+            <i>${cell.short}</i>
+            <b>${cell.factorName}</b>
+            ${renderFactorCostBadge(cell.cost)}
+          </button>
+        `;
+      }).join("")}
+    </div>
+    ${renderArmorFactorPicker()}
+    <div class="armor-factor-effects">
+      ${armorFactorBingoRewards.map((reward) => {
+        const unlocked = bingoCount >= reward.count;
+        return `
+          <span class="${unlocked ? "unlocked" : "locked"}">
+            <i>${unlocked ? reward.count : "?"}</i>
+            <b>${reward.title}</b>
+            <em>${unlocked ? reward.effect : "未披露"}</em>
+          </span>
+        `;
+      }).join("")}
+      ${board.activeLines.length
+        ? `<div class="armor-factor-line-notes">
+          ${board.activeLines.map((line, index) => `<small>连线 ${index + 1}：${line.effect}</small>`).join("")}
+        </div>`
+        : `<div class="armor-factor-line-notes"><small>将同类型模块排成横、竖或斜向三连后，才会点亮连线并解锁 Bingo 奖励。</small></div>`}
+    </div>
+    <small>点击模块槽可替换模块。模块总占用不能超过战甲提供的改造容量；只有同类型三连会触发 Bingo。</small>
+  `;
+}
+
+function renderArmorFactorEditor() {
+  if (!ui.skillEditor) return;
+  ui.skillEditor.classList.add("armor-factor-editor");
+  ui.skillEditor.innerHTML = `
+    <div class="armor-factor-editor-body">
+      ${renderArmorFactorContent()}
+    </div>
+  `;
+  ui.skillEditor.querySelectorAll("[data-open-factor-picker]").forEach((button) => {
+    button.addEventListener("click", () => {
+      loadoutState.activeArmorFactorSlot = Number(button.dataset.openFactorPicker) || 0;
+      loadoutState.armorFactorPickerOpen = true;
+      renderPrebattleSkillConfig();
+    });
+  });
+  ui.skillEditor.querySelectorAll("[data-factor-drag]").forEach((button) => {
+    button.addEventListener("dragstart", (event) => {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", button.dataset.factorDrag);
+      button.classList.add("dragging");
+    });
+    button.addEventListener("dragend", () => {
+      button.classList.remove("dragging");
+      ui.skillEditor.querySelectorAll(".factor-drop-target").forEach((target) => target.classList.remove("factor-drop-target"));
+    });
+  });
+  ui.skillEditor.querySelectorAll("[data-factor-drop]").forEach((button) => {
+    button.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      button.classList.add("factor-drop-target");
+    });
+    button.addEventListener("dragleave", () => {
+      button.classList.remove("factor-drop-target");
+    });
+    button.addEventListener("drop", (event) => {
+      event.preventDefault();
+      button.classList.remove("factor-drop-target");
+      moveArmorFactorSlot(event.dataTransfer.getData("text/plain"), button.dataset.factorDrop);
+    });
+  });
+  ui.skillEditor.querySelectorAll("[data-close-factor-picker]").forEach((button) => {
+    button.addEventListener("click", () => {
+      loadoutState.armorFactorPickerOpen = false;
+      renderPrebattleSkillConfig();
+    });
+  });
+  ui.skillEditor.querySelectorAll("[data-factor-slot][data-factor-id]").forEach((button) => {
+    button.addEventListener("click", () => equipArmorFactorSlot(button.dataset.factorSlot, button.dataset.factorId));
+  });
+  ui.skillEditor.querySelector("[data-clear-factor-slot]")?.addEventListener("click", (event) => {
+    clearArmorFactorSlot(event.currentTarget.dataset.clearFactorSlot);
+  });
+  ui.skillEditor.querySelectorAll("[data-factor-part][data-factor-id]").forEach((button) => {
+    button.addEventListener("click", () => equipArmorFactor(button.dataset.factorPart, button.dataset.factorId));
+  });
+}
+
+function armorFactorStatBonus() {
+  return buildArmorFactorBoard().activeLines.reduce((bonus, line) => {
+    Object.entries(line.statBonus || {}).forEach(([key, value]) => {
+      bonus[key] = (bonus[key] || 0) + value;
+    });
+    return bonus;
+  }, {});
+}
+
+function characterTabContent(tabId) {
+  const equippedWeapons = carriedWeapons();
+  const weaponNames = equippedWeapons.map((weapon) => weapon.name).join(" / ");
+  const accessoryNames = ["无人机", "喷气式装置", "酒葫芦", "箭袋"].filter(isLoadoutItemEquipped);
+  const content = {
+    skills: {
+      title: "技能流派",
+      eyebrow: "战斗定位",
+      summary: "通过近战压制与重型破甲打开 Boss 部位，再用灵魂战甲完成爆发。",
+      points: [
+        "拳套负责贴身连击和弱点爆发。",
+        "大剑负责破甲、蓄势和反击窗口。",
+        "灵魂战甲作为固定大招，不随武器切换。",
+      ],
+    },
+    outfit: {
+      title: "服饰挂件",
+      eyebrow: "当前战甲",
+      summary: "修罗主题战甲默认穿戴，挂件提供协同、回复和破甲强化。",
+      points: accessoryNames.length
+        ? accessoryNames.map((name) => `${name} 已装配。`)
+        : ["暂无挂件装配。"],
+    },
+    weapons: {
+      title: "武器携带",
+      eyebrow: "当前武器组",
+      summary: `当前携带 ${weaponNames || "未选择武器"}，战斗中可在携带武器之间切换。`,
+      points: equippedWeapons.map((weapon) => `${weapon.name}：${weapon.role}`),
+    },
+  };
+  return content[tabId] || content.skills;
+}
+
+function renderCharacterInfo() {
+  const activeTab = loadoutState.activeCharacterTab || "skills";
+  ui.characterTabButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.characterTab === activeTab);
+  });
+  if (!ui.characterStyleCard || !ui.characterTabPanel) return;
+  const info = characterTabContent(activeTab);
+  const boss = currentBossBlueprint();
+  ui.characterStyleCard.innerHTML = `
+    <span>当前流派</span>
+    <h2>机动破甲武士</h2>
+    <p>面向 ${boss.name} 的战前策略：用破甲打开硬甲部位，用高爆发压低胸口核心。</p>
+    <div class="character-style-tags">
+      <i>近战压制</i>
+      <i>破甲应对</i>
+      <i>挂件协同</i>
+    </div>
+  `;
+  ui.characterTabPanel.innerHTML = `
+    <span>${info.eyebrow}</span>
+    <h3>${info.title}</h3>
+    <p>${info.summary}</p>
+    <ul>
+      ${info.points.map((point) => `<li>${point}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function equippedLoadoutItemByName(itemName) {
+  return Object.values(loadoutState.equipped).find((item) => item?.name === itemName)
+    || attachmentOptions.find((item) => item.name === itemName)
+    || null;
+}
+
+function lockedSkillPreviewForSource(source) {
+  const weaponPreviews = {
+    fists: {
+      id: "locked_fists_air_combo",
+      name: "裂空追击",
+      targetParts: ["core", "arms"],
+      targetLabel: "胸部+手部",
+      kindLabel: "连携",
+      comboChance: 0.65,
+      damage: 88,
+      armorDamage: 18,
+      actionCost: 4,
+      color: "#76d17b",
+      desc: "贴身二段追击，适合破甲后连续压低弱点血量。",
+      unlockHint: "拳套熟练度 Lv.2 解锁",
+    },
+    greatsword: {
+      id: "locked_gs_mountain_break",
+      name: "崩山断甲",
+      targetParts: ["arms", "legs"],
+      targetLabel: "手部+脚部",
+      kindLabel: "重破甲",
+      armorBreaker: true,
+      damage: 96,
+      armorDamage: 140,
+      actionCost: 5,
+      color: "#f0b84f",
+      desc: "高行动力重击，专门处理多处硬甲部位。",
+      unlockHint: "大剑熟练度 Lv.2 解锁",
+    },
+    bow: {
+      id: "locked_bow_core_burst",
+      name: "爆裂穿心矢",
+      targetParts: ["core"],
+      targetLabel: "胸部",
+      kindLabel: "远程爆发",
+      armorBreaker: true,
+      damage: 120,
+      armorDamage: 40,
+      actionCost: 4,
+      ammoCost: 2,
+      color: "#58b7ff",
+      desc: "消耗更多弹药，对裸露核心造成高额单点爆发。",
+      unlockHint: "弓弩熟练度 Lv.2 解锁",
+    },
+  };
+
+  const armorPreviews = {
+    armor_head: ["战术解析", "读取 Boss 未披露情报，提前看到关键准备动作。"],
+    armor_torso: ["熔核护盾", "承受高威胁攻击后生成临时护盾。"],
+    armor_pants: ["稳步推进", "降低被击退和踉跄带来的行动损失。"],
+    armor_bracer: ["过载臂甲", "强化下一次近战破甲或连击判定。"],
+    armor_shoes: ["踏焰步", "闪避成功后提高下次攻击收益。"],
+  };
+
+  const accessoryPreviews = {
+    accessory_drone: ["蜂群齐射", "无人机在破甲窗口中追加多段远程射击。"],
+    accessory_jet: ["垂直轰击", "喷气装置改变攻击轨迹，形成跃升重击。"],
+    accessory_gourd: ["醉意爆发", "饮酒后短时间提高攻击与抗打断能力。"],
+    accessory_quiver: ["破甲箭幕", "箭袋提供更多穿甲箭，压制多个硬甲部位。"],
+    accessory_sigils: ["魂能回路", "提高灵魂战甲充能效率并强化大招。"],
+  };
+
+  const weaponPreview = weaponPreviews[source.id];
+  if (weaponPreview) {
+    return [{ ...weaponPreview, locked: true }];
+  }
+
+  const armorPreview = armorPreviews[source.id];
+  if (armorPreview) {
+    return [{
+      id: `locked_${source.id}_mastery`,
+      name: armorPreview[0],
+      targetParts: [],
+      targetLabel: "自身",
+      kindLabel: "战甲技",
+      sourcePreview: true,
+      damage: 0,
+      armorDamage: 0,
+      actionCost: 0,
+      color: "#9aa8ba",
+      desc: armorPreview[1],
+      unlockHint: "战甲部位强化后解锁",
+      locked: true,
+    }];
+  }
+
+  const accessoryPreview = accessoryPreviews[source.id];
+  if (accessoryPreview) {
+    return [{
+      id: `locked_${source.id}_mastery`,
+      name: accessoryPreview[0],
+      targetParts: [],
+      targetLabel: "挂件",
+      kindLabel: "挂件技",
+      sourcePreview: true,
+      damage: 0,
+      armorDamage: 0,
+      actionCost: 0,
+      color: "#d8b4ff",
+      desc: accessoryPreview[1],
+      unlockHint: "挂件强化后解锁",
+      locked: true,
+    }];
+  }
+
+  return [];
+}
+
+function skillsForSource(source) {
+  return [...(source.skills || []), ...lockedSkillPreviewForSource(source)];
+}
+
+function prebattleSkillGroups() {
+  const weaponSources = carriedWeapons().map((weapon) => ({
+    id: weapon.id,
+    type: "weapon",
+    group: "weapon",
+    name: weapon.name,
+    role: weapon.role,
+    icon: weapon.icon,
+    short: weapon.short,
+    skills: configuredWeaponSkills(weapon.id),
+  }));
+
+  const armorSources = loadoutParts.map((part) => {
+    const equippedItem = loadoutState.equipped[`${part.id}:base`]
+      || attachmentOptions.find((item) => item.name === part.defaultItem);
+    const profile = armorSkillProfiles[part.id];
+    return {
+      id: `armor_${part.id}`,
+      type: "armor",
+      group: "armor",
+      name: part.label,
+      role: equippedItem?.name || "战甲部位",
+      icon: equippedItem?.image || "",
+      short: part.icon,
+      skills: profile ? [{ ...profile, id: `armor_${part.id}_${profile.kind}` }] : [],
+    };
+  });
+
+  const accessorySources = accessorySkillProfiles.map((profile) => {
+    const equippedItem = equippedLoadoutItemByName(profile.itemName);
+    return {
+      id: profile.sourceId,
+      type: "accessory",
+      group: "accessory",
+      name: profile.itemName,
+      role: profile.role,
+      icon: equippedItem?.image || "",
+      short: equippedItem?.icon || profile.fallbackIcon,
+      skills: [{ ...profile.skill }],
+    };
+  });
+
+  return [
+    { id: "weapon", title: "武器", summary: "已携带武器技能", sources: weaponSources },
+    { id: "armor", title: "战甲", summary: "五个基础部位能力", sources: armorSources },
+    { id: "accessory", title: "挂件", summary: "五个挂件技能位", sources: accessorySources },
+  ];
+}
+
+function prebattleSkillSources() {
+  return prebattleSkillGroups().flatMap((group) => group.sources);
+}
+
+function renderPrebattleSkillConfig() {
+  if (!ui.skillLoadoutWeapons || !ui.skillSourceTabs || !ui.skillConfigList || !ui.skillEditor) return;
+  updateEnterBattleState();
+  const groups = prebattleSkillGroups();
+  const sources = groups.flatMap((group) => group.sources);
+  if (!sources.length) return;
+  const preferredGroup = groups.find((group) => group.id === loadoutState.activeSkillGroupId) || groups[0];
+  if (!sources.some((source) => source.id === loadoutState.activeSkillSourceId)) {
+    loadoutState.activeSkillSourceId = preferredGroup.sources[0]?.id || sources[0].id;
+  }
+  const activeSource = sources.find((source) => source.id === loadoutState.activeSkillSourceId) || preferredGroup.sources[0] || sources[0];
+  const activeGroup = groups.find((group) => group.sources.some((source) => source.id === activeSource.id)) || preferredGroup;
+  const activeSourceSkills = skillsForSource(activeSource);
+  const unlockedSkillCount = activeSourceSkills.filter((skill) => !skill.locked).length;
+  const activeArmorBoard = activeGroup.id === "armor" ? buildArmorFactorBoard() : null;
+  loadoutState.activeSkillGroupId = activeGroup.id;
+  loadoutState.skillGroupExpanded = {
+    weapon: false,
+    armor: false,
+    accessory: false,
+    ...(loadoutState.skillGroupExpanded || {}),
+  };
+  if (!activeSourceSkills.some((skill) => skill.id === loadoutState.activeSkillEditorId)) {
+    loadoutState.activeSkillEditorId = activeSourceSkills[0]?.id || "";
+  }
+
+  ui.skillSourceTabs.className = "skill-source-tabs skill-source-tabs-visible";
+  ui.skillSourceTabs.innerHTML = `
+    <span class="skill-board-path">${activeGroup.title}</span>
+    <span class="skill-board-title">
+      <strong>${activeArmorBoard ? "战甲模块盘" : activeSource.name}</strong>
+      <small>${activeArmorBoard ? "由五个战甲部位生成连线效果" : activeSource.role}</small>
+    </span>
+    <em>${activeArmorBoard ? `${activeArmorBoard.activeLines.length} 条连线` : `${unlockedSkillCount}/${activeSourceSkills.length} 可用`}</em>
+  `;
+  ui.skillLoadoutWeapons.innerHTML = groups
+    .map((group) => `
+      <section class="skill-filter-group${loadoutState.skillGroupExpanded[group.id] ? " expanded" : ""}${group.id === activeGroup.id ? " active" : ""}">
+        <button class="skill-filter-head" type="button" data-skill-group="${group.id}" aria-expanded="${loadoutState.skillGroupExpanded[group.id] ? "true" : "false"}">
+          <span>
+            <strong>${group.title}</strong>
+            <small>${group.summary}</small>
+          </span>
+          <i></i>
+        </button>
+        <div class="skill-filter-body">
+          ${group.sources
+            .map((source) => `
+              <button class="skill-loadout-chip${source.id === activeSource.id ? " active" : ""}" type="button" data-skill-source="${source.id}">
+                <span>${renderSkillSourceIcon(source)}</span>
+                <strong>${source.name}</strong>
+                <small>${source.role}</small>
+              </button>
+            `)
+            .join("")}
+        </div>
+      </section>
+    `)
+    .join("");
+
+  ui.skillConfigList.className = "skill-config-list";
+  ui.skillConfigList.innerHTML = activeSourceSkills
+    .map((skill) => renderSkillConfigCard(skill, activeSource))
+    .join("");
+
+  ui.skillLoadoutWeapons.querySelectorAll("[data-skill-group]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const group = groups.find((item) => item.id === button.dataset.skillGroup);
+      if (!group) return;
+      const wasExpanded = !!loadoutState.skillGroupExpanded?.[group.id];
+      loadoutState.activeSkillGroupId = group.id;
+      loadoutState.skillGroupExpanded = {
+        ...(loadoutState.skillGroupExpanded || {}),
+        [group.id]: !wasExpanded,
+      };
+      if (!group.sources.some((source) => source.id === loadoutState.activeSkillSourceId)) {
+        loadoutState.activeSkillSourceId = group.sources[0]?.id || "";
+        loadoutState.activeSkillEditorId = skillsForSource(group.sources[0] || {})[0]?.id || "";
+      }
+      renderPrebattleSkillConfig();
+    });
+  });
+
+  ui.skillLoadoutWeapons.querySelectorAll("[data-skill-source]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const source = sources.find((item) => item.id === button.dataset.skillSource);
+      if (!source) return;
+      const group = groups.find((item) => item.sources.some((groupSource) => groupSource.id === source.id));
+      if (group) {
+        loadoutState.activeSkillGroupId = group.id;
+        loadoutState.skillGroupExpanded = {
+          ...(loadoutState.skillGroupExpanded || {}),
+          [group.id]: true,
+        };
+      }
+      loadoutState.activeSkillSourceId = source.id;
+      loadoutState.activeSkillEditorId = skillsForSource(source)[0]?.id || "";
+      renderPrebattleSkillConfig();
+    });
+  });
+
+  ui.skillConfigList.querySelectorAll("[data-skill-config]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const source = sources.find((item) => item.id === button.dataset.skillSource);
+      if (!source) return;
+      loadoutState.activeSkillSourceId = source.id;
+      loadoutState.activeSkillEditorId = button.dataset.skillConfig || source.skills[0]?.id || "";
+      renderPrebattleSkillConfig();
+    });
+  });
+
+  const activeSkill = activeSourceSkills.find((skill) => skill.id === loadoutState.activeSkillEditorId) || activeSourceSkills[0];
+  if (activeGroup.id === "armor") {
+    renderArmorFactorEditor();
+  } else {
+    renderSkillEditor(activeSkill, activeSource);
+  }
+}
+
+function renderSkillSourceIcon(source) {
+  return source.icon ? `<img src="${source.icon}" alt="" />` : `<b>${source.short}</b>`;
+}
+
+function skillConfigMeta(skill) {
+  if (skill.statBonus) {
+    return [`基础属性`, statBonusText(skill.statBonus)];
+  }
+  if (skill.noEffect) return ["无战斗效果"];
+  const meta = [];
+  if (skill.targetLabel && (skill.targetParts || []).length) meta.push(skill.targetLabel);
+  if (skill.kindLabel) meta.push(skill.kindLabel);
+  if (skill.damage > 0) meta.push(skill.maxDots ? `每档伤害 ${skill.damage}` : `伤害 ${skill.damage}`);
+  const armorDamage = effectiveArmorDamage(skill);
+  if (armorDamage > 0) meta.push(`护甲 ${armorDamage}`);
+  if (skill.ammoCost) meta.push(`弹药 ${skill.ammoCost}`);
+  return meta.length ? meta : ["配置预览"];
+}
+
+function renderSkillConfigCard(skill, source) {
+  const partIds = skill.targetParts || [];
+  const iconMarkup = skill.noEffect || skill.statBonus || skill.sourcePreview ? renderSkillSourceIcon(source) : renderPartIconGroup(partIds, "badge");
+  const meta = skillConfigMeta(skill);
+  return `
+    <button class="skill-config-card${skill.id === loadoutState.activeSkillEditorId ? " active" : ""}${skill.locked ? " locked" : ""}" type="button" data-skill-source="${source.id}" data-skill-config="${skill.id}">
+      <span class="skill-config-part${partIds.length > 1 ? " multi" : ""}${skillTargetClass(skill)}${skillTargetCountClass(skill)}${skill.noEffect ? " no-effect" : ""}${skill.statBonus ? " stat-bonus" : ""}" style="--skill-color:${skill.color}">
+        ${iconMarkup}
+      </span>
+      <span class="skill-config-copy">
+        <span class="skill-config-title-row">
+          <strong>${skill.name}</strong>
+          <em>${skill.locked ? "未解锁" : "可用"}</em>
+        </span>
+        <span class="skill-config-tags">${renderPrebattleSkillTags(skill)}</span>
+        <span class="skill-config-meta">${meta.map((item) => `<i>${item}</i>`).join("")}</span>
+        <small>${skill.desc}${skill.locked && skill.unlockHint ? ` ${skill.unlockHint}` : ""}</small>
+      </span>
+      ${skill.actionCost > 0 ? `<span class="skill-config-cost">行动力<b>${skill.actionCost}</b></span>` : ""}
+    </button>
+  `;
+}
+
+function partLabelForConfig(partId) {
+  const runtimePart = state?.enemy?.parts?.find((part) => part.id === partId);
+  if (runtimePart) return runtimePart.label;
+  const blueprintPart = partBlueprint.find((part) => part.id === partId);
+  return blueprintPart?.label || partId;
+}
+
+function renderPrebattleSkillTags(skill) {
+  const tags = [];
+  if (skill.locked) tags.push("未解锁");
+  if (skill.armorBreaker) tags.push("破甲");
+  if (skill.comboChance) tags.push("连击");
+  return tags.map((tag) => `<i class="${skillTagClass(tag)}">${tag}</i>`).join("");
+}
+
+function statBonusText(stats = {}) {
+  const pieces = [];
+  if (stats.attack) pieces.push(`攻击 +${stats.attack}`);
+  if (stats.defense) pieces.push(`防御 +${stats.defense}`);
+  if (stats.hp) pieces.push(`生命 +${stats.hp}`);
+  return pieces.length ? pieces.join(" / ") : "无属性";
+}
+
+function skillPreviewVideo(skill) {
+  if (skill.previewVideo) {
+    return { src: skill.previewVideo, label: skill.previewVideoLabel || "表现预览" };
+  }
+  if (skill.cinematicVideo) {
+    return { src: skill.cinematicVideo, label: "技能表现预览" };
+  }
+  if (skill.accessoryFlow?.introVideo) {
+    return { src: skill.accessoryFlow.introVideo, label: "挂件选择起手" };
+  }
+  const firstAccessoryEffect = skill.accessoryFlow?.effects
+    ? Object.values(skill.accessoryFlow.effects).find((effect) => effect?.video)
+    : null;
+  if (firstAccessoryEffect?.video) {
+    return { src: firstAccessoryEffect.video, label: `${firstAccessoryEffect.label || "挂件"}预览` };
+  }
+  return null;
+}
+
+function renderSkillPreviewVideo(skill) {
+  const preview = skillPreviewVideo(skill);
+  if (!preview) return "";
+  return `
+    <section class="skill-editor-video-preview" aria-label="${preview.label}">
+      <span>${preview.label}</span>
+      <video src="${preview.src}" muted loop playsinline autoplay preload="metadata"></video>
+    </section>
+  `;
+}
+
+function renderSkillEditor(skill, source) {
+  if (!ui.skillEditor) return;
+  ui.skillEditor.classList.remove("armor-factor-editor");
+  if (!skill) {
+    ui.skillEditor.innerHTML = `<p class="skill-editor-empty">当前来源暂无技能。</p>`;
+    return;
+  }
+  if (skill.locked) {
+    const targetNames = (skill.targetParts || []).length ? skill.targetParts.map(partLabelForConfig).join(" / ") : skill.targetLabel || "自身";
+    ui.skillEditor.innerHTML = `
+      <div class="skill-editor-head">
+        <span class="skill-editor-source locked">未解锁</span>
+        <h2>${skill.name}</h2>
+        <p>${skill.desc}</p>
+      </div>
+      ${renderSkillPreviewVideo(skill)}
+      <dl class="skill-editor-fields">
+        <div><dt>附着来源</dt><dd>${source.name}</dd></div>
+        <div><dt>解锁条件</dt><dd>${skill.unlockHint || "后续版本开放"}</dd></div>
+        <div><dt>技能方向</dt><dd>${skill.kindLabel || "预告技能"}</dd></div>
+        <div><dt>目标</dt><dd>${targetNames}</dd></div>
+        ${skill.actionCost > 0 ? `<div><dt>行动力</dt><dd>${skill.actionCost}</dd></div>` : ""}
+        ${skill.damage > 0 ? `<div><dt>预计伤害</dt><dd>${skill.damage}</dd></div>` : ""}
+        ${skill.armorDamage > 0 ? `<div><dt>预计破甲</dt><dd>${skill.armorDamage}</dd></div>` : ""}
+      </dl>
+      <button class="skill-editor-apply locked" type="button">未解锁，仅作配置预览</button>
+    `;
+    return;
+  }
+  if (skill.noEffect) {
+    ui.skillEditor.innerHTML = `
+      <div class="skill-editor-head">
+        <span class="skill-editor-source">${source.name}</span>
+        <h2>无效果</h2>
+        <p>${skill.desc}</p>
+      </div>
+      ${renderSkillPreviewVideo(skill)}
+      <dl class="skill-editor-fields">
+        <div><dt>附着来源</dt><dd>${source.name}</dd></div>
+        <div><dt>当前状态</dt><dd>无战斗效果</dd></div>
+      </dl>
+      <button class="skill-editor-apply" type="button">当前装备无效果</button>
+    `;
+    return;
+  }
+  if (skill.statBonus) {
+    ui.skillEditor.innerHTML = `
+      <div class="skill-editor-head">
+        <span class="skill-editor-source">${source.name}</span>
+        <h2>${skill.name}</h2>
+        <p>${skill.desc}</p>
+      </div>
+      ${renderSkillPreviewVideo(skill)}
+      <dl class="skill-editor-fields">
+        <div><dt>附着来源</dt><dd>${source.name}</dd></div>
+        <div><dt>属性类型</dt><dd>基础属性</dd></div>
+        <div><dt>攻击</dt><dd>+${skill.statBonus.attack || 0}</dd></div>
+        <div><dt>防御</dt><dd>+${skill.statBonus.defense || 0}</dd></div>
+        <div><dt>生命</dt><dd>+${skill.statBonus.hp || 0}</dd></div>
+      </dl>
+      <button class="skill-editor-apply" type="button">${statBonusText(skill.statBonus)}</button>
+    `;
+    return;
+  }
+  const targetNames = skill.targetParts.map(partLabelForConfig).join(" / ");
+  const armorDamage = effectiveArmorDamage(skill);
+  ui.skillEditor.innerHTML = `
+    <div class="skill-editor-head">
+      <span class="skill-editor-source">${source.name}</span>
+      <h2>${skill.name}</h2>
+      <p>${skill.desc}</p>
+    </div>
+    ${renderSkillPreviewVideo(skill)}
+    <dl class="skill-editor-fields">
+      <div><dt>附着来源</dt><dd>${source.name}</dd></div>
+      <div><dt>打击部位</dt><dd>${targetNames}</dd></div>
+      <div><dt>技能类型</dt><dd>${skill.kindLabel}</dd></div>
+      <div><dt>行动力</dt><dd>${skill.actionCost || 0}</dd></div>
+      <div><dt>伤害</dt><dd>${skill.maxDots ? `每档 ${skill.damage}` : skill.damage}</dd></div>
+      <div><dt>护甲损坏</dt><dd>${armorDamage || 0}</dd></div>
+      ${skill.ammoCost ? `<div><dt>弹药消耗</dt><dd>${skill.ammoCost}</dd></div>` : ""}
+      ${skill.comboChance ? `<div><dt>连击</dt><dd>${Math.round(skill.comboChance * 100)}% 概率追加普攻</dd></div>` : ""}
+    </dl>
+    <button class="skill-editor-apply" type="button">已使用当前技能配置</button>
+  `;
+}
+
+function updateEnterBattleState() {
+  if (!ui.enterBattleBtn) return;
+  const selectedWeapons = loadoutState.selectedWeaponIds || [];
+  const readyBoss = bossBlueprints.some((boss) => boss.id === loadoutState.selectedBossId && isBossUnlocked(boss));
+  const readyWeapons = selectedWeapons.length === 2
+    && new Set(selectedWeapons).size === 2
+    && selectedWeapons.every((id) => weapons.some((weapon) => weapon.id === id && isWeaponUnlocked(weapon)));
+  const ready = readyBoss && readyWeapons;
+  ui.enterBattleBtn.disabled = !ready;
+  ui.enterBattleBtn.title = ready ? "进入挑战" : "请选择 Boss，并携带 2 件武器";
+  if (ui.nextSkillBtn) {
+    ui.nextSkillBtn.disabled = !ready;
+    ui.nextSkillBtn.title = ready ? "进入技能配置" : "请选择 Boss，并携带 2 件武器";
+  }
+  if (ui.nextSkillFromWeaponBtn) {
+    ui.nextSkillFromWeaponBtn.disabled = !ready;
+    ui.nextSkillFromWeaponBtn.title = ready ? "进入技能配置" : "请选择 Boss，并携带 2 件武器";
+  }
+}
+
+function setPrebattleStep(step) {
+  if (step !== "weapons") {
+    loadoutState.weaponDetailOpen = false;
+    loadoutState.weaponSkillPickerOpen = false;
+  }
+  if (step === "battle") {
+    enterBattleFromLoadout();
+    return;
+  }
+  if (step === "skills") {
+    updateEnterBattleState();
+    if (ui.nextSkillBtn?.disabled) {
+      loadoutState.prebattleStep = "loadout";
+    } else {
+      loadoutState.prebattleStep = "skills";
+      renderPrebattleSkillConfig();
+    }
+  } else if (step === "character") {
+    loadoutState.prebattleStep = "character";
+    renderCharacterInfo();
+  } else if (step === "loadout") {
+    loadoutState.prebattleStep = "loadout";
+    renderPrebattleLoadout();
+  } else if (step === "weapons") {
+    loadoutState.prebattleStep = "weapons";
+    renderPrebattleWeapons();
+  } else {
+    loadoutState.prebattleStep = "boss";
+  }
+  renderPrebattleFlow();
+}
+
+function openCharacterDestination(tabId) {
+  loadoutState.activeCharacterTab = tabId || "skills";
+  if (tabId === "skills") {
+    setPrebattleStep("skills");
+    return;
+  }
+  if (tabId === "weapons") {
+    loadoutState.activeWeaponSlot = 0;
+    setPrebattleStep("weapons");
+    return;
+  } else {
+    loadoutState.activePartId = "head";
+    loadoutState.activeSlot = "base";
+  }
+  loadoutState.isFocusing = false;
+  hideLoadoutTacticalInfo();
+  setPrebattleStep("loadout");
+}
+
+function renderPrebattleFlow() {
+  if (!ui.prebattleScreen) return;
+  ui.prebattleScreen.dataset.step = loadoutState.prebattleStep;
+  ui.prebattleStepButtons.forEach((button) => {
+    const isActive = button.dataset.prebattleStep === loadoutState.prebattleStep;
+    button.classList.toggle("active", isActive);
+  });
 }
 
 function showLoadoutTacticalInfo(item, anchor) {
@@ -712,6 +2905,11 @@ function updateLoadoutFocus(activePart) {
 }
 
 function enterBattleFromLoadout() {
+  updateEnterBattleState();
+  if (ui.enterBattleBtn?.disabled) {
+    setPrebattleStep("loadout");
+    return;
+  }
   document.getElementById("prebattleScreen")?.classList.add("is-hidden");
   document.getElementById("battleApp")?.classList.remove("is-hidden");
   resetGame();
@@ -724,7 +2922,8 @@ function showWeakpointTip(message, duration = 1.5) {
 }
 
 function currentWeapon() {
-  return weapons.find((weapon) => weapon.id === state.selectedWeaponId) || weapons[0];
+  const carried = carriedWeapons();
+  return carried.find((weapon) => weapon.id === state.selectedWeaponId) || carried[0] || weapons[0];
 }
 
 function updatePlayerSpriteForWeapon() {
@@ -734,9 +2933,7 @@ function updatePlayerSpriteForWeapon() {
 }
 
 function currentSkills() {
-  return skills
-    .filter((skill) => skill.weaponId === state.selectedWeaponId)
-    .sort((a, b) => (a.actionCost || 0) - (b.actionCost || 0) || a.name.localeCompare(b.name, "zh-Hans-CN"));
+  return configuredWeaponSkills(state.selectedWeaponId);
 }
 
 function isLoadoutItemEquipped(itemName) {
@@ -745,7 +2942,9 @@ function isLoadoutItemEquipped(itemName) {
 
 function buildWeaponControls() {
   ui.weaponButtons.innerHTML = "";
-  weapons.forEach((weapon) => {
+  const equippedWeapons = carriedWeapons();
+  ui.weaponOverlay?.style.setProperty("--weapon-count", String(equippedWeapons.length));
+  equippedWeapons.forEach((weapon) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "weapon-card";
@@ -771,6 +2970,7 @@ function renderWeaponToggle() {
 
 function selectWeapon(weaponId) {
   if (!state || state.turn !== "player" || state.enemy.intent || state.result) return;
+  if (!isWeaponCarried(weaponId)) return;
   if (state.selectedWeaponId === weaponId) return;
   state.selectedWeaponId = weaponId;
   const weapon = currentWeapon();
@@ -799,7 +2999,7 @@ function createSkillButton(skill, compact) {
   button.dataset.targetParts = skill.targetParts.join(",");
   button.innerHTML = `
     ${skill.actionCost > 0 ? `<span class="action-cost-corner" style="--skill-color:${skill.color}"><b>${skill.actionCost}</b></span>` : ""}
-    <span class="part-badge${skill.targetParts.length > 1 ? " part-badge-ring" : ""}" style="--skill-color:${skill.color}">${renderPartIconGroup(skill.targetParts, "badge")}</span>
+    <span class="part-badge${skill.targetParts.length > 1 ? " part-badge-ring" : ""}${skillTargetClass(skill)}${skillTargetCountClass(skill)}" style="--skill-color:${skill.color}">${renderPartIconGroup(skill.targetParts, "badge")}</span>
     <span class="skill-copy">
       <strong>${skill.name}</strong>
       ${renderSkillTags(skill)}
@@ -913,6 +3113,8 @@ function clearHoveredTargetParts() {
 }
 
 function skillSummaryText(skill) {
+  if (skill.noEffect) return "";
+  if (skill.statBonus) return `（${statBonusText(skill.statBonus)}）`;
   if (skill.summaryOverride) return `（${skill.summaryOverride}）`;
   const pieces = [`伤害 ${skill.damage}`];
   if (skill.maxDots) pieces[0] = `每档伤害 ${skill.damage}`;
@@ -933,6 +3135,7 @@ function renderSkillTags(skill) {
 }
 
 function skillTagClass(tag) {
+  if (tag === "未解锁") return "skill-tag-locked";
   if (tag === "连击") return "skill-tag-combo";
   if (tag.includes("破甲")) return "skill-tag-break";
   return "skill-tag-generic";
@@ -975,7 +3178,7 @@ function buildSoulSkillControls() {
     button.className = "skill-card soul-skill-card";
     button.dataset.soulSkill = skill.id;
     button.innerHTML = `
-      <span class="part-badge${skill.targetParts.length > 1 ? " part-badge-ring" : ""}" style="--skill-color:${skill.color}">${renderPartIconGroup(skill.targetParts, "badge")}</span>
+      <span class="part-badge${skill.targetParts.length > 1 ? " part-badge-ring" : ""}${skillTargetClass(skill)}${skillTargetCountClass(skill)}" style="--skill-color:${skill.color}">${renderPartIconGroup(skill.targetParts, "badge")}</span>
       <span class="skill-copy">
         <strong>${skill.name}</strong>
         <span class="skill-tags">
@@ -1009,7 +3212,7 @@ function partIconInfo(partId) {
 }
 
 function renderPartIconGroup(partIds, mode) {
-  return partIds
+  const icons = partIds
     .map((partId) => {
       const info = partIconInfo(partId);
       if (!info) return "";
@@ -1020,7 +3223,18 @@ function renderPartIconGroup(partIds, mode) {
         </span>
       `;
     })
-    .join("");
+    .filter(Boolean);
+  if (icons.length <= 1) return icons.join("");
+  return `<span class="part-icon-cluster part-icon-cluster-${Math.min(icons.length, 4)} part-icon-${mode}-cluster">${icons.join("")}</span>`;
+}
+
+function skillTargetClass(skill) {
+  return (skill.targetParts || []).length > 1 ? " multi-target" : "";
+}
+
+function skillTargetCountClass(skill) {
+  const count = Math.min((skill.targetParts || []).length, 4);
+  return count > 1 ? ` target-count-${count}` : "";
 }
 
 function log(text) {
@@ -1062,7 +3276,7 @@ function canUseSoulArmorSkill(skill) {
 }
 
 function useSkill(skillId) {
-  const skill = skills.find((item) => item.id === skillId);
+  const skill = currentSkills().find((item) => item.id === skillId);
   if (!skill || !canUseSkill(skill)) return;
   ui.battleSkillOverlay.classList.remove("active");
   closeWeaponOverlay();
@@ -1218,7 +3432,7 @@ function startComboFollowUpFlow(skill, target) {
 function applyComboFollowUpDamage(skill, target) {
   const comboSkill = { name: "连击追打", color: skill.color };
   const baseDamage = skill.comboDamage || NORMAL_ATTACK_DAMAGE;
-  let damage = baseDamage;
+  let damage = baseDamage + (state.player.attack || 0);
   if (target.broken) {
     damage = Math.round(baseDamage * 1.2);
     state.enemy.extraDamage = (state.enemy.extraDamage || 0) + damage;
@@ -1343,7 +3557,9 @@ function useSoulArmorSkill(skillId, dots = 1, targetPartId = null) {
   log(`${skill.name}发动：${spendDots} 档释放，目标${target.label}。`);
   targets.forEach((target) => {
     const brokenBonus = target.broken ? 1.2 : 1;
-    const damage = Math.round((target.weakpoint ? skill.damage * spendDots * 1.35 : skill.damage * spendDots) * brokenBonus);
+    const attackBonus = state.player.attack || 0;
+    const baseDamage = skill.damage * spendDots + attackBonus;
+    const damage = Math.round((target.weakpoint ? baseDamage * 1.35 : baseDamage) * brokenBonus);
     if (target.broken) {
       state.enemy.extraDamage = (state.enemy.extraDamage || 0) + damage;
     } else {
@@ -1416,7 +3632,7 @@ function clearSoulHoldTimer() {
 }
 
 function applySkillToPart(target, skill, context = {}) {
-  let damage = skill.damage;
+  let damage = skill.damage > 0 ? skill.damage + (state.player.attack || 0) : skill.damage;
   let armorDamage = effectiveArmorDamage(skill);
   let armorDamageDone = 0;
   let globalChipDamage = 0;
@@ -1771,15 +3987,16 @@ function releaseDelayedEnemyAttack(attack) {
 
 function applyPlayerDamage(attack, damage, options = {}) {
   if (damage <= 0) return;
-  state.player.hp = Math.max(0, state.player.hp - damage);
+  const mitigatedDamage = Math.max(1, damage - (state.player.defense || 0));
+  state.player.hp = Math.max(0, state.player.hp - mitigatedDamage);
   state.playerHitFlashTimer = 0.42;
   playerHitFloaters.push({
-    text: `受到${attack.label}攻击，损失${damage}点血量`,
+    text: `受到${attack.label}攻击，损失${mitigatedDamage}点血量`,
     x: canvas.width / 2,
     y: canvas.height * 0.38,
     life: 1.25,
   });
-  log(`受到${attack.label}攻击，损失${damage}点血量。`);
+  log(`受到${attack.label}攻击，防御抵消 ${damage - mitigatedDamage} 点，损失${mitigatedDamage}点血量。`);
   if (options.allowCounter !== false) {
     resolveGreatswordCounterAfterHit(attack);
   }
@@ -3095,8 +5312,9 @@ function updateUi() {
     button.disabled = !canSwitchWeapon;
   });
 
+  const activeWeaponSkills = currentSkills();
   [...ui.skillButtons.children].forEach((button) => {
-    const skill = skills.find((item) => item.id === button.dataset.skill);
+    const skill = activeWeaponSkills.find((item) => item.id === button.dataset.skill);
     button.disabled = !skill || !canUseSkill(skill);
   });
 
@@ -3105,7 +5323,7 @@ function updateUi() {
       button.disabled = !state.soulTargetSelection;
       return;
     }
-    const skill = skills.find((item) => item.id === button.dataset.skill);
+    const skill = activeWeaponSkills.find((item) => item.id === button.dataset.skill);
     button.disabled = !skill || !canUseSkill(skill);
   });
 
@@ -3141,6 +5359,36 @@ function loop(now) {
 
 ui.resetBtn.addEventListener("click", resetGame);
 document.getElementById("enterBattleBtn")?.addEventListener("click", enterBattleFromLoadout);
+ui.nextLoadoutBtn?.addEventListener("click", () => setPrebattleStep("character"));
+ui.nextLoadoutFromCharacterBtn?.addEventListener("click", () => setPrebattleStep("battle"));
+ui.nextSkillBtn?.addEventListener("click", () => setPrebattleStep("skills"));
+ui.nextSkillFromWeaponBtn?.addEventListener("click", () => setPrebattleStep("skills"));
+ui.backToBossBtn?.addEventListener("click", () => setPrebattleStep("character"));
+ui.backToBossFromCharacterBtn?.addEventListener("click", () => setPrebattleStep("boss"));
+ui.backToCharacterFromWeaponBtn?.addEventListener("click", () => setPrebattleStep("character"));
+ui.backToLoadoutBtn?.addEventListener("click", () => setPrebattleStep("character"));
+ui.characterTabButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    openCharacterDestination(button.dataset.characterTab || "skills");
+  });
+});
+ui.prebattleStepButtons.forEach((button) => {
+  button.addEventListener("click", () => setPrebattleStep(button.dataset.prebattleStep));
+});
+ui.prebattleScreen?.addEventListener("click", (event) => {
+  if (loadoutState.prebattleStep !== "weapons" || !loadoutState.weaponDetailOpen) return;
+  const target = event.target;
+  if (
+    target.closest?.(".weapon-detail-panel")
+    || target.closest?.(".weapon-gallery-card")
+    || target.closest?.(".weapon-carry-card")
+  ) {
+    return;
+  }
+  loadoutState.weaponDetailOpen = false;
+  loadoutState.weaponSkillPickerOpen = false;
+  renderPrebattleWeapons();
+});
 ui.weaponToggle.addEventListener("click", toggleWeaponOverlay);
 document.addEventListener("click", (event) => {
   if (event.target.closest?.("[data-skill-tag]") || event.target.closest?.("#skillTagBubble")) return;

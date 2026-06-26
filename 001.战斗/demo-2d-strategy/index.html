@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>M98 2D Strategy Combat Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=skip-broken-rock-throw-20260624" />
+    <link rel="stylesheet" href="./styles.css?v=module-bingo-20260626" />
   </head>
   <body>
     <div class="demo-version" data-demo-version>Demo --</div>
-    <section class="prebattle-screen" id="prebattleScreen" aria-label="战前装备搭配">
+    <section class="prebattle-screen" id="prebattleScreen" data-step="boss" aria-label="战前策略准备">
       <div class="prebattle-bg"></div>
       <header class="prebattle-top">
         <div class="prebattle-logo">GM</div>
@@ -16,34 +16,108 @@
         <button class="prebattle-icon-button eye" type="button" aria-label="预览">◈</button>
       </header>
 
-      <div class="prebattle-left">
-        <button class="scheme-select" type="button">自定义方案2 <span>⌄</span></button>
-        <button class="scheme-edit" type="button" aria-label="编辑方案">✎</button>
-        <label class="shoe-toggle"><input type="checkbox" checked /> 显示鞋子</label>
-      </div>
-
-      <div class="loadout-hero">
-        <img id="loadoutHeroImage" src="./assets/loadout-character-front.png" alt="角色预览" />
-        <img class="loadout-drone" src="./assets/loadout-drone.png" alt="" />
-        <div class="loadout-fixed-gourd" aria-label="前腰挂件：酒葫芦">
-          <img src="./assets/loadout-gourd.jpeg" alt="" />
-          <span>前腰</span>
-        </div>
-      </div>
-
-      <nav class="loadout-parts" id="loadoutParts" aria-label="基础部位"></nav>
-
-      <section class="attachment-panel" aria-label="挂件槽位">
-        <div class="attachment-slots" id="attachmentSlots"></div>
-        <p class="attachment-title" id="attachmentTitle">选择挂件</p>
-        <div class="attachment-items" id="attachmentItems"></div>
+      <section class="prebattle-page boss-page" data-prebattle-page="boss" aria-label="选择Boss">
+        <section class="boss-select-panel">
+          <div class="prebattle-panel-head">
+            <span>选择Boss</span>
+          </div>
+          <div class="boss-card-list" id="bossCards"></div>
+          <div class="boss-intel" id="bossIntel"></div>
+          <div class="boss-page-actions">
+            <button class="enter-battle" id="nextLoadoutBtn" type="button">挑战</button>
+          </div>
+        </section>
       </section>
 
-      <footer class="prebattle-actions">
-        <button class="edit-appearance" type="button">编辑挂件</button>
-        <button class="enter-battle" id="enterBattleBtn" type="button">进入战斗</button>
-        <button class="save-loadout" type="button">保存</button>
-      </footer>
+      <section class="prebattle-page character-page" data-prebattle-page="character" aria-label="角色信息">
+        <section class="character-info-shell">
+          <div class="character-portrait-stage">
+            <img class="character-portrait" src="./assets/loadout-character-front.png" alt="角色流派预览" />
+            <img class="character-portrait-drone" src="./assets/loadout-drone.png" alt="" />
+          </div>
+
+          <nav class="character-bottom-tabs" aria-label="角色信息标签">
+            <button class="active" type="button" data-character-tab="weapons">武器</button>
+            <button type="button" data-character-tab="outfit">服饰</button>
+            <button type="button" data-character-tab="skills">技能</button>
+          </nav>
+
+          <footer class="character-info-actions">
+            <button class="edit-appearance" id="backToBossFromCharacterBtn" type="button">返回Boss选择</button>
+            <button class="enter-battle" id="nextLoadoutFromCharacterBtn" type="button">挑战</button>
+          </footer>
+        </section>
+      </section>
+
+      <section class="prebattle-page loadout-page" data-prebattle-page="loadout" aria-label="搭配装备">
+        <div class="loadout-hero">
+          <img id="loadoutHeroImage" src="./assets/loadout-character-front.png" alt="角色预览" />
+          <img class="loadout-drone" src="./assets/loadout-drone.png" alt="" />
+          <div class="loadout-fixed-gourd" aria-label="前腰挂件：酒葫芦">
+            <img src="./assets/loadout-gourd.jpeg" alt="" />
+            <span>前腰</span>
+          </div>
+        </div>
+
+        <nav class="loadout-parts" id="loadoutParts" aria-label="装备分页"></nav>
+        <section class="loadout-armor-summary" id="loadoutArmorSummary" aria-label="战甲图形化说明"></section>
+
+        <section class="attachment-panel" aria-label="装配槽位">
+          <div class="attachment-slots" id="attachmentSlots"></div>
+          <p class="attachment-title" id="attachmentTitle">选择挂件</p>
+          <div class="attachment-items" id="attachmentItems"></div>
+        </section>
+
+        <footer class="prebattle-actions">
+          <button class="edit-appearance" id="backToBossBtn" type="button">返回角色信息</button>
+          <button class="save-loadout" type="button">保存方案</button>
+        </footer>
+      </section>
+
+      <section class="prebattle-page weapon-page" data-prebattle-page="weapons" aria-label="武器搭配">
+        <div class="weapon-page-hero">
+          <img class="weapon-page-character" src="./assets/loadout-character-front.png" alt="武器搭配角色预览" />
+          <img class="weapon-page-drone" src="./assets/loadout-drone.png" alt="" />
+        </div>
+
+        <section class="weapon-equip-panel" aria-label="武器选择">
+          <div class="weapon-carry-slots" id="weaponCarrySlots"></div>
+          <p class="weapon-selection-title" id="weaponSelectionTitle">选择携带武器：武器A</p>
+          <div class="weapon-gallery" id="weaponGallery"></div>
+        </section>
+        <aside class="weapon-detail-panel" id="weaponDetailPanel" aria-label="武器技能装配"></aside>
+
+        <footer class="weapon-page-actions">
+          <button class="edit-appearance" id="backToCharacterFromWeaponBtn" type="button">编辑样式</button>
+          <button class="save-loadout" type="button">保存</button>
+        </footer>
+      </section>
+
+      <section class="prebattle-page skill-page" data-prebattle-page="skills" aria-label="技能配置">
+        <section class="skill-config-shell">
+          <header class="skill-config-head">
+            <span>技能配置</span>
+            <strong>按武器、战甲、挂件三类查看技能来源</strong>
+          </header>
+
+          <aside class="skill-config-loadout">
+            <span>当前携带</span>
+            <div class="skill-loadout-weapons" id="skillLoadoutWeapons"></div>
+          </aside>
+
+          <section class="skill-config-board">
+            <nav class="skill-source-tabs" id="skillSourceTabs" aria-label="技能来源"></nav>
+            <div class="skill-config-list" id="skillConfigList"></div>
+          </section>
+
+          <aside class="skill-editor" id="skillEditor" aria-label="技能编辑"></aside>
+
+          <footer class="skill-config-actions">
+            <button class="edit-appearance" id="backToLoadoutBtn" type="button">返回角色主界面</button>
+            <button class="enter-battle" id="enterBattleBtn" type="button">进入挑战</button>
+          </footer>
+        </section>
+      </section>
     </section>
 
     <main class="app-shell is-hidden" id="battleApp">
@@ -148,7 +222,7 @@
       </aside>
     </main>
 
-    <script src="./game.js?v=skip-broken-rock-throw-20260624"></script>
+    <script src="./game.js?v=module-bingo-20260626"></script>
   </body>
 </html>
 
