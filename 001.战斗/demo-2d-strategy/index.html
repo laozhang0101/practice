@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>M98 2D Strategy Combat Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=module-bingo-20260626" />
+    <link rel="stylesheet" href="./styles.css?v=energy-icon-position-20260630" />
   </head>
   <body>
     <div class="demo-version" data-demo-version>Demo --</div>
@@ -40,11 +40,29 @@
             <button class="active" type="button" data-character-tab="weapons">武器</button>
             <button type="button" data-character-tab="outfit">服饰</button>
             <button type="button" data-character-tab="skills">技能</button>
+            <button type="button" data-character-tab="links">能源链路</button>
           </nav>
 
           <footer class="character-info-actions">
             <button class="edit-appearance" id="backToBossFromCharacterBtn" type="button">返回Boss选择</button>
             <button class="enter-battle" id="nextLoadoutFromCharacterBtn" type="button">挑战</button>
+          </footer>
+        </section>
+      </section>
+
+      <section class="prebattle-page link-page" data-prebattle-page="links" aria-label="能源链路图">
+        <section class="link-page-shell">
+          <header class="link-page-head">
+            <span>能源链路图</span>
+            <strong>用同一套“来源、转化、释放、结果”体系，承接不同文明的战士力量。</strong>
+          </header>
+
+          <section class="link-map" id="tacticalLinkMap" aria-label="当前能源链路"></section>
+          <aside class="link-detail" id="tacticalLinkDetail" aria-label="能源谱系"></aside>
+
+          <footer class="link-page-actions">
+            <button class="edit-appearance" id="backToCharacterFromLinksBtn" type="button">返回角色信息</button>
+            <button class="enter-battle" id="enterBattleFromLinksBtn" type="button">挑战</button>
           </footer>
         </section>
       </section>
@@ -72,6 +90,22 @@
           <button class="edit-appearance" id="backToBossBtn" type="button">返回角色信息</button>
           <button class="save-loadout" type="button">保存方案</button>
         </footer>
+      </section>
+
+      <section class="prebattle-page armor-board-page" data-prebattle-page="armorBoard" aria-label="战甲能量盘配置">
+        <section class="armor-board-shell">
+          <header class="armor-board-head">
+            <span>战甲能量盘</span>
+            <strong>五个战甲部位提供能量承载，装填模块并形成 Bingo 连线。</strong>
+          </header>
+
+          <aside class="armor-board-parts" id="armorBoardParts" aria-label="战甲部位"></aside>
+          <section class="armor-board-config" id="armorBoardConfig" aria-label="能量盘配置"></section>
+
+          <footer class="armor-board-actions">
+            <button class="edit-appearance" id="backToLoadoutFromArmorBoardBtn" type="button">返回服饰装扮</button>
+          </footer>
+        </section>
       </section>
 
       <section class="prebattle-page weapon-page" data-prebattle-page="weapons" aria-label="武器搭配">
@@ -222,7 +256,7 @@
       </aside>
     </main>
 
-    <script src="./game.js?v=module-bingo-20260626"></script>
+    <script src="./game.js?v=energy-icon-position-20260630"></script>
   </body>
 </html>
 

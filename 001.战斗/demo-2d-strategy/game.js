@@ -1,6 +1,6 @@
 ﻿const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
-const DEMO_VERSION = "2026.06.26-module-bingo";
+const DEMO_VERSION = "2026.06.30-energy-icon-position";
 const DEFAULT_MELEE_CINEMATIC_DURATION = 0.82;
 const NORMAL_ATTACK_DAMAGE = 22;
 const GOURD_HEAL_CHANCE = 0.5;
@@ -97,6 +97,13 @@ const ui = {
   skillSourceTabs: document.getElementById("skillSourceTabs"),
   skillConfigList: document.getElementById("skillConfigList"),
   skillEditor: document.getElementById("skillEditor"),
+  armorBoardParts: document.getElementById("armorBoardParts"),
+  armorBoardConfig: document.getElementById("armorBoardConfig"),
+  tacticalLinkMap: document.getElementById("tacticalLinkMap"),
+  tacticalLinkDetail: document.getElementById("tacticalLinkDetail"),
+  backToCharacterFromLinksBtn: document.getElementById("backToCharacterFromLinksBtn"),
+  backToLoadoutFromArmorBoardBtn: document.getElementById("backToLoadoutFromArmorBoardBtn"),
+  enterBattleFromLinksBtn: document.getElementById("enterBattleFromLinksBtn"),
   enterBattleBtn: document.getElementById("enterBattleBtn"),
 };
 
@@ -133,9 +140,34 @@ const bossBlueprints = [
       { label: "防御", value: 8 },
     ],
     partIntel: [
-      { partId: "core", label: "躯干核心", state: "裸露弱点", hint: "可直接压低总血量。" },
-      { partId: "arms", label: "双臂", state: "硬甲 / 投石", hint: "准备投石时打手部可中断。" },
-      { partId: "legs", label: "双腿", state: "硬甲支撑", hint: "破甲后适合压制稳定性。" },
+      {
+        partId: "core",
+        label: "躯干核心",
+        tags: [
+          { label: "裸露", tone: "exposed" },
+          { label: "弱点", tone: "weak" },
+        ],
+        hint: "可直接压低总血量。",
+      },
+      {
+        partId: "arms",
+        label: "双臂",
+        tags: [
+          { label: "硬甲", tone: "armor" },
+          { label: "投石", tone: "danger" },
+          { label: "可打断", tone: "interrupt" },
+        ],
+        hint: "准备投石时打手部可中断。",
+      },
+      {
+        partId: "legs",
+        label: "双腿",
+        tags: [
+          { label: "硬甲", tone: "armor" },
+          { label: "支撑", tone: "control" },
+        ],
+        hint: "破甲后适合压制稳定性。",
+      },
     ],
     startTip: "怪物全身硬甲，躯干核心裸露；看到手部举石时，攻击手部可以打断投石。",
     recommendedPlan: "先判断武器是否具备破甲能力：破甲武器处理硬甲部位，爆发技能优先压低躯干核心。",
@@ -533,6 +565,7 @@ const attachmentOptions = [
     trait: "上臂挂件，远程协同",
     category: "drone",
     slots: ["上臂"],
+    socketCount: 2,
     image: "./assets/loadout-drone.png",
     tacticalInfo: {
       title: "无人机",
@@ -547,6 +580,7 @@ const attachmentOptions = [
     trait: "后背挂件，强化穿臂箭破甲",
     category: "quiver",
     slots: ["后背"],
+    socketCount: 3,
     image: "./assets/loadout-quiver.jpeg",
     tacticalInfo: {
       title: "箭袋",
@@ -561,6 +595,7 @@ const attachmentOptions = [
     trait: "肩膀挂件，跃升爆发",
     category: "jet",
     slots: ["肩膀"],
+    socketCount: 4,
     image: "./assets/loadout-jet.png",
     tacticalInfo: {
       title: "喷气式装置",
@@ -575,6 +610,7 @@ const attachmentOptions = [
     trait: "前腰固定挂件，回合开始概率饮酒回血",
     category: "gourd",
     slots: ["前腰"],
+    socketCount: 1,
     image: "./assets/loadout-gourd.jpeg",
     tacticalInfo: {
       title: "酒葫芦",
@@ -584,6 +620,35 @@ const attachmentOptions = [
     },
   },
 ];
+
+const socketCountPipMap = {
+  1: [5],
+  2: [1, 9],
+  3: [1, 5, 9],
+  4: [1, 3, 7, 9],
+  5: [1, 3, 5, 7, 9],
+  6: [1, 3, 4, 6, 7, 9],
+};
+
+const loadoutSlotSocketCounts = {
+  "head:脸部": 1,
+  "head:护额": 2,
+  "torso:肩膀": 4,
+  "torso:前胸": 5,
+  "torso:后背": 3,
+  "torso:上臂": 2,
+  "torso:脖子": 1,
+  "pants:前腰": 1,
+  "pants:后腰": 2,
+  "pants:左腿": 3,
+  "pants:右腰": 4,
+  "pants:大腿": 6,
+  "bracer:腕部": 2,
+  "shoes:小腿前": 3,
+  "shoes:小腿后": 4,
+  "shoes:小腿侧": 5,
+  "shoes:脚部": 1,
+};
 
 const armorStatProfiles = {
   head: { attack: 4, defense: 2, hp: 10 },
@@ -1246,9 +1311,34 @@ function renderArmorEnergyBadge(part, item) {
   const deltaClass = delta > 0 ? "up" : delta < 0 ? "down" : "same";
   return `
     <em class="attachment-energy ${deltaClass}">
-      模块容量 ${nextCapacity}
+      战甲能量 ${nextCapacity}
       <b>${deltaText}</b>
     </em>
+  `;
+}
+
+function renderArmorMountSpec(activePart, item) {
+  const capacity = armorEnergyCapacityForItem(activePart, item);
+  const slots = activePart.slots || [];
+  const slotSamples = slots.slice(0, 5);
+  const totalSocketCount = slots.reduce((sum, slot) => sum + getLoadoutSlotSocketCount(activePart.id, slot), 0);
+  const maxSocketCount = slots.reduce((max, slot) => Math.max(max, getLoadoutSlotSocketCount(activePart.id, slot)), 0);
+  return `
+    <div class="armor-mount-spec" aria-label="${item.name}挂载规则">
+      <span>
+        <b>挂载部位</b>
+        <em>${slotSamples.join(" / ")}${slots.length > slotSamples.length ? " ..." : ""}</em>
+      </span>
+      <span>
+        <b>孔位制式</b>
+        <em>${slots.length}槽 / 最高${maxSocketCount}孔</em>
+      </span>
+      <span>
+        <b>战甲能量</b>
+        <em>${capacity}</em>
+      </span>
+      <small>该部位共提供 ${totalSocketCount} 个挂载孔。孔位越多，可兼容越大的挂件；战甲能量用于驱动挂件和模组。</small>
+    </div>
   `;
 }
 
@@ -1256,39 +1346,42 @@ function renderArmorStatMeter(label, value, max, className) {
   return renderMeter(label, value, max, `armor-stat-meter ${className}`);
 }
 
+function renderArmorStatChip(label, value, max, className) {
+  return `
+    <div class="armor-stat-chip ${className}" style="--stat-value:${clampPercent(value, max)}%">
+      <span>${label}</span>
+      <strong>+${value}</strong>
+      <i><u></u></i>
+    </div>
+  `;
+}
+
+function openArmorEnergyBoard(partId = "") {
+  const targetPartId = partId || loadoutState.activePartId || "head";
+  loadoutState.activePartId = targetPartId;
+  loadoutState.activeArmorFactorSlot = armorFactorSlots[targetPartId] ?? 0;
+  loadoutState.armorFactorPickerOpen = false;
+  setPrebattleStep("armorBoard");
+}
+
 function renderLoadoutArmorSummary(activePart) {
   const panel = document.getElementById("loadoutArmorSummary");
   if (!panel) return;
-  const stats = equippedArmorStats();
   const board = buildArmorFactorBoard();
-  const activeCapacity = armorEnergyCapacityForPart(activePart);
-  const activeFactor = armorFactorForPart(activePart);
   panel.innerHTML = `
-    <span>战甲图解</span>
-    <div class="loadout-summary-grid">
-      ${renderArmorStatMeter("攻击", stats.attack, 24, "attack")}
-      ${renderArmorStatMeter("防御", stats.defense, 32, "defense")}
-      ${renderArmorStatMeter("生命", stats.hp, 95, "hp")}
-    </div>
-    <div class="loadout-energy-graphic">
-      <span>
-        <b>改造容量</b>
-        <em>${board.capacityUsed} / ${board.capacityTotal}</em>
-      </span>
-      <div class="loadout-energy-bar" style="--energy-value:${clampPercent(board.capacityUsed, board.capacityTotal)}%">
-        <i></i>
-      </div>
-      ${renderEnergyDots(board.capacityUsed, board.capacityTotal, "loadout-energy-dots")}
-    </div>
-    <div class="loadout-active-part-energy">
-      <span>
-        <b>${activePart.label}容量</b>
-        <em>${activeCapacity}</em>
-      </span>
-      ${renderEnergyDots(activeCapacity, 10, "part-capacity-dots")}
-      <small>${activeFactor ? `当前模块：${activeFactor.factorName}` : "当前未装入模块"}</small>
+    <div class="armor-energy-hud">
+      <button class="armor-board-open armor-board-open-minimal" type="button" data-open-armor-energy-board aria-label="打开战甲能量盘" title="打开战甲能量盘">
+        <img src="./assets/armor-shield.png" alt="" />
+      </button>
+      <i class="armor-energy-bar" style="--energy-value:${clampPercent(board.capacityUsed, board.capacityTotal)}%">
+        <u></u>
+        <strong class="armor-energy-value">${board.capacityUsed}<b>/ ${board.capacityTotal}</b></strong>
+      </i>
     </div>
   `;
+  panel.querySelector("[data-open-armor-energy-board]")?.addEventListener("click", () => {
+    openArmorEnergyBoard(activePart.id);
+  });
 }
 
 function renderPrebattleLoadout() {
@@ -1326,7 +1419,8 @@ function renderPrebattleLoadout() {
     partNav.appendChild(button);
   });
 
-  itemsEl.classList.remove("weapon-selection-grid");
+  itemsEl.classList.remove("weapon-selection-grid", "armor-base-list");
+  itemsEl.classList.toggle("armor-base-list", loadoutState.activeSlot === "base");
 
   slotsEl.innerHTML = "";
   activePart.slots.forEach((slot) => {
@@ -1337,10 +1431,15 @@ function renderPrebattleLoadout() {
     const isFixedGourdSlot = activePart.id === "pants" && slot === "前腰";
     slotEl.className = `attachment-slot${slot === loadoutState.activeSlot ? " active" : ""}${isFixedGourdSlot ? " fixed-gourd" : ""}`;
     slotEl.dataset.slotKey = key;
+    const slotSocketCount = getLoadoutSlotSocketCount(activePart.id, slot);
     slotEl.innerHTML = `
-      <span>${slot}</span>
+      <span class="attachment-slot-head">
+        <b>${slot}</b>
+        ${renderSocketCountMark(slotSocketCount, "slot-socket-marks")}
+      </span>
       <span class="attachment-slot-box${equipped ? " equipped" : ""}">
         ${renderLoadoutItemPreview(equipped, "+")}
+        ${equipped ? renderSocketCountMark(getLoadoutItemSocketCount(equipped), "equipped-socket-marks") : ""}
       </span>
     `;
     slotEl.addEventListener("click", () => {
@@ -1363,18 +1462,29 @@ function renderPrebattleLoadout() {
   getLoadoutOptions(activePart, loadoutState.activeSlot).forEach((item) => {
     const key = `${activePart.id}:${loadoutState.activeSlot}`;
     const active = loadoutState.equipped[key]?.name === item.name;
+    const compatible = loadoutState.activeSlot === "base" || isLoadoutItemSocketCompatible(activePart, loadoutState.activeSlot, item);
     const card = document.createElement("button");
+    const isBaseSelection = loadoutState.activeSlot === "base";
     card.type = "button";
-    card.className = `attachment-card${active ? " active" : ""}`;
+    card.className = `attachment-card${isBaseSelection ? " armor-base-card" : ""}${active ? " active" : ""}${compatible ? "" : " incompatible"}`;
     card.dataset.itemName = item.name;
-    const energyBadge = loadoutState.activeSlot === "base" ? renderArmorEnergyBadge(activePart, item) : "";
-    card.innerHTML = `
-      <span class="attachment-card-preview">${renderLoadoutItemPreview(item, item.icon)}</span>
+    card.disabled = !compatible && !active;
+    card.innerHTML = isBaseSelection ? `
+      <span class="attachment-card-preview armor-base-preview">
+        ${renderLoadoutItemPreview(item, item.icon)}
+      </span>
+      <span class="armor-base-name">${item.name}</span>
+    ` : `
+      <span class="attachment-card-preview">
+        ${renderLoadoutItemPreview(item, item.icon)}
+        ${renderSocketCountMark(getLoadoutItemSocketCount(item), "card-socket-marks")}
+      </span>
       <span>${item.name}</span>
       <small>${item.trait}</small>
-      ${energyBadge}
+      ${compatible ? "" : "<em class=\"socket-mismatch\">孔位不匹配</em>"}
     `;
     card.addEventListener("click", () => {
+      if (!compatible && !active) return;
       loadoutState.equipped[key] = item;
       renderPrebattleLoadout();
       if (item.tacticalInfo) {
@@ -1676,6 +1786,29 @@ function renderBossAbilityProfile(items = []) {
     .join("");
 }
 
+function bossPartIntelTagTone(label = "") {
+  if (/弱点|裸露|核心/.test(label)) return "weak";
+  if (/硬甲|护甲/.test(label)) return "armor";
+  if (/投石|大招|高威胁|不可/.test(label)) return "danger";
+  if (/打断|中断/.test(label)) return "interrupt";
+  if (/支撑|稳定|压制/.test(label)) return "control";
+  if (/未知|未披露|不明/.test(label)) return "unknown";
+  return "neutral";
+}
+
+function renderBossPartIntelTags(item = {}) {
+  const tags = item.tags?.length
+    ? item.tags
+    : String(item.state || "")
+      .split(/[\/、,，]/)
+      .map((label) => label.trim())
+      .filter(Boolean)
+      .map((label) => ({ label, tone: bossPartIntelTagTone(label) }));
+  return tags
+    .map((tag) => `<em class="boss-intel-tag tone-${tag.tone || bossPartIntelTagTone(tag.label)}">${tag.label}</em>`)
+    .join("");
+}
+
 function renderBossPartIntel(items = [], mysteries = []) {
   const knownRows = items
     .map((item) => {
@@ -1688,7 +1821,7 @@ function renderBossPartIntel(items = [], mysteries = []) {
             <strong>${item.label}</strong>
           </span>
           <span class="boss-part-advice">
-            <em>${item.state}</em>
+            <span class="boss-intel-tags">${renderBossPartIntelTags(item)}</span>
             <small>${item.hint}</small>
           </span>
         </article>
@@ -1703,7 +1836,7 @@ function renderBossPartIntel(items = [], mysteries = []) {
           <strong>未披露</strong>
         </span>
         <span class="boss-part-advice">
-          <em>未知情报</em>
+          <span class="boss-intel-tags"><em class="boss-intel-tag tone-unknown">未知情报</em></span>
           <small>${label}</small>
         </span>
       </article>
@@ -1854,6 +1987,14 @@ function armorEnergyCapacityForPart(part) {
   return armorEnergyCapacityForItem(part, equippedArmorItemForPart(part));
 }
 
+function refreshArmorFactorViews() {
+  if (loadoutState.prebattleStep === "armorBoard") {
+    renderStandaloneArmorEnergyBoard();
+  } else {
+    renderPrebattleSkillConfig();
+  }
+}
+
 function equipArmorFactor(partId, factorId) {
   ensureArmorFactorLoadout();
   const part = loadoutParts.find((item) => item.id === partId);
@@ -1864,7 +2005,7 @@ function equipArmorFactor(partId, factorId) {
   loadoutState.armorFactorLoadout[partId] = factor.id;
   if (slotIndex !== undefined) loadoutState.armorFactorBoardSlots[slotIndex] = factor.id;
   loadoutState.armorFactorPickerOpen = false;
-  renderPrebattleSkillConfig();
+  refreshArmorFactorViews();
 }
 
 function equipArmorFactorSlot(slotIndex, factorId) {
@@ -1878,7 +2019,7 @@ function equipArmorFactorSlot(slotIndex, factorId) {
   if (part) loadoutState.armorFactorLoadout[part.id] = factor.id;
   loadoutState.activeArmorFactorSlot = normalized;
   loadoutState.armorFactorPickerOpen = false;
-  renderPrebattleSkillConfig();
+  refreshArmorFactorViews();
 }
 
 function clearArmorFactorSlot(slotIndex) {
@@ -1888,7 +2029,7 @@ function clearArmorFactorSlot(slotIndex) {
   loadoutState.armorFactorBoardSlots[normalized] = null;
   loadoutState.activeArmorFactorSlot = normalized;
   loadoutState.armorFactorPickerOpen = false;
-  renderPrebattleSkillConfig();
+  refreshArmorFactorViews();
 }
 
 function moveArmorFactorSlot(fromSlot, toSlot) {
@@ -1907,7 +2048,7 @@ function moveArmorFactorSlot(fromSlot, toSlot) {
   });
   loadoutState.activeArmorFactorSlot = to;
   loadoutState.armorFactorPickerOpen = false;
-  renderPrebattleSkillConfig();
+  refreshArmorFactorViews();
 }
 
 function armorFactorForPart(part) {
@@ -2012,7 +2153,7 @@ function buildArmorFactorBoard() {
     capacityUsed,
     capacityTotal,
     overCapacity,
-    title: "战甲模块盘",
+    title: "战甲能量盘",
   };
 }
 
@@ -2052,7 +2193,7 @@ function renderArmorFactorPicker() {
         <div class="armor-factor-picker-head">
           <span>
             <b>选择模块</b>
-            <small>剩余改造容量 ${remaining} / ${board.capacityTotal}${current ? ` · 当前 ${current.factorName}` : ""}</small>
+            <small>剩余战甲能量 ${remaining} / ${board.capacityTotal}${current ? ` · 当前 ${current.factorName}` : ""}</small>
           </span>
           <button type="button" data-close-factor-picker aria-label="关闭模块列表">×</button>
         </div>
@@ -2086,10 +2227,10 @@ function renderArmorFactorContent() {
   const bingoCount = board.activeLines.length;
   const maxBingo = armorFactorBingoRewards[armorFactorBingoRewards.length - 1]?.count || 0;
   return `
-    <span>战甲模块盘</span>
+    <span>战甲能量盘</span>
     <strong>${bingoCount} Bingo</strong>
     <div class="armor-factor-capacity-summary">
-      ${renderMeter("改造容量", board.capacityUsed, board.capacityTotal, "factor-energy-meter")}
+      ${renderMeter("战甲能量", board.capacityUsed, board.capacityTotal, "factor-energy-meter")}
       <span class="factor-bingo-count">
         <b>Bingo</b>
         <em>${bingoCount} / ${maxBingo}</em>
@@ -2134,26 +2275,21 @@ function renderArmorFactorContent() {
         </div>`
         : `<div class="armor-factor-line-notes"><small>将同类型模块排成横、竖或斜向三连后，才会点亮连线并解锁 Bingo 奖励。</small></div>`}
     </div>
-    <small>点击模块槽可替换模块。模块总占用不能超过战甲提供的改造容量；只有同类型三连会触发 Bingo。</small>
+    <small>点击模块槽可替换模块。模块总消耗不能超过战甲提供的能量；只有同类型三连会触发 Bingo。</small>
   `;
 }
 
-function renderArmorFactorEditor() {
-  if (!ui.skillEditor) return;
-  ui.skillEditor.classList.add("armor-factor-editor");
-  ui.skillEditor.innerHTML = `
-    <div class="armor-factor-editor-body">
-      ${renderArmorFactorContent()}
-    </div>
-  `;
-  ui.skillEditor.querySelectorAll("[data-open-factor-picker]").forEach((button) => {
+function attachArmorFactorBoardEvents(container, rerender) {
+  if (!container) return;
+  const refresh = typeof rerender === "function" ? rerender : refreshArmorFactorViews;
+  container.querySelectorAll("[data-open-factor-picker]").forEach((button) => {
     button.addEventListener("click", () => {
       loadoutState.activeArmorFactorSlot = Number(button.dataset.openFactorPicker) || 0;
       loadoutState.armorFactorPickerOpen = true;
-      renderPrebattleSkillConfig();
+      refresh();
     });
   });
-  ui.skillEditor.querySelectorAll("[data-factor-drag]").forEach((button) => {
+  container.querySelectorAll("[data-factor-drag]").forEach((button) => {
     button.addEventListener("dragstart", (event) => {
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", button.dataset.factorDrag);
@@ -2161,10 +2297,10 @@ function renderArmorFactorEditor() {
     });
     button.addEventListener("dragend", () => {
       button.classList.remove("dragging");
-      ui.skillEditor.querySelectorAll(".factor-drop-target").forEach((target) => target.classList.remove("factor-drop-target"));
+      container.querySelectorAll(".factor-drop-target").forEach((target) => target.classList.remove("factor-drop-target"));
     });
   });
-  ui.skillEditor.querySelectorAll("[data-factor-drop]").forEach((button) => {
+  container.querySelectorAll("[data-factor-drop]").forEach((button) => {
     button.addEventListener("dragover", (event) => {
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
@@ -2179,21 +2315,118 @@ function renderArmorFactorEditor() {
       moveArmorFactorSlot(event.dataTransfer.getData("text/plain"), button.dataset.factorDrop);
     });
   });
-  ui.skillEditor.querySelectorAll("[data-close-factor-picker]").forEach((button) => {
+  container.querySelectorAll("[data-close-factor-picker]").forEach((button) => {
     button.addEventListener("click", () => {
       loadoutState.armorFactorPickerOpen = false;
-      renderPrebattleSkillConfig();
+      refresh();
     });
   });
-  ui.skillEditor.querySelectorAll("[data-factor-slot][data-factor-id]").forEach((button) => {
+  container.querySelectorAll("[data-factor-slot][data-factor-id]").forEach((button) => {
     button.addEventListener("click", () => equipArmorFactorSlot(button.dataset.factorSlot, button.dataset.factorId));
   });
-  ui.skillEditor.querySelector("[data-clear-factor-slot]")?.addEventListener("click", (event) => {
+  container.querySelector("[data-clear-factor-slot]")?.addEventListener("click", (event) => {
     clearArmorFactorSlot(event.currentTarget.dataset.clearFactorSlot);
   });
-  ui.skillEditor.querySelectorAll("[data-factor-part][data-factor-id]").forEach((button) => {
+  container.querySelectorAll("[data-factor-part][data-factor-id]").forEach((button) => {
     button.addEventListener("click", () => equipArmorFactor(button.dataset.factorPart, button.dataset.factorId));
   });
+}
+
+function renderArmorFactorEditor() {
+  if (!ui.skillEditor) return;
+  ui.skillEditor.classList.add("armor-factor-editor");
+  ui.skillEditor.innerHTML = `
+    <div class="armor-factor-editor-body">
+      ${renderArmorFactorContent()}
+    </div>
+  `;
+  attachArmorFactorBoardEvents(ui.skillEditor, renderPrebattleSkillConfig);
+}
+
+function armorBodyMapPoint(partId) {
+  const points = {
+    head: { bodyX: 51, bodyY: 18, cardX: 17, cardY: 13 },
+    torso: { bodyX: 51, bodyY: 39, cardX: 82, cardY: 24 },
+    bracer: { bodyX: 37, bodyY: 45, cardX: 18, cardY: 48 },
+    pants: { bodyX: 51, bodyY: 62, cardX: 82, cardY: 63 },
+    shoes: { bodyX: 48, bodyY: 82, cardX: 22, cardY: 82 },
+  };
+  return points[partId] || points.head;
+}
+
+function renderArmorBodyMap(activePart) {
+  const lines = loadoutParts.map((part) => {
+    const point = armorBodyMapPoint(part.id);
+    return `
+      <line
+        class="armor-body-link-line ${part.id === activePart.id ? "active" : ""}"
+        x1="${point.bodyX}" y1="${point.bodyY}"
+        x2="${point.cardX}" y2="${point.cardY}"
+      ></line>
+    `;
+  }).join("");
+  return `
+    <div class="armor-body-map-head">
+      <span>战甲部位图</span>
+      <strong>点击装备图片切换对应部位，再在右侧调整能量盘模块。</strong>
+    </div>
+    <div class="armor-body-map">
+      <svg class="armor-body-links" viewBox="0 0 100 100" aria-hidden="true">${lines}</svg>
+      <div class="armor-body-silhouette" aria-hidden="true">
+        <span class="body-head"></span>
+        <span class="body-torso"></span>
+        <span class="body-arm left"></span>
+        <span class="body-arm right"></span>
+        <span class="body-leg left"></span>
+        <span class="body-leg right"></span>
+      </div>
+      ${loadoutParts.map((part) => {
+        const item = equippedArmorItemForPart(part);
+        const slotIndex = armorFactorSlots[part.id];
+        const factor = armorFactorForSlot(slotIndex);
+        const capacity = armorEnergyCapacityForPart(part);
+        const isActive = part.id === activePart.id;
+        return `
+          <button class="armor-body-card armor-body-card-${part.id}${isActive ? " active" : ""}" type="button" data-armor-board-part="${part.id}">
+            <span class="armor-body-card-image">${item?.image ? `<img src="${item.image}" alt="" />` : part.icon}</span>
+            <span class="armor-body-card-copy">
+              <strong>${part.label}</strong>
+              <small>${item?.name || "未装配战甲"}</small>
+            </span>
+            ${part.id === "head" ? "" : `<em>承载 ${capacity}</em>`}
+            <i>${factor ? factor.factorName : "空槽"}</i>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderStandaloneArmorEnergyBoard() {
+  if (!ui.armorBoardParts || !ui.armorBoardConfig) return;
+  ensureArmorFactorLoadout();
+  const activePart = loadoutParts.find((part) => part.id === loadoutState.activePartId) || loadoutParts[0];
+  loadoutState.activePartId = activePart.id;
+  const board = buildArmorFactorBoard();
+  ui.armorBoardParts.innerHTML = renderArmorBodyMap(activePart);
+  ui.armorBoardConfig.innerHTML = `
+    <div class="armor-board-config-head">
+      <span>${activePart.label} / ${equippedArmorItemForPart(activePart)?.name || "未装配战甲"}</span>
+      <strong>总能量 ${board.capacityUsed} / ${board.capacityTotal}</strong>
+    </div>
+    <div class="armor-factor-editor-body armor-board-factor-body">
+      ${renderArmorFactorContent()}
+    </div>
+  `;
+  ui.armorBoardParts.querySelectorAll("[data-armor-board-part]").forEach((button) => {
+    button.addEventListener("click", () => {
+      loadoutState.activePartId = button.dataset.armorBoardPart || "head";
+      loadoutState.activeArmorFactorSlot = armorFactorSlots[loadoutState.activePartId] ?? 0;
+      loadoutState.armorFactorPickerOpen = false;
+      renderStandaloneArmorEnergyBoard();
+    });
+  });
+  attachArmorFactorBoardEvents(ui.armorBoardConfig, renderStandaloneArmorEnergyBoard);
 }
 
 function armorFactorStatBonus() {
@@ -2203,6 +2436,208 @@ function armorFactorStatBonus() {
     });
     return bonus;
   }, {});
+}
+
+function isConfiguredSkillActive(skillId) {
+  return carriedWeapons().some((weapon) => configuredWeaponSkills(weapon.id).some((skill) => skill.id === skillId));
+}
+
+function tacticalLinkStatus(requirements) {
+  const met = requirements.filter((item) => item.ok).length;
+  if (met === requirements.length) return "active";
+  if (met > 0) return "partial";
+  return "missing";
+}
+
+function tacticalLinkGaps(requirements) {
+  return requirements.filter((item) => !item.ok).map((item) => item.gap);
+}
+
+function tacticalLinks() {
+  const hasFists = isWeaponCarried("fists");
+  const hasGreatsword = isWeaponCarried("greatsword");
+  const hasBow = isWeaponCarried("bow");
+  const hasDrone = isLoadoutItemEquipped("无人机");
+  const hasJet = isLoadoutItemEquipped("喷气式装置");
+  const hasGourd = isLoadoutItemEquipped("酒葫芦");
+  const hasQuiver = isLoadoutItemEquipped("箭袋");
+  const fistCore = isConfiguredSkillActive("fist_arm_rush");
+  const bowPierce = isConfiguredSkillActive("bow_arm_pierce");
+  const greatswordStance = isConfiguredSkillActive("gs_sweep");
+
+  const makeLink = (link) => {
+    const status = tacticalLinkStatus(link.requirements);
+    return {
+      ...link,
+      status,
+      gaps: tacticalLinkGaps(link.requirements),
+    };
+  };
+
+  return [
+    makeLink({
+      id: "drone_core",
+      title: "机关火控回路",
+      tone: "blue",
+      civilization: "机械文明",
+      energy: "外挂火力",
+      fit: "弱点压制",
+      requirements: [
+        { ok: hasDrone, gap: "上臂未装配无人机" },
+        { ok: hasFists, gap: "未携带拳套" },
+        { ok: fistCore, gap: "拳套未装配核心连打" },
+      ],
+      nodes: [
+        { title: "能源来源", text: "上臂无人机", iconSrc: "./assets/loadout-drone.png" },
+        { title: "转化器", text: "拳套近身定位", iconSrc: "./assets/weapon-fists.png" },
+        { title: "释放端", text: "侧翼远程齐射", iconText: "射" },
+        { title: "战斗结果", text: "压低躯干核心", iconSrc: "./assets/part-core.png" },
+      ],
+      payoff: "机械系不是单纯加伤害，而是把角色的近身定位转化成无人机可执行的火控坐标。",
+    }),
+    makeLink({
+      id: "quiver_pierce",
+      title: "游猎弹药回路",
+      tone: "cyan",
+      civilization: "游猎文明",
+      energy: "穿甲弹药",
+      fit: "手部应对",
+      requirements: [
+        { ok: hasQuiver, gap: "后背未装配箭袋" },
+        { ok: hasBow, gap: "未携带弓弩" },
+        { ok: bowPierce, gap: "弓弩未装配穿臂箭" },
+      ],
+      nodes: [
+        { title: "能源来源", text: "后背箭袋", iconSrc: "./assets/loadout-quiver.jpeg" },
+        { title: "转化器", text: "弓弩蓄力结构", iconSrc: "./assets/weapon-bow.png" },
+        { title: "释放端", text: "穿甲箭头", iconText: "箭" },
+        { title: "战斗结果", text: "破手部硬甲", iconSrc: "./assets/part-arms.png" },
+      ],
+      payoff: "游猎系把携带资源转化成针对性弹药，用较低风险处理 Boss 的危险部位。",
+    }),
+    makeLink({
+      id: "jet_melee",
+      title: "推进爆发回路",
+      tone: "orange",
+      civilization: "机动铠装",
+      energy: "推进力",
+      fit: "近战增伤",
+      requirements: [
+        { ok: hasJet, gap: "肩膀未装配喷气式装置" },
+        { ok: hasFists || hasGreatsword, gap: "未携带近战武器" },
+      ],
+      nodes: [
+        { title: "能源来源", text: "肩部喷气装置", iconSrc: "./assets/loadout-jet.png" },
+        { title: "转化器", text: "姿态与惯性控制", iconText: "势" },
+        { title: "释放端", text: "跃升重击", iconText: "跃" },
+        { title: "战斗结果", text: "近战爆发提高", iconText: "伤" },
+      ],
+      payoff: "推进系把外部动力转化成身体动量，让同一个近战技能拥有更强的命中表现和爆发价值。",
+    }),
+    makeLink({
+      id: "gourd_recover",
+      title: "酒气调息回路",
+      tone: "gold",
+      civilization: "东方武学",
+      energy: "酒气 / 血气",
+      fit: "回合续航",
+      requirements: [
+        { ok: hasGourd, gap: "前腰未装配酒葫芦" },
+      ],
+      nodes: [
+        { title: "能源来源", text: "前腰酒葫芦", iconSrc: "./assets/loadout-gourd.jpeg" },
+        { title: "转化器", text: "呼吸与血气调动", iconText: "气" },
+        { title: "释放端", text: "回合开始饮酒", iconText: "饮" },
+        { title: "战斗结果", text: "恢复生命", iconText: "生" },
+      ],
+      payoff: "东方武学不需要机械能源，也能被纳入同一体系：酒气先转成血气，再释放为续航。",
+    }),
+    makeLink({
+      id: "greatsword_counter",
+      title: "架势反击回路",
+      tone: "red",
+      civilization: "重装武技",
+      energy: "受击势能",
+      fit: "承压反击",
+      requirements: [
+        { ok: hasGreatsword, gap: "未携带大剑" },
+        { ok: greatswordStance, gap: "大剑未装配蓄势" },
+      ],
+      nodes: [
+        { title: "能源来源", text: "大剑架势", iconSrc: "./assets/weapon-greatsword.png" },
+        { title: "转化器", text: "承压蓄势", iconText: "蓄" },
+        { title: "释放端", text: "受击反击", iconText: "反" },
+        { title: "战斗结果", text: "下次攻击强化", iconText: "强" },
+      ],
+      payoff: "重装武技把敌人的冲击转化为自己的反击资源，体现慢但不容易断的价值。",
+    }),
+  ];
+}
+
+function tacticalLinkStatusLabel(status) {
+  if (status === "active") return "回路闭合";
+  if (status === "partial") return "回路缺口";
+  return "未接入";
+}
+
+function renderTacticalLinkIcon(node) {
+  if (node.iconSrc) return `<img src="${node.iconSrc}" alt="" />`;
+  return `<b>${node.iconText || "?"}</b>`;
+}
+
+function renderTacticalLinkCard(link) {
+  const statusText = link.gaps.length ? link.gaps.slice(0, 2).join(" / ") : "已闭合";
+  return `
+    <article class="tactical-link-card ${link.status} tone-${link.tone}">
+      <header>
+        <span>${tacticalLinkStatusLabel(link.status)}</span>
+        <strong>${link.title}</strong>
+        <em>${link.energy}</em>
+        <small>${link.civilization} / ${link.fit}</small>
+      </header>
+      <div class="tactical-link-flow">
+        ${link.nodes.map((node, index) => `
+          <div class="tactical-link-node">
+            <i>${renderTacticalLinkIcon(node)}</i>
+            <span>${node.title}</span>
+            <b>${node.text}</b>
+          </div>
+          ${index < link.nodes.length - 1 ? `<u aria-hidden="true"></u>` : ""}
+        `).join("")}
+      </div>
+      <div class="tactical-link-gaps">
+        <span>${link.gaps.length ? "缺口" : "状态"}</span>
+        <i>${statusText}${link.gaps.length > 2 ? " ..." : ""}</i>
+      </div>
+    </article>
+  `;
+}
+
+function renderTacticalLinkPage() {
+  if (!ui.tacticalLinkMap || !ui.tacticalLinkDetail) return;
+  updateEnterBattleState();
+  const links = tacticalLinks();
+  const activeLinks = links.filter((link) => link.status === "active");
+  const partialLinks = links.filter((link) => link.status === "partial");
+
+  ui.tacticalLinkMap.innerHTML = `
+    <section class="link-overview">
+      <span>当前能源构型</span>
+      <strong>${links.length} 条能源回路</strong>
+      <div>
+        <i>${activeLinks.length} 条闭合回路</i>
+        <i>${partialLinks.length} 条存在缺口</i>
+        <i>${links.length - activeLinks.length - partialLinks.length} 条未接入</i>
+        <i>${carriedWeapons().map((weapon) => weapon.name).join(" / ")}</i>
+      </div>
+    </section>
+    <div class="tactical-link-grid">
+      ${links.map(renderTacticalLinkCard).join("")}
+    </div>
+  `;
+
+  ui.tacticalLinkDetail.innerHTML = "";
+  ui.tacticalLinkDetail.hidden = true;
 }
 
 function characterTabContent(tabId) {
@@ -2468,8 +2903,8 @@ function renderPrebattleSkillConfig() {
   ui.skillSourceTabs.innerHTML = `
     <span class="skill-board-path">${activeGroup.title}</span>
     <span class="skill-board-title">
-      <strong>${activeArmorBoard ? "战甲模块盘" : activeSource.name}</strong>
-      <small>${activeArmorBoard ? "由五个战甲部位生成连线效果" : activeSource.role}</small>
+      <strong>${activeArmorBoard ? "战甲能量盘" : activeSource.name}</strong>
+      <small>${activeArmorBoard ? "由五个战甲部位提供能量承载，并驱动挂件与模组" : activeSource.role}</small>
     </span>
     <em>${activeArmorBoard ? `${activeArmorBoard.activeLines.length} 条连线` : `${unlockedSkillCount}/${activeSourceSkills.length} 可用`}</em>
   `;
@@ -2757,6 +3192,10 @@ function updateEnterBattleState() {
     ui.nextSkillFromWeaponBtn.disabled = !ready;
     ui.nextSkillFromWeaponBtn.title = ready ? "进入技能配置" : "请选择 Boss，并携带 2 件武器";
   }
+  if (ui.enterBattleFromLinksBtn) {
+    ui.enterBattleFromLinksBtn.disabled = !ready;
+    ui.enterBattleFromLinksBtn.title = ready ? "进入挑战" : "请选择 Boss，并携带 2 件武器";
+  }
 }
 
 function setPrebattleStep(step) {
@@ -2782,9 +3221,15 @@ function setPrebattleStep(step) {
   } else if (step === "loadout") {
     loadoutState.prebattleStep = "loadout";
     renderPrebattleLoadout();
+  } else if (step === "armorBoard") {
+    loadoutState.prebattleStep = "armorBoard";
+    renderStandaloneArmorEnergyBoard();
   } else if (step === "weapons") {
     loadoutState.prebattleStep = "weapons";
     renderPrebattleWeapons();
+  } else if (step === "links") {
+    loadoutState.prebattleStep = "links";
+    renderTacticalLinkPage();
   } else {
     loadoutState.prebattleStep = "boss";
   }
@@ -2800,6 +3245,10 @@ function openCharacterDestination(tabId) {
   if (tabId === "weapons") {
     loadoutState.activeWeaponSlot = 0;
     setPrebattleStep("weapons");
+    return;
+  }
+  if (tabId === "links") {
+    setPrebattleStep("links");
     return;
   } else {
     loadoutState.activePartId = "head";
@@ -2888,6 +3337,32 @@ function renderLoadoutItemPreview(item, fallback) {
   return `<strong>${item?.icon || fallback}</strong>`;
 }
 
+function getLoadoutSlotSocketCount(partId, slot) {
+  return loadoutSlotSocketCounts[`${partId}:${slot}`] || 0;
+}
+
+function getLoadoutItemSocketCount(item) {
+  return Number(item?.socketCount) || 0;
+}
+
+function renderSocketCountMark(count, extraClass = "") {
+  const normalized = Math.max(0, Math.min(6, Number(count) || 0));
+  if (!normalized) return "";
+  const label = `${normalized}孔制式`;
+  const pips = socketCountPipMap[normalized] || [];
+  return `
+    <span class="socket-dice ${extraClass}" title="${label}" aria-label="${label}">
+      ${pips.map((position) => `<i class="socket-pip socket-pip-${position}" aria-hidden="true"></i>`).join("")}
+    </span>
+  `;
+}
+
+function isLoadoutItemSocketCompatible(activePart, slot, item) {
+  const slotCount = getLoadoutSlotSocketCount(activePart.id, slot);
+  const itemCount = getLoadoutItemSocketCount(item);
+  return Boolean(slotCount && itemCount && slotCount >= itemCount);
+}
+
 function getLoadoutOptions(activePart, slot) {
   if (slot === "base") {
     return attachmentOptions.filter((item) => item.category === "base" && item.parts?.includes(activePart.id));
@@ -2895,7 +3370,10 @@ function getLoadoutOptions(activePart, slot) {
   if (activePart.id === "pants" && slot === "前腰") {
     return attachmentOptions.filter((item) => item.name === "酒葫芦");
   }
-  return attachmentOptions.filter((item) => item.slots?.includes(slot));
+  return attachmentOptions.filter((item) => {
+    if (item.category === "base" || !item.slots?.length) return false;
+    return item.slots.some((candidateSlot) => activePart.slots.includes(candidateSlot));
+  });
 }
 
 function updateLoadoutFocus(activePart) {
@@ -5367,6 +5845,9 @@ ui.backToBossBtn?.addEventListener("click", () => setPrebattleStep("character"))
 ui.backToBossFromCharacterBtn?.addEventListener("click", () => setPrebattleStep("boss"));
 ui.backToCharacterFromWeaponBtn?.addEventListener("click", () => setPrebattleStep("character"));
 ui.backToLoadoutBtn?.addEventListener("click", () => setPrebattleStep("character"));
+ui.backToCharacterFromLinksBtn?.addEventListener("click", () => setPrebattleStep("character"));
+ui.backToLoadoutFromArmorBoardBtn?.addEventListener("click", () => setPrebattleStep("loadout"));
+ui.enterBattleFromLinksBtn?.addEventListener("click", enterBattleFromLoadout);
 ui.characterTabButtons.forEach((button) => {
   button.addEventListener("click", () => {
     openCharacterDestination(button.dataset.characterTab || "skills");

@@ -1,0 +1,362 @@
+<title>M98「轻松塑造战斗化身」体验讨论整理</title>
+
+<callout emoji="✅" background-color="light-green" border-color="green">
+  <p><b>核心共识：</b>M98 当前最重要的不是先把战斗、养成、DIY 各自做复杂，而是先验证玩家能否轻松塑造一个“属于自己的战斗化身”。所有系统都应围绕“我想成为怎样的战士、我能否轻松塑造出来、这个战士是否被系统承认”来判断。</p>
+</callout>
+
+<h1>一、核心体验定位</h1>
+
+<p>项目内核可以收束为一句话：<b>让玩家轻松塑造他的战斗化身。</b></p>
+
+<table>
+  <colgroup><col span="1" width="140"/><col span="1" width="420"/><col span="1" width="420"/></colgroup>
+  <thead>
+    <tr>
+      <th background-color="light-gray">体验层级</th>
+      <th background-color="light-gray">玩家真正关心的问题</th>
+      <th background-color="light-gray">成立标准</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>创作感</b></td>
+      <td>我能不能做出心里想象的战士？</td>
+      <td>外观、轮廓、气质、装备组合能形成差异化表达。</td>
+    </tr>
+    <tr>
+      <td><b>成长感</b></td>
+      <td>这个战士能不能按我的方向逐渐变强？</td>
+      <td>成长不是单纯数值变大，而是越来越接近玩家认可的战斗形象。</td>
+    </tr>
+    <tr>
+      <td><b>表达感</b></td>
+      <td>我塑造出的战士能不能被看见、被验证、被展示？</td>
+      <td>玩家能欣赏、调整、保存、展示，并在玩法中看到选择被承认。</td>
+    </tr>
+  </tbody>
+</table>
+
+<callout emoji="📌" background-color="light-blue" border-color="blue">
+  <p><b>判断原则：</b>一个功能是否重要，不取决于它是否复杂，而取决于它是否增强“自由塑造、专属拥有、轻松调整”这三件事。</p>
+</callout>
+
+<hr/>
+
+<h1>二、轻松塑造与自由塑造的区别</h1>
+
+<grid>
+  <column width-ratio="0.5">
+    <h2>自由塑造</h2>
+    <p><b>核心问题：</b>我能不能塑造成我想要的样子？</p>
+    <ul>
+      <li>强调选择空间、组合可能和审美表达。</li>
+      <li>解决的是玩家的表达权。</li>
+      <li>决定体验上限：玩家能做出多独特、多自我的战士。</li>
+    </ul>
+  </column>
+  <column width-ratio="0.5">
+    <h2>轻松塑造</h2>
+    <p><b>核心问题：</b>我能不能低负担地完成塑造？</p>
+    <ul>
+      <li>强调规则易懂、操作顺畅、预览清晰、犯错成本低。</li>
+      <li>解决的是进入门槛和持续意愿。</li>
+      <li>决定体验覆盖面：有多少玩家愿意开始、愿意坚持。</li>
+    </ul>
+  </column>
+</grid>
+
+<p>两者不是互相替代的关系。只有自由，没有轻松，玩家会觉得“能做很多，但太累”；只有轻松，没有自由，玩家会觉得“很好上手，但不属于我”。</p>
+
+<callout emoji="💡" background-color="light-yellow" border-color="yellow">
+  <p><b>理想状态：</b>看起来很容易开始，玩进去后发现可以塑造得很深。轻松不是削弱自由，而是把自由包装成玩家愿意使用的形态。</p>
+</callout>
+
+<hr/>
+
+<h1>三、自我表达如何成立</h1>
+
+<p>仅靠 DIY 不足以成立长期自我表达。DIY 只能回答“他看起来像不像我想象中的战士”，但完整的自我表达还必须回答“他为什么这样战斗、如何变强、是否真的按我的想象行动”。</p>
+
+<table>
+  <colgroup><col span="1" width="120"/><col span="1" width="260"/><col span="1" width="520"/></colgroup>
+  <thead>
+    <tr>
+      <th background-color="light-gray">阶段</th>
+      <th background-color="light-gray">体验目标</th>
+      <th background-color="light-gray">玩家感受</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>想象</td>
+      <td>形成模糊幻想</td>
+      <td>我想做一个重装猛男、灵巧刺客、远程猎手、机械武者、东方武者或恶魔铠甲战士。</td>
+    </tr>
+    <tr>
+      <td>创作</td>
+      <td>把幻想变成可见形象</td>
+      <td>我看到他，就觉得这是我想要的方向。</td>
+    </tr>
+    <tr>
+      <td>定义</td>
+      <td>赋予战斗身份</td>
+      <td>他靠什么赢？擅长什么？怕什么？力量来源是什么？</td>
+    </tr>
+    <tr>
+      <td>验证</td>
+      <td>看到行为符合定义</td>
+      <td>他不只是看起来像，打起来也像。</td>
+    </tr>
+    <tr>
+      <td>反馈</td>
+      <td>系统承认玩家选择</td>
+      <td>我这样塑造是有意义的，系统理解并回应了我。</td>
+    </tr>
+    <tr>
+      <td>调整</td>
+      <td>回到塑造继续精修</td>
+      <td>我不是因为失败才改，而是因为我想让他更像心里的那个战士。</td>
+    </tr>
+  </tbody>
+</table>
+
+<callout emoji="✅" background-color="light-green" border-color="green">
+  <p><b>完整链路：</b>想象一个战士 → 创作他的外观 → 定义他的战斗方式 → 在玩法中验证 → 获得反馈 → 再次调整塑造。</p>
+</callout>
+
+<h2>三层表达必须同时成立</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th background-color="light-gray">表达类型</th>
+      <th background-color="light-gray">含义</th>
+      <th background-color="light-gray">缺失后的风险</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>外观表达</b></td>
+      <td>他看起来是我的。</td>
+      <td>只有这一层，会变成换装游戏。</td>
+    </tr>
+    <tr>
+      <td><b>行为表达</b></td>
+      <td>他打起来是我的。</td>
+      <td>只有这一层，会变成职业 Build 游戏。</td>
+    </tr>
+    <tr>
+      <td><b>成长表达</b></td>
+      <td>他变强的路径也是我选择的。</td>
+      <td>只有这一层，会变成传统数值养成游戏。</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr/>
+
+<h1>四、为什么这些体验更重要</h1>
+
+<callout emoji="📌" background-color="light-blue" border-color="blue">
+  <p>这些体验更重要，是因为它们决定项目到底是在做“塑造战斗化身”，还是只是在做一套换皮的装备系统。</p>
+</callout>
+
+<h2>1. 玩家第一动机不是理解规则，而是确认自我表达是否成立</h2>
+<p>玩家进入游戏时，最先关心的不是装备加多少数值，而是“我能不能做出一个我喜欢、我认可、我愿意投入的战士”。如果这个问题没被回答，再复杂的战斗、养成、收集都很难成立。</p>
+
+<h2>2. 自由塑造是差异化的根</h2>
+<p>如果玩家只能在预设职业、预设套装、预设流派里做选择，体验会快速滑向传统 RPG。M98 的核心不是“选择一个强职业”，而是“创造一个属于我的战斗化身”。</p>
+
+<h2>3. 专属拥有是长期留存的心理基础</h2>
+<p>如果角色只是系统发给玩家的战斗单位，玩家可以很快替换它；如果它是玩家亲手塑造、反复调整、逐渐长成的化身，玩家会更难割舍。</p>
+
+<h2>4. 轻松调整保护玩家的创作欲</h2>
+<p>如果塑造过程太复杂，玩家会从“创作状态”掉进“配置负担”。轻松调整能降低门槛，鼓励试错，让玩家敢于尝试非最优但更自我的搭配。</p>
+
+<h2>5. 复杂规则必须后置</h2>
+<p>复杂规则不是坏东西，但必须建立在玩家已经产生兴趣之后。早期出现是门槛，后期出现才是深度。</p>
+
+<hr/>
+
+<h1>五、什么是核心相关，什么是外围</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th background-color="light-gray">判断问题</th>
+      <th background-color="light-gray">强化体验的设计</th>
+      <th background-color="light-gray">关系较弱的设计</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>能否按想象塑造？</td>
+      <td>提升自由度、组合感、审美表达、差异化身份。</td>
+      <td>只是增加规则数量，但没有增加创作感。</td>
+    </tr>
+    <tr>
+      <td>能否感到这是“我的”战士？</td>
+      <td>制造专属感、投入感、成长痕迹、选择印记。</td>
+      <td>只是增加数值维度，但没有增强归属感。</td>
+    </tr>
+    <tr>
+      <td>能否轻松理解并继续调整？</td>
+      <td>更直觉、更低负担、更有即时反馈。</td>
+      <td>要求理解很多前置知识，才知道为什么要这么做。</td>
+    </tr>
+    <tr>
+      <td>是否服务体验自洽？</td>
+      <td>让玩家更想塑造、更能塑造、更愿意相信这是自己的化身。</td>
+      <td>更像系统自洽，而不是玩家体验自洽。</td>
+    </tr>
+  </tbody>
+</table>
+
+<callout emoji="⚠️" background-color="light-red" border-color="red">
+  <p><b>风险提醒：</b>当玩家从“我想塑造”变成“我必须解题”时，系统即使很精巧，也已经偏离了当前核心体验。</p>
+</callout>
+
+<hr/>
+
+<h1>六、先建构什么，后生长什么</h1>
+
+<grid>
+  <column width-ratio="0.5">
+    <h2>可以先建构的体验底座</h2>
+    <ul>
+      <li>玩家是否知道自己在塑造什么。</li>
+      <li>玩家是否能轻松做选择。</li>
+      <li>玩家是否能看到选择带来的变化。</li>
+      <li>玩家是否愿意反复调整。</li>
+      <li>玩家是否能形成“这是我的战士”的归属感。</li>
+    </ul>
+  </column>
+  <column width-ratio="0.5">
+    <h2>应等体感清楚后生长的内容</h2>
+    <ul>
+      <li>更复杂的规则。</li>
+      <li>更深的成长线。</li>
+      <li>更强的叙事羁绊。</li>
+      <li>更长期的收集目标。</li>
+      <li>更细的数值差异。</li>
+      <li>更高级的社交展示。</li>
+    </ul>
+  </column>
+</grid>
+
+<callout emoji="✅" background-color="light-green" border-color="green">
+  <p><b>阶段原则：</b>先建构“塑造是否成立”，再生长“塑造如何变深”。先验证玩家是否愿意创造和调整，再决定要不要加复杂规则、长期养成和情感羁绊。</p>
+</callout>
+
+<hr/>
+
+<h1>七、战灵概念与世界观翻译</h1>
+
+<p>战灵不应被泛化为一切装备效果的来源。更准确的定义是：<b>战灵是寄宿在玩家铠甲中的历史名宿、古代强者或文明意志。</b></p>
+
+<table>
+  <thead>
+    <tr>
+      <th background-color="light-gray">概念</th>
+      <th background-color="light-gray">定位</th>
+      <th background-color="light-gray">边界</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>玩家</b></td>
+      <td>御者，决定如何塑造、携带、调用。</td>
+      <td>不是被系统指定的职业，而是塑造行为的主体。</td>
+    </tr>
+    <tr>
+      <td><b>战甲</b></td>
+      <td>容器与身体，承载战灵，也提供挂载与能量基础。</td>
+      <td>不是单纯数值装备，应承担化身身份。</td>
+    </tr>
+    <tr>
+      <td><b>战灵</b></td>
+      <td>铠甲中的名宿意志，决定气质、战斗理念和共鸣方向。</td>
+      <td>不是无人机、酒葫芦、喷气背包等具体功能本体。</td>
+    </tr>
+    <tr>
+      <td><b>挂件/符咒/灵物/机械</b></td>
+      <td>发挥战甲和战灵能力的媒介。</td>
+      <td>不是战灵外化，而是调用、转化、释放力量的方式。</td>
+    </tr>
+    <tr>
+      <td><b>武器</b></td>
+      <td>出手方式，让力量落到具体战斗行为上。</td>
+      <td>不应完全取代战甲成为唯一职业来源。</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>能源流转的世界观翻译</h2>
+
+<p>可以把之前的能源流转系统翻译为：玩家以自身灵能驱动战甲，战甲承载战灵，挂件和武器作为媒介，将灵能转化为具体行为；当组合符合战灵的战斗理念时，触发战灵共鸣。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th background-color="light-gray">原系统概念</th>
+      <th background-color="light-gray">世界观翻译</th>
+      <th background-color="light-gray">含义</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>能源来源</td>
+      <td>玩家灵能</td>
+      <td>玩家自身觉醒的力量，是驱动基础。</td>
+    </tr>
+    <tr>
+      <td>能量上限</td>
+      <td>战甲承载</td>
+      <td>战甲能承受多少灵能、挂件和战法。</td>
+    </tr>
+    <tr>
+      <td>能量流动</td>
+      <td>导灵</td>
+      <td>灵能从玩家身体流入战甲，再流向武器或挂件。</td>
+    </tr>
+    <tr>
+      <td>插槽孔位</td>
+      <td>灵窍 / 挂载孔</td>
+      <td>战甲上可接入媒介的位置。</td>
+    </tr>
+    <tr>
+      <td>挂件/模块</td>
+      <td>灵媒器</td>
+      <td>把灵能转化成具体功能的媒介。</td>
+    </tr>
+    <tr>
+      <td>连线奖励</td>
+      <td>战灵共鸣</td>
+      <td>配置符合战灵战斗理念后获得额外效果。</td>
+    </tr>
+    <tr>
+      <td>大招</td>
+      <td>战灵解放</td>
+      <td>短时间让战灵意志介入战斗。</td>
+    </tr>
+  </tbody>
+</table>
+
+<callout emoji="📌" background-color="light-blue" border-color="blue">
+  <p><b>一句话定义：</b>战灵决定这套战甲想怎么战斗，挂件决定这种战斗方式如何被具体释放出来，玩家决定最终塑造成什么样的战士。</p>
+</callout>
+
+<hr/>
+
+<h1>八、后续设计检核问题</h1>
+
+<checkbox done="false">这个功能是否让玩家更容易塑造自己心目中的战士？</checkbox>
+<checkbox done="false">这个功能是否增加了专属感，而不是只增加系统复杂度？</checkbox>
+<checkbox done="false">玩家是否能在不读长说明的情况下理解它的意义？</checkbox>
+<checkbox done="false">玩家是否能看到自己的选择带来的外观、身份或行为变化？</checkbox>
+<checkbox done="false">它是否让玩家更愿意回来继续调整，而不是更害怕改错？</checkbox>
+<checkbox done="false">它是否服务“我的战士就应该这样”的感受？</checkbox>
+
+<callout emoji="🏁" background-color="light-yellow" border-color="yellow">
+  <p><b>最终判断：</b>当前阶段最重要的不是把系统做深，而是让玩家愿意反复打开塑造界面，调整、欣赏、保存自己的战士。只要这个体验成立，战斗策略、养成深度、战灵羁绊才有继续生长的空间。</p>
+</callout>
