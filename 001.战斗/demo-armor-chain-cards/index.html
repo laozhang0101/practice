@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0d10" />
+    <title>M98 卡牌版战斗 Demo</title>
+    <link rel="stylesheet" href="./styles.css?v=20260716-intervention-focus-v2" />
+  </head>
+  <body>
+    <main class="game-shell" id="gameShell">
+      <div class="demo-version" aria-label="演示版本">卡牌版 · 2026.07.16 · 慢动作介入</div>
+      <header class="top-hud">
+        <section class="fighter-hud" aria-label="玩家状态">
+          <img src="./assets/player-avatar.png" alt="" />
+          <div class="fighter-bars">
+            <div class="hud-line">
+              <strong>修罗</strong>
+              <span id="turnLabel">自动回合 · 玩家行动</span>
+            </div>
+            <div class="bar health"><i id="playerHpBar"></i><b id="playerHpText">220 / 220</b></div>
+            <div class="armor-energy">
+              <span class="energy-mark" aria-hidden="true"></span>
+              <div class="energy-cells" id="energyCells"></div>
+              <b id="energyText">7 / 10</b>
+            </div>
+          </div>
+        </section>
+
+        <section class="boss-hud" aria-label="Boss状态">
+          <div class="boss-heading">
+            <div>
+              <span>巨型熔岩构装体</span>
+              <strong>熔岩石头人</strong>
+            </div>
+            <div class="intent-chip" id="intentChip">
+              <span>下一行动</span>
+              <b id="intentName">巨石投掷</b>
+            </div>
+          </div>
+          <div class="bar boss-health"><i id="bossHpBar"></i><b id="bossHpText">420 / 420</b></div>
+          <div class="part-bars" id="partBars"></div>
+        </section>
+
+        <button class="icon-button reset-button" id="resetButton" type="button" aria-label="重新开始" title="重新开始">↻</button>
+      </header>
+
+      <section class="battlefield" id="battlefield" aria-label="战斗场景">
+        <div class="arena-shade"></div>
+
+        <div class="auto-mode-panel" aria-label="自动战斗方式">
+          <img id="battleWeaponIcon" src="./assets/weapon-fists.png" alt="" />
+          <div>
+            <span>武器决定固定攻击方式</span>
+            <strong id="battleWeaponName">拳套 · 近身压制</strong>
+            <small id="autoActionText">玩家准备出手</small>
+          </div>
+          <div class="auto-action-meter"><i id="autoActionBar"></i></div>
+        </div>
+
+        <div class="intent-banner" id="intentBanner">
+          <img id="intentPartIcon" src="./assets/part-arms.png" alt="" />
+          <div>
+            <span id="intentCue">手臂聚力</span>
+            <strong id="intentTitle">Boss准备投掷巨石</strong>
+          </div>
+          <b id="intentCounter">4.8s</b>
+        </div>
+
+        <div class="reaction-controls" id="reactionControls" aria-label="闪避与格挡操作">
+          <span>防御操作</span>
+          <button type="button" data-defense="left"><kbd>A</kbd><b>左闪</b></button>
+          <button type="button" data-defense="block"><kbd>W</kbd><b>格挡</b></button>
+          <button type="button" data-defense="right"><kbd>D</kbd><b>右闪</b></button>
+          <small id="reactionHint">Boss出手时输入</small>
+        </div>
+
+        <div class="player-unit" id="playerUnit">
+          <div class="module-socket socket-reactor" data-socket="reactor"></div>
+          <div class="module-socket socket-jet" data-socket="jet"></div>
+          <div class="module-socket socket-cannon" data-socket="cannon"></div>
+          <img id="playerImage" src="./assets/player-fists.png" alt="玩家战斗化身" />
+          <div class="unit-shadow"></div>
+        </div>
+
+        <div class="drone-unit" id="droneUnit">
+          <img src="./assets/drone.png" alt="无人机挂件" />
+        </div>
+
+        <div class="boss-unit" id="bossUnit">
+          <div class="boss-visual">
+            <img id="bossImage" src="./assets/boss.png" alt="熔岩石头人" />
+            <div class="boss-core-pulse" aria-hidden="true"></div>
+          </div>
+          <div class="unit-shadow"></div>
+        </div>
+
+        <section class="live-chain-panel" id="liveChainPanel" aria-label="实时连携">
+          <header>
+            <span>实时连携</span>
+            <strong id="chainTitle">等待玩家介入</strong>
+            <b id="chainCount">0</b>
+          </header>
+          <div class="chain-lane" id="chainLane">
+            <span class="chain-placeholder">选择挂件卡接入下一次攻击</span>
+          </div>
+          <div class="chain-combo-readout hidden" id="chainComboReadout">
+            <span>COMBO</span>
+            <b id="chainComboName">连续接入</b>
+            <small id="chainComboEffect">挂件效果提升</small>
+          </div>
+          <div class="chain-window"><i id="chainTimerBar"></i></div>
+        </section>
+
+        <div class="battle-message" id="battleMessage" aria-live="polite"></div>
+        <div class="floating-layer" id="floatingLayer" aria-hidden="true"></div>
+        <div class="effect-layer" id="effectLayer" aria-hidden="true"></div>
+
+        <section class="weapon-switch-cinematic hidden" id="weaponSwitchCinematic" aria-label="武器切换表现" aria-hidden="true">
+          <div class="weapon-switch-sweep"></div>
+          <div class="weapon-switch-emblem">
+            <img id="weaponSwitchIcon" src="./assets/weapon-fists.png" alt="" />
+            <span>武器切换</span>
+            <strong id="weaponSwitchName">拳套</strong>
+            <small id="weaponSwitchStyle">近身压制</small>
+          </div>
+        </section>
+
+        <section class="cinematic module-cinematic hidden" id="moduleCinematic" aria-label="挂件表现视频" aria-hidden="true">
+          <video id="moduleVideo" playsinline muted preload="metadata"></video>
+          <div class="cinematic-vignette"></div>
+          <header class="module-video-heading">
+            <span id="moduleVideoType">挂件介入</span>
+            <strong id="moduleVideoTitle">喷气背包</strong>
+          </header>
+          <div class="module-video-combo" id="moduleVideoCombo">
+            <div class="module-video-icons" id="moduleVideoIcons"></div>
+            <div>
+              <span>COMBO</span>
+              <strong id="moduleVideoComboName">独立启动</strong>
+              <small id="moduleVideoComboEffect">继续接入挂件可形成联动</small>
+            </div>
+          </div>
+          <button class="module-video-skip" id="moduleVideoSkip" type="button" aria-label="跳过挂件表现视频">
+            <kbd>M</kbd><span>跳过</span>
+          </button>
+        </section>
+
+        <section class="result-overlay hidden" id="resultOverlay" aria-live="polite">
+          <span id="resultEyebrow">战斗结束</span>
+          <strong id="resultTitle">巨兽已失衡</strong>
+          <p id="resultCopy"></p>
+          <button id="resultRestart" type="button">再次挑战</button>
+        </section>
+      </section>
+
+      <section class="command-deck" id="commandDeck">
+        <header class="live-command-bar">
+          <button class="weapon-auto-summary" id="weaponToggle" type="button" aria-expanded="false" aria-controls="weaponSwitchMenu" aria-label="武器切换，当前拳套">
+            <span class="weapon-attack-orbit" id="weaponAttackRing" aria-hidden="true">
+              <img id="autoWeaponIcon" src="./assets/weapon-fists.png" alt="" />
+            </span>
+            <div class="weapon-summary-copy">
+              <span>武器切换 · 当前主武器</span>
+              <strong id="autoWeaponName">拳套 · 近身压制</strong>
+              <small id="weaponCadenceText">高速攻击 · 下一击蓄势中</small>
+            </div>
+            <i aria-hidden="true">⇄</i>
+          </button>
+          <div class="weapon-switch-menu hidden" id="weaponSwitchMenu" aria-label="切换武器"></div>
+          <div class="live-intervention-copy">
+            <span>实时介入</span>
+            <strong id="liveHint">自动战斗持续进行，介入时刻可接入挂件</strong>
+          </div>
+          <div class="energy-rate" id="energyRate" aria-label="战甲能量：当前6，上限10">
+            <span class="energy-orb">
+              <i></i>
+              <b id="cardEnergyValue">6</b>
+              <span class="energy-cap" id="energyCapText">上限 10</span>
+            </span>
+            <span class="energy-charge-meter" aria-hidden="true"><i id="energyChargeBar"></i></span>
+            <small id="energyChargeLabel">+1 / 3s</small>
+          </div>
+        </header>
+
+        <section class="card-hand" id="cardHand" aria-label="战甲与挂件卡牌"></section>
+      </section>
+
+      <aside class="compact-log" id="compactLog" aria-live="polite"></aside>
+    </main>
+
+    <script src="./game.js?v=20260716-intervention-focus-v2"></script>
+  </body>
+</html>

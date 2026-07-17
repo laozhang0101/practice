@@ -38,24 +38,41 @@ jobs:
           echo "Top-level files:"
           ls -la
 
-      - name: Resolve demo path
-        id: demo_path
+      - name: Prepare Pages site
+        id: pages_site
         shell: bash
         run: |
           set -euo pipefail
-          DEMO_PATH="$(find . -type f -path '*/demo-2d-strategy/index.html' -printf '%h\n' | head -n 1)"
-          if [ -z "$DEMO_PATH" ]; then
+          STRATEGY_PATH="$(find . -type f -path '*/demo-2d-strategy/index.html' -printf '%h\n' | head -n 1)"
+          CARD_PATH="$(find . -type f -path '*/demo-armor-chain-cards/index.html' -printf '%h\n' | head -n 1)"
+
+          if [ -z "$STRATEGY_PATH" ]; then
             echo "demo-2d-strategy/index.html not found"
             exit 1
           fi
-          echo "Resolved demo path: $DEMO_PATH"
-          echo "path=$DEMO_PATH" >> "$GITHUB_OUTPUT"
+          if [ -z "$CARD_PATH" ]; then
+            echo "demo-armor-chain-cards/index.html not found"
+            exit 1
+          fi
+
+          SITE_PATH="$RUNNER_TEMP/pages-site"
+          mkdir -p "$SITE_PATH/card"
+          cp -a "$STRATEGY_PATH/." "$SITE_PATH/"
+          cp -a "$CARD_PATH/." "$SITE_PATH/card/"
+          find "$SITE_PATH" -type f -name '.server-*.log' -delete
+          touch "$SITE_PATH/.nojekyll"
+
+          test -f "$SITE_PATH/index.html"
+          test -f "$SITE_PATH/card/index.html"
+          echo "Strategy entry: $SITE_PATH/index.html"
+          echo "Card entry: $SITE_PATH/card/index.html"
+          echo "path=$SITE_PATH" >> "$GITHUB_OUTPUT"
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ steps.demo_path.outputs.path }}
+          path: ${{ steps.pages_site.outputs.path }}
 
       - id: deployment
         uses: actions/deploy-pages@v4
