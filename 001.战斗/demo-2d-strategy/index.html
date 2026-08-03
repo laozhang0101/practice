@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>M98 2D Strategy Combat Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=energy-icon-position-20260630" />
+    <title>M98 战斗策略版 Demo</title>
+    <link rel="stylesheet" href="./styles.css?v=full-attack-qte-20260803" />
   </head>
   <body>
     <div class="demo-version" data-demo-version>Demo --</div>
@@ -37,7 +37,8 @@
           </div>
 
           <nav class="character-bottom-tabs" aria-label="角色信息标签">
-            <button class="active" type="button" data-character-tab="weapons">武器</button>
+            <button class="active" type="button" data-character-tab="presets">方案</button>
+            <button type="button" data-character-tab="weapons">武器</button>
             <button type="button" data-character-tab="outfit">服饰</button>
             <button type="button" data-character-tab="skills">技能</button>
             <button type="button" data-character-tab="links">能源链路</button>
@@ -46,6 +47,35 @@
           <footer class="character-info-actions">
             <button class="edit-appearance" id="backToBossFromCharacterBtn" type="button">返回Boss选择</button>
             <button class="enter-battle" id="nextLoadoutFromCharacterBtn" type="button">挑战</button>
+          </footer>
+        </section>
+      </section>
+
+      <section class="prebattle-page preset-page" data-prebattle-page="presets" aria-label="战术装配方案">
+        <section class="loadout-preset-shell">
+          <header class="loadout-preset-head">
+            <span>
+              <small>战前策略</small>
+              <strong>我的装配方案</strong>
+              <p>选择方案后，武器、战甲、挂件和技能会立即替换。</p>
+            </span>
+            <div class="preset-boss-context" id="presetBossContext"></div>
+          </header>
+
+          <aside class="preset-library" aria-label="拥有的装配方案">
+            <div class="preset-section-title">
+              <span>已拥有</span>
+              <strong id="presetOwnedCount">0 套</strong>
+            </div>
+            <div class="preset-list" id="loadoutPresetList"></div>
+          </aside>
+
+          <section class="preset-stage" id="loadoutPresetStage" aria-label="当前装配角色"></section>
+          <aside class="preset-loadout-detail" id="loadoutPresetDetail" aria-label="装配与技能"></aside>
+
+          <footer class="preset-page-actions">
+            <button class="edit-appearance" id="backToBossFromPresetsBtn" type="button">返回Boss图鉴</button>
+            <button class="enter-battle" id="enterBattleFromPresetsBtn" type="button">进入挑战</button>
           </footer>
         </section>
       </section>
@@ -79,6 +109,7 @@
 
         <nav class="loadout-parts" id="loadoutParts" aria-label="装备分页"></nav>
         <section class="loadout-armor-summary" id="loadoutArmorSummary" aria-label="战甲图形化说明"></section>
+        <section class="upper-armor-inlay-panel" id="upperArmorPassiveInlays" aria-label="上衣被动镶嵌" hidden></section>
 
         <section class="attachment-panel" aria-label="装配槽位">
           <div class="attachment-slots" id="attachmentSlots"></div>
@@ -87,20 +118,20 @@
         </section>
 
         <footer class="prebattle-actions">
-          <button class="edit-appearance" id="backToBossBtn" type="button">返回角色信息</button>
+          <button class="edit-appearance" id="backToBossBtn" type="button">返回装配方案</button>
           <button class="save-loadout" type="button">保存方案</button>
         </footer>
       </section>
 
-      <section class="prebattle-page armor-board-page" data-prebattle-page="armorBoard" aria-label="战甲能量盘配置">
+      <section class="prebattle-page armor-board-page" data-prebattle-page="armorBoard" aria-label="战甲承载配置">
         <section class="armor-board-shell">
           <header class="armor-board-head">
-            <span>战甲能量盘</span>
-            <strong>五个战甲部位提供能量承载，装填模块并形成 Bingo 连线。</strong>
+            <span>战甲承载</span>
+            <strong>五个战甲部位提供承载，灵媒器接入后塑造战斗化身。</strong>
           </header>
 
           <aside class="armor-board-parts" id="armorBoardParts" aria-label="战甲部位"></aside>
-          <section class="armor-board-config" id="armorBoardConfig" aria-label="能量盘配置"></section>
+          <section class="armor-board-config" id="armorBoardConfig" aria-label="战甲承载配置"></section>
 
           <footer class="armor-board-actions">
             <button class="edit-appearance" id="backToLoadoutFromArmorBoardBtn" type="button">返回服饰装扮</button>
@@ -122,7 +153,7 @@
         <aside class="weapon-detail-panel" id="weaponDetailPanel" aria-label="武器技能装配"></aside>
 
         <footer class="weapon-page-actions">
-          <button class="edit-appearance" id="backToCharacterFromWeaponBtn" type="button">编辑样式</button>
+          <button class="edit-appearance" id="backToCharacterFromWeaponBtn" type="button">返回装配方案</button>
           <button class="save-loadout" type="button">保存</button>
         </footer>
       </section>
@@ -147,7 +178,7 @@
           <aside class="skill-editor" id="skillEditor" aria-label="技能编辑"></aside>
 
           <footer class="skill-config-actions">
-            <button class="edit-appearance" id="backToLoadoutBtn" type="button">返回角色主界面</button>
+            <button class="edit-appearance" id="backToLoadoutBtn" type="button">返回装配方案</button>
             <button class="enter-battle" id="enterBattleBtn" type="button">进入挑战</button>
           </footer>
         </section>
@@ -189,19 +220,13 @@
           </button>
           <div class="video-overlay hidden" id="videoOverlay">
             <video id="skillVideo" playsinline muted preload="auto"></video>
+            <img class="skill-frame-sequence hidden" id="skillFrameSequence" alt="" />
             <div class="qte-overlay hidden" id="qteOverlay">
               <div class="qte-title" id="qteTitle">QTE</div>
               <div class="qte-copy" id="qteCopy">D 右闪 / W 格挡</div>
               <div class="qte-bar"><i id="qteGauge"></i></div>
             </div>
-            <div class="accessory-choice hidden" id="accessoryChoice">
-              <button class="accessory-choice-zone accessory-choice-top" type="button" data-accessory="jet">
-                <span>喷气挂件</span>
-              </button>
-              <button class="accessory-choice-zone accessory-choice-bottom" type="button" data-accessory="drone">
-                <span>无人机挂件</span>
-              </button>
-            </div>
+            <div class="accessory-choice hidden" id="accessoryChoice"></div>
           </div>
           <div class="weakpoint-tip hidden" id="weakpointTip">
             <img src="./assets/tips-avatar.png" alt="队友提示" />
@@ -252,11 +277,16 @@
         <section class="panel log-panel">
           <h2>战斗记录</h2>
           <ol id="logList"></ol>
+          <footer class="gm-battle-tools">
+            <span>GM 工具</span>
+            <button id="gmHideBattleUi" type="button">隐藏战斗 UI</button>
+          </footer>
         </section>
       </aside>
+      <button class="gm-ui-restore" id="gmShowBattleUi" type="button">GM 显示 UI</button>
     </main>
 
-    <script src="./game.js?v=energy-icon-position-20260630"></script>
+    <script src="./game.js?v=full-attack-qte-20260803"></script>
   </body>
 </html>
 
