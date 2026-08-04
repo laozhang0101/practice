@@ -5,11 +5,171 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0d10" />
     <title>M98 卡牌版战斗 Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=20260804-card-release" />
+    <link rel="stylesheet" href="./styles.css?v=20260804-next-card-preview-29" />
   </head>
   <body>
     <main class="game-shell" id="gameShell">
-      <div class="demo-version" aria-label="演示版本">卡牌版 · 2026.08.04 · 自动充能 / 手动唤醒</div>
+      <div class="demo-version" aria-label="演示版本">卡牌版 · 2026.08.04 · 严格交替回合 / 精简能量</div>
+
+      <section class="battle-preparation monster-step" id="battlePreparation" aria-label="战前准备流程" aria-hidden="false">
+        <div class="preparation-ambient" aria-hidden="true"></div>
+        <header class="preparation-heading">
+          <span id="preparationEyebrow">战前准备 · 怪物信息</span>
+          <h1 id="preparationTitle">先读懂这头巨兽</h1>
+          <p id="preparationDescription">确认Boss的蓄力部位、攻击方式与反制输入，再进入个人装配。</p>
+        </header>
+
+        <ol class="preparation-progress" aria-label="战前准备进度">
+          <li class="active" data-preparation-progress="monster"><b>01</b><span>怪物信息</span></li>
+          <li data-preparation-progress="loadout"><b>02</b><span>个人装配</span></li>
+          <li data-preparation-progress="battle"><b>03</b><span>进入战斗</span></li>
+        </ol>
+
+        <div class="monster-preparation-stage preparation-stage" id="preparationMonsterStage" aria-hidden="false">
+          <section class="monster-briefing-visual" aria-label="熔岩石头人预览">
+            <img src="./assets/boss.png" alt="熔岩石头人全身预览" />
+            <div class="monster-threat-tags" aria-label="怪物特征">
+              <span>高护甲</span><span>部位蓄力</span><span>重型反击</span>
+            </div>
+          </section>
+
+          <section class="monster-intel-panel" aria-label="怪物战斗情报">
+            <header>
+              <span>01 / 怪物信息</span>
+              <strong>部位与招式情报</strong>
+              <small>Boss会按手部 → 胸口 → 脚部循环蓄力</small>
+            </header>
+
+            <div class="monster-part-summary" aria-label="怪物部位状态">
+              <span><img src="./assets/part-arms.png" alt="" /><b>手部</b><small>75护甲 · 巨石投掷</small></span>
+              <span><img src="./assets/part-core.png" alt="" /><b>胸口</b><small>核心裸露 · 熔岩喷发</small></span>
+              <span><img src="./assets/part-feet.png" alt="" /><b>脚部</b><small>68护甲 · 重压踏击</small></span>
+            </div>
+
+            <div class="monster-intent-list">
+              <article>
+                <img src="./assets/part-arms.png" alt="" />
+                <span><b>巨石投掷</b><small>手部聚力 · 右侧重击</small></span>
+                <em><kbd>D</kbd>右闪 / <kbd>W</kbd>格挡</em>
+              </article>
+              <article>
+                <img src="./assets/part-core.png" alt="" />
+                <span><b>熔岩喷发</b><small>胸核升温 · 范围爆发</small></span>
+                <em><kbd>A</kbd>或<kbd>D</kbd>侧闪</em>
+              </article>
+              <article>
+                <img src="./assets/part-feet.png" alt="" />
+                <span><b>重压踏击</b><small>下盘下沉 · 地面震击</small></span>
+                <em><kbd>A</kbd>左闪 / <kbd>W</kbd>格挡</em>
+              </article>
+            </div>
+
+            <footer class="monster-intel-footer">
+              <div>
+                <span>讨伐建议</span>
+                <strong>先读蓄力部位，再用挂件破甲、打断或补足生存</strong>
+              </div>
+              <button id="preparationMonsterNext" type="button">下一步 · 查看个人装配</button>
+            </footer>
+          </section>
+        </div>
+
+        <div class="preparation-layout preparation-stage hidden" id="preparationLoadoutStage" aria-hidden="true">
+          <section class="preparation-preview" aria-label="当前流派预览">
+            <div class="preparation-preview-copy">
+              <span>修罗战甲 · 当前装配</span>
+              <strong id="preparationStyleName">拳套 · 近身压制</strong>
+              <small id="preparationStyleMeta">严格交替 · 玩家蓄势3.0秒 · 完整循环约6.4秒</small>
+            </div>
+            <img id="preparationPreviewImage" src="./assets/player-fists.png" alt="拳套流派战斗化身" />
+            <div class="preparation-traits" aria-label="拳套流派特性">
+              <span><b>攻击节奏</b>高速连击</span>
+              <span><b>协同挂件</b>反应炉 / 喷气 / 无人机</span>
+              <span><b>操作定位</b>近身压制</span>
+            </div>
+          </section>
+
+          <section class="preparation-selector" aria-label="可选流派">
+            <header>
+              <span>02 / 个人装配</span>
+              <strong>本次出战配置</strong>
+              <small>仅拳套开放</small>
+            </header>
+
+            <div class="style-options" role="group" aria-label="战斗流派页签">
+              <button class="style-option selected" id="styleTabFists" type="button" data-style-id="fists" aria-pressed="true" aria-controls="styleLoadoutDetail">
+                <span class="style-option-status available">已选</span>
+                <img src="./assets/weapon-fists.png" alt="" />
+                <span class="style-option-copy">
+                  <strong>拳套</strong>
+                  <small>近压</small>
+                </span>
+              </button>
+
+              <button class="style-option locked" type="button" data-style-id="greatsword" disabled aria-disabled="true">
+                <span class="style-option-status">锁定</span>
+                <img src="./assets/weapon-greatsword.png" alt="" />
+                <span class="style-option-copy">
+                  <strong>大剑</strong>
+                  <small>重破</small>
+                </span>
+              </button>
+
+              <button class="style-option locked" type="button" data-style-id="bow" disabled aria-disabled="true">
+                <span class="style-option-status">锁定</span>
+                <img src="./assets/weapon-bow.png" alt="" />
+                <span class="style-option-copy">
+                  <strong>弓弩</strong>
+                  <small>远点</small>
+                </span>
+              </button>
+            </div>
+
+            <section class="style-loadout-detail" id="styleLoadoutDetail" aria-labelledby="styleTabFists">
+              <header class="style-loadout-bar">
+                <div>
+                  <img src="./assets/weapon-fists.png" alt="" />
+                  <strong>拳套流派</strong>
+                </div>
+                <span>近战</span><span>连击</span><span>压制</span>
+              </header>
+
+              <div class="loadout-gear-list" aria-label="拳套流派装配内容">
+                <article class="loadout-gear-item weapon">
+                  <span class="loadout-gear-icon"><img src="./assets/weapon-fists.png" alt="拳套" /></span>
+                  <div><small>武器</small><strong>拳套</strong></div>
+                </article>
+                <article class="loadout-gear-item armor">
+                  <span class="loadout-gear-icon"><img src="./assets/player-avatar.png" alt="修罗战甲" /></span>
+                  <div><small>战甲</small><strong>修罗</strong></div>
+                </article>
+                <article class="loadout-gear-item accessories">
+                  <span class="loadout-accessory-icons" aria-label="方舟反应炉、喷气背包、肩炮、酒葫芦">
+                    <img src="./assets/arc-reactor.jpeg" alt="方舟反应炉" />
+                    <img src="./assets/jet.png" alt="喷气背包" />
+                    <img src="./assets/shoulder-cannon.jpeg" alt="肩炮" />
+                    <img src="./assets/gourd.jpeg" alt="酒葫芦" />
+                  </span>
+                  <div><small>挂件</small><strong>4件</strong></div>
+                </article>
+              </div>
+            </section>
+
+            <footer class="preparation-footer">
+              <div>
+                <span>已选择</span>
+                <strong id="preparationSelectionName">拳套流派 · 近身压制</strong>
+                <small>进入战斗后锁定</small>
+              </div>
+              <div class="preparation-footer-actions">
+                <button class="preparation-secondary" id="preparationBackToMonster" type="button">返回怪物信息</button>
+                <button id="preparationConfirm" type="button">确认装配 · 进入战斗</button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      </section>
+
       <header class="top-hud">
         <section class="fighter-hud" aria-label="玩家状态">
           <img src="./assets/player-avatar.png" alt="" />
@@ -22,12 +182,14 @@
             <div class="armor-energy">
               <span class="energy-mark" aria-hidden="true"></span>
               <div class="energy-cells" id="energyCells"></div>
-              <b id="energyText">7 / 10</b>
+              <b id="energyText">1 / 10</b>
             </div>
+            <div class="fighter-status-strip" id="playerStatusStrip" aria-label="Player status effects"></div>
           </div>
         </section>
 
         <section class="boss-hud" aria-label="Boss状态">
+          <img class="boss-hud-avatar" id="bossHudAvatar" src="./assets/boss.png" alt="" />
           <div class="boss-heading">
             <div>
               <span>巨型熔岩构装体</span>
@@ -42,7 +204,7 @@
           <div class="part-bars" id="partBars"></div>
         </section>
 
-        <button class="icon-button reset-button" id="resetButton" type="button" aria-label="重新开始" title="重新开始">↻</button>
+        <button class="icon-button reset-button" id="resetButton" type="button" aria-label="返回战前准备" title="返回战前准备">↻</button>
       </header>
 
       <section class="battlefield" id="battlefield" aria-label="战斗场景">
@@ -51,7 +213,7 @@
         <div class="auto-mode-panel" aria-label="自动战斗方式">
           <img id="battleWeaponIcon" src="./assets/weapon-fists.png" alt="" />
           <div>
-            <span>武器决定固定攻击方式</span>
+            <span>严格交替回合 · 玩家 / Boss</span>
             <strong id="battleWeaponName">拳套 · 近身压制</strong>
             <small id="autoActionText">玩家准备出手</small>
           </div>
@@ -87,8 +249,8 @@
           <div class="unit-shadow"></div>
         </div>
 
-        <div class="drone-unit" id="droneUnit">
-          <img src="./assets/drone.png" alt="无人机挂件" />
+        <div class="drone-unit" id="droneUnit" aria-hidden="true">
+          <img src="./assets/drone.png" alt="" />
         </div>
 
         <div class="boss-unit" id="bossUnit">
@@ -99,56 +261,32 @@
           <div class="unit-shadow"></div>
         </div>
 
-        <section class="awakening-console hidden" id="awakeningConsole" aria-label="选择唤醒部件" aria-hidden="true">
-          <div class="awakening-console-copy">
-            <span>核心形态已响应</span>
-            <strong id="awakeningPreviewTitle">选择本次唤醒部件</strong>
-            <small id="awakeningPreviewEffect">选择后将按实际介入顺序预览协同路径</small>
-          </div>
-          <div class="awakening-selection" id="awakeningSelection"></div>
-          <div class="awakening-selection-meta">
-            <span id="awakeningSelectionCount">已选 0 / 3</span>
-            <b id="awakeningSelectionCost">消耗 0</b>
-          </div>
-          <div class="awakening-actions">
-            <button id="awakeningCancel" type="button">暂不唤醒</button>
-            <button id="awakeningConfirm" type="button" disabled>确认变身</button>
-          </div>
-        </section>
-
-        <section class="armor-transform-cinematic hidden" id="armorTransformCinematic" aria-label="战甲变身" aria-hidden="true">
-          <div class="transform-core">
-            <img src="./assets/armor-overdrive.jpeg" alt="" />
+        <section class="ultimate-cinematic hidden" id="ultimateCinematic" aria-label="灵魂终结技" aria-hidden="true">
+          <div class="ultimate-impact-core">
+            <img src="./assets/soul-armor-skill.jpg" alt="" />
             <i></i>
+            <b id="ultimateCinematicTier">I</b>
           </div>
-          <span>核心形态</span>
-          <strong>修罗战甲 · 唤醒</strong>
-          <div class="transform-modules" id="transformModules"></div>
+          <span>灵魂终结技 · 消耗 <b id="ultimateCinematicCost">25</b> 点</span>
+          <strong id="ultimateCinematicName">碎岳 · 崩拳</strong>
+          <small id="ultimateCinematicEffect">锁定当前蓄力部位，打出破甲重拳</small>
         </section>
-
-        <div class="awakened-status hidden" id="awakenedStatus" aria-live="polite">
-          <span>战甲状态</span>
-          <strong id="awakenedStatusName">部件协同</strong>
-          <div id="awakenedStatusModules"></div>
-          <b id="awakenedTurns">2回合</b>
-        </div>
 
         <div class="battle-message" id="battleMessage" aria-live="polite"></div>
         <div class="floating-layer" id="floatingLayer" aria-hidden="true"></div>
         <div class="effect-layer" id="effectLayer" aria-hidden="true"></div>
 
-        <section class="weapon-switch-cinematic hidden" id="weaponSwitchCinematic" aria-label="武器切换表现" aria-hidden="true">
-          <div class="weapon-switch-sweep"></div>
-          <div class="weapon-switch-emblem">
-            <img id="weaponSwitchIcon" src="./assets/weapon-fists.png" alt="" />
-            <span>武器切换</span>
-            <strong id="weaponSwitchName">拳套</strong>
-            <small id="weaponSwitchStyle">近身压制</small>
-          </div>
-        </section>
-
-        <section class="cinematic module-cinematic hidden" id="moduleCinematic" aria-label="挂件表现视频" aria-hidden="true">
+        <section class="cinematic module-cinematic hidden" id="moduleCinematic" aria-label="挂件释放表现" aria-hidden="true">
           <video id="moduleVideo" playsinline muted preload="metadata"></video>
+          <div class="module-frame-stage hidden" id="moduleFrameStage" aria-hidden="true">
+            <div class="module-frame-lines" aria-hidden="true"></div>
+            <div class="module-frame-core">
+              <i aria-hidden="true"></i>
+              <img id="moduleFrameIcon" src="./assets/arc-reactor.jpeg" alt="" />
+            </div>
+            <span>挂件协议已响应</span>
+            <strong id="moduleFrameName">方舟反应炉</strong>
+          </div>
           <div class="cinematic-vignette"></div>
           <header class="module-video-heading">
             <span id="moduleVideoType">挂件介入</span>
@@ -162,7 +300,7 @@
               <small id="moduleVideoComboEffect">继续接入挂件可形成联动</small>
             </div>
           </div>
-          <button class="module-video-skip" id="moduleVideoSkip" type="button" aria-label="跳过挂件表现视频">
+          <button class="module-video-skip" id="moduleVideoSkip" type="button" aria-label="跳过挂件释放表现">
             <kbd>M</kbd><span>跳过</span>
           </button>
         </section>
@@ -171,59 +309,68 @@
           <span id="resultEyebrow">战斗结束</span>
           <strong id="resultTitle">巨兽已失衡</strong>
           <p id="resultCopy"></p>
-          <button id="resultRestart" type="button">再次挑战</button>
+          <button id="resultRestart" type="button">重新整备</button>
         </section>
       </section>
 
       <section class="command-deck" id="commandDeck">
         <header class="live-command-bar">
-          <button class="weapon-auto-summary" id="weaponToggle" type="button" aria-expanded="false" aria-controls="weaponSwitchMenu" aria-label="武器切换，当前拳套">
+          <div class="weapon-auto-summary combat-style-summary" id="combatStyleSummary" hidden aria-hidden="true">
             <span class="weapon-attack-orbit" id="weaponAttackRing" aria-hidden="true">
               <img id="autoWeaponIcon" src="./assets/weapon-fists.png" alt="" />
             </span>
             <div class="weapon-summary-copy">
-              <span>武器切换 · 当前主武器</span>
+              <span>当前流派 · 战前已锁定</span>
               <strong id="autoWeaponName">拳套 · 近身压制</strong>
-              <small id="weaponCadenceText">高速攻击 · 下一击蓄势中</small>
+              <small id="weaponCadenceText">稳定连击 · 3.0秒蓄势</small>
             </div>
-            <i aria-hidden="true">⇄</i>
-          </button>
-          <div class="weapon-switch-menu hidden" id="weaponSwitchMenu" aria-label="切换武器"></div>
-          <div class="live-intervention-copy">
-            <span>核心形态 + 部件唤醒</span>
-            <strong id="liveHint">自动积累唤醒值，激活时机由你决定</strong>
+            <em class="style-lock-mark" aria-hidden="true">锁定</em>
           </div>
-          <button class="awakening-control" id="awakeningButton" type="button" disabled aria-label="战甲唤醒进度0%">
-            <span class="awakening-emblem">
-              <img src="./assets/armor-overdrive.jpeg" alt="" />
-              <i id="awakeningRing"></i>
-            </span>
-            <span class="awakening-copy">
-              <small>修罗战甲</small>
-              <strong id="awakeningButtonLabel">自动积累中</strong>
-              <span class="awakening-meter"><i id="awakeningBar"></i></span>
-              <b id="awakeningText">0 / 100</b>
-            </span>
-          </button>
+          <div class="live-intervention-copy" hidden aria-hidden="true">
+            <span>挂件自由激活 + 灵魂终结技</span>
+            <strong id="liveHint">挂件卡随时释放 · 长按终结技逐档蓄力</strong>
+          </div>
         </header>
 
-        <div class="combat-card-cluster" aria-label="能量恢复与技能卡牌">
-          <div class="energy-rate" id="energyRate" aria-label="战甲能量：当前6，上限10">
-            <span class="energy-orb">
-              <i></i>
-              <b id="cardEnergyValue">6</b>
-              <span class="energy-cap" id="energyCapText">上限 10</span>
+        <div class="combat-card-cluster" aria-label="灵魂终结技、自由技能卡牌与当前战术能量">
+          <button class="awakening-control soul-ultimate-control" id="soulUltimateButton" type="button" disabled aria-label="战甲终结技尚未蓄满第一档">
+            <span class="awakening-emblem">
+              <img src="./assets/soul-armor-skill.jpg" alt="" />
             </span>
-            <span class="energy-charge-meter" aria-hidden="true"><i id="energyChargeBar"></i></span>
-            <small id="energyChargeLabel">恢复 +1 / 3s</small>
+            <span class="awakening-copy">
+              <small>战甲终结技 · 四档蓄能</small>
+              <strong id="ultimateButtonLabel">终结技蓄能中</strong>
+              <span class="soul-stage-pips" aria-hidden="true"><b></b><b></b><b></b><b></b></span>
+              <span class="ultimate-control-hint" id="ultimateControlHint">每点亮一档即可释放</span>
+            </span>
+            <span class="soul-fire-aura" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+            <span class="soul-cancel-target" id="soulCancelTarget" aria-hidden="true"><i></i></span>
+          </button>
+          <div class="card-rail">
+            <section class="card-hand" id="cardHand" aria-label="战甲与挂件卡牌"></section>
+            <aside class="next-card-preview" id="nextCardPreview" aria-live="polite" aria-label="下一张补充卡牌">
+              <i class="next-card-chevron" aria-hidden="true"></i>
+              <span class="next-card-frame">
+                <img id="nextCardImage" src="./assets/drone.png" alt="" />
+                <b id="nextCardCost">2</b>
+                <small id="nextCardName">无人机</small>
+              </span>
+            </aside>
+            <span class="card-energy-pips" id="cardEnergyPips" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </span>
+            <div class="energy-rate" id="energyRate" aria-label="当前战术能量1点，上限10点">
+              <span class="energy-orb">
+                <b id="cardEnergyValue"><span id="cardEnergyCurrent">1</span><small>/<span id="cardEnergyMax">10</span></small></b>
+              </span>
+            </div>
           </div>
-          <section class="card-hand" id="cardHand" aria-label="战甲与挂件卡牌"></section>
         </div>
       </section>
 
       <aside class="compact-log" id="compactLog" aria-live="polite"></aside>
     </main>
 
-    <script src="./game.js?v=20260804-card-release"></script>
+    <script src="./game.js?v=20260804-next-card-preview-29"></script>
   </body>
 </html>

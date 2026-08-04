@@ -1,25 +1,29 @@
 "use strict";
 
-const DEMO_VERSION = "卡牌版-2026.08.04-自动充能手动唤醒";
+const DEMO_VERSION = "卡牌版-2026.08.04-严格交替回合与精简能量";
 const MAX_PLAYER_HP = 220;
 const MAX_BOSS_HP = 420;
 const MAX_ENERGY = 10;
-const MAX_AWAKENING = 100;
-const MAX_AWAKENING_SELECTION = 3;
-const AWAKENED_PLAYER_TURNS = 2;
-const ARMOR_TRANSFORM_DURATION = 1280;
-const AWAKENING_CHARGE_DURATION = 12000;
-const BOSS_TURN_INTERVAL = 2400;
-const FIRST_TURN_DELAY = 900;
-const BOSS_IMPACT_DELAY = 980;
-const ATTACK_RECOVER_DELAY = 1320;
-const ENERGY_INTERVAL = 3000;
+const MAX_SOUL_ENERGY = 100;
+const SOUL_TIER_COST = 25;
+const SOUL_ENERGY_CHARGE_DURATION = 40000;
+const ULTIMATE_MIN_HOLD_MS = 300;
+const ULTIMATE_TIER_HOLD_MS = 400;
+const ULTIMATE_CAST_DURATION = 1120;
+const BOSS_TURN_INTERVAL = 3400;
+const FIRST_TURN_DELAY = 1500;
+const BOSS_IMPACT_DELAY = 1200;
+const ATTACK_RECOVER_DELAY = 1650;
+const ENERGY_INTERVAL = 4000;
 const BASE_CHAIN_WINDOW = 2700;
 const MAX_HAND_SIZE = 4;
 const INTERVENTION_TRIGGER_MS = 900;
 const INTERVENTION_WINDOW_MS = 1400;
 const INTERVENTION_TIME_SCALE = 0.3;
-const INTERVENTION_RELEASE_DELAY = 460;
+const INTERVENTION_RELEASE_DELAY = 900;
+const MODULE_FRAME_DURATION = 900;
+const MODULE_VIDEO_TIMEOUT = 12000;
+const MIN_TURN_GAP = 600;
 
 const deckRecipe = ["armor", "reactor", "jet", "cannon", "drone", "gourd", "reactor", "cannon"];
 const openingHandRecipe = ["reactor", "jet", "cannon", "gourd"];
@@ -33,10 +37,10 @@ const weaponModes = [
     icon: "./assets/weapon-fists.png",
     playerSprite: "./assets/player-fists.png",
     color: "#ef873f",
-    attackInterval: 1700,
-    impactDelay: 390,
-    recoverDelay: 1050,
-    cadence: "高速攻击",
+    attackInterval: 3000,
+    impactDelay: 620,
+    recoverDelay: 1400,
+    cadence: "稳定连击",
     synergyCards: ["reactor", "jet", "drone"],
     neutralCards: ["gourd"],
     sound: { wave: "square", start: 230, end: 360, duration: 0.11 },
@@ -54,9 +58,9 @@ const weaponModes = [
     icon: "./assets/weapon-greatsword.png",
     playerSprite: "./assets/player-greatsword.png",
     color: "#e45f48",
-    attackInterval: 3100,
-    impactDelay: 680,
-    recoverDelay: 1480,
+    attackInterval: 4600,
+    impactDelay: 900,
+    recoverDelay: 1950,
     cadence: "慢速重击",
     synergyCards: ["armor", "reactor", "cannon"],
     neutralCards: ["gourd"],
@@ -75,9 +79,9 @@ const weaponModes = [
     icon: "./assets/weapon-bow.png",
     playerSprite: "./assets/player-bow.png",
     color: "#62bfe8",
-    attackInterval: 2400,
-    impactDelay: 330,
-    recoverDelay: 980,
+    attackInterval: 3600,
+    impactDelay: 640,
+    recoverDelay: 1500,
     cadence: "中速点射",
     synergyCards: ["reactor", "cannon", "drone"],
     neutralCards: ["gourd"],
@@ -90,13 +94,15 @@ const weaponModes = [
   },
 ];
 
+const availableStyleIds = new Set(["fists"]);
+
 const cards = [
   {
     id: "armor",
     name: "战甲承压",
     type: "战甲技能",
     role: "稳定",
-    icon: "./assets/armor-overdrive.jpeg",
+    icon: "./assets/soul-armor-skill.jpg",
     cost: 2,
     color: "#e0ae4f",
     summary: "唤醒战甲承压结构，强化形态期间的格挡稳定性。",
@@ -111,9 +117,9 @@ const cards = [
     icon: "./assets/arc-reactor.jpeg",
     cost: 1,
     color: "#f08a45",
-    summary: "反应炉脉冲恢复3点战甲能量，并强化后续两个模块。",
+    summary: "反应炉脉冲恢复3点战术能量，并强化后续两个模块。",
     usage: "连携起手 · 回能并强化后续",
-    effectTags: ["恢复3能量", "强化后续×2"],
+    effectTags: ["恢复3战术能量", "强化后续×2"],
   },
   {
     id: "jet",
@@ -121,7 +127,7 @@ const cards = [
     type: "肩部挂件",
     role: "变轨",
     icon: "./assets/jet.png",
-    cost: 3,
+    cost: 4,
     color: "#55bfe7",
     summary: "喷气推进强化下一次自动攻击，并减轻下一次Boss反击。",
     usage: "攻击前使用 · 强化下次攻击",
@@ -134,11 +140,12 @@ const cards = [
     type: "肩部挂件",
     role: "破甲",
     icon: "./assets/shoulder-cannon.jpeg",
-    cost: 3,
+    cost: 4,
     color: "#e75f45",
     summary: "立即轰击Boss正在蓄力的部位，造成高额破甲与打断值。",
     usage: "Boss蓄力时 · 破甲并打断",
     effectTags: ["高额破甲", "打断蓄力"],
+    targetsIntentPart: true,
   },
   {
     id: "drone",
@@ -151,6 +158,7 @@ const cards = [
     summary: "立即从侧翼补射，接在其他模块之后收益更高。",
     usage: "连携后段 · 触发侧翼追击",
     effectTags: ["侧翼追击", "连携增伤"],
+    targetsIntentPart: true,
     video: "./assets/videos/drone-accessory-effect-web.mp4",
   },
   {
@@ -233,15 +241,79 @@ const chainTiers = [
   "全武装齐射",
 ];
 
+const ultimateTiers = [
+  {
+    tier: 1,
+    roman: "I",
+    cost: 25,
+    name: "修罗一式 · 截势重拳",
+    effect: "轰击Boss当前蓄力部位，低成本截断攻势",
+    damage: 24,
+    armorDamage: 28,
+    pressure: 48,
+    color: "#efb761",
+  },
+  {
+    tier: 2,
+    roman: "II",
+    cost: 50,
+    name: "修罗二式 · 裂甲连破",
+    effect: "连续轰击Boss当前蓄力部位，集中打开硬甲",
+    damage: 48,
+    armorDamage: 68,
+    pressure: 64,
+    color: "#ff9552",
+  },
+  {
+    tier: 3,
+    roman: "III",
+    cost: 75,
+    name: "修罗三式 · 镇岳百裂",
+    effect: "必破当前硬甲，并强制击溃Boss当前攻势",
+    damage: 78,
+    armorDamage: 100,
+    pressure: 84,
+    color: "#ff714b",
+  },
+  {
+    tier: 4,
+    roman: "IV",
+    cost: 100,
+    name: "修罗奥义 · 百炼归一",
+    effect: "修罗全功率集中一点，处决Boss当前蓄力部位",
+    damage: 120,
+    armorDamage: 150,
+    pressure: 120,
+    color: "#fff0a0",
+  },
+];
+
 const ui = {
   gameShell: document.getElementById("gameShell"),
+  battlePreparation: document.getElementById("battlePreparation"),
+  preparationEyebrow: document.getElementById("preparationEyebrow"),
+  preparationTitle: document.getElementById("preparationTitle"),
+  preparationDescription: document.getElementById("preparationDescription"),
+  preparationMonsterStage: document.getElementById("preparationMonsterStage"),
+  preparationLoadoutStage: document.getElementById("preparationLoadoutStage"),
+  preparationMonsterNext: document.getElementById("preparationMonsterNext"),
+  preparationBackToMonster: document.getElementById("preparationBackToMonster"),
+  preparationProgressItems: document.querySelectorAll("[data-preparation-progress]"),
+  preparationPreviewImage: document.getElementById("preparationPreviewImage"),
+  preparationStyleName: document.getElementById("preparationStyleName"),
+  preparationStyleMeta: document.getElementById("preparationStyleMeta"),
+  preparationSelectionName: document.getElementById("preparationSelectionName"),
+  preparationConfirm: document.getElementById("preparationConfirm"),
+  preparationStyleOptions: document.querySelectorAll(".style-option[data-style-id]"),
   turnLabel: document.getElementById("turnLabel"),
   playerHpBar: document.getElementById("playerHpBar"),
   playerHpText: document.getElementById("playerHpText"),
   energyCells: document.getElementById("energyCells"),
   energyText: document.getElementById("energyText"),
+  playerStatusStrip: document.getElementById("playerStatusStrip"),
   bossHpBar: document.getElementById("bossHpBar"),
   bossHpText: document.getElementById("bossHpText"),
+  bossHudAvatar: document.getElementById("bossHudAvatar"),
   intentChip: document.getElementById("intentChip"),
   intentName: document.getElementById("intentName"),
   partBars: document.getElementById("partBars"),
@@ -274,35 +346,42 @@ const ui = {
   commandDeck: document.getElementById("commandDeck"),
   liveHint: document.getElementById("liveHint"),
   cardEnergyValue: document.getElementById("cardEnergyValue"),
+  cardEnergyCurrent: document.getElementById("cardEnergyCurrent"),
+  cardEnergyMax: document.getElementById("cardEnergyMax"),
   energyRate: document.getElementById("energyRate"),
-  energyCapText: document.getElementById("energyCapText"),
-  energyChargeBar: document.getElementById("energyChargeBar"),
-  energyChargeLabel: document.getElementById("energyChargeLabel"),
+  cardEnergyPips: document.getElementById("cardEnergyPips"),
   cardHand: document.getElementById("cardHand"),
+  nextCardPreview: document.getElementById("nextCardPreview"),
+  nextCardImage: document.getElementById("nextCardImage"),
+  nextCardCost: document.getElementById("nextCardCost"),
+  nextCardName: document.getElementById("nextCardName"),
   compactLog: document.getElementById("compactLog"),
-  weaponToggle: document.getElementById("weaponToggle"),
+  combatStyleSummary: document.getElementById("combatStyleSummary"),
   weaponAttackRing: document.getElementById("weaponAttackRing"),
   autoWeaponIcon: document.getElementById("autoWeaponIcon"),
   autoWeaponName: document.getElementById("autoWeaponName"),
   weaponCadenceText: document.getElementById("weaponCadenceText"),
-  weaponSwitchMenu: document.getElementById("weaponSwitchMenu"),
-  weaponSwitchCinematic: document.getElementById("weaponSwitchCinematic"),
-  weaponSwitchIcon: document.getElementById("weaponSwitchIcon"),
-  weaponSwitchName: document.getElementById("weaponSwitchName"),
-  weaponSwitchStyle: document.getElementById("weaponSwitchStyle"),
   moduleCinematic: document.getElementById("moduleCinematic"),
   moduleVideo: document.getElementById("moduleVideo"),
+  moduleFrameStage: document.getElementById("moduleFrameStage"),
+  moduleFrameIcon: document.getElementById("moduleFrameIcon"),
+  moduleFrameName: document.getElementById("moduleFrameName"),
   moduleVideoType: document.getElementById("moduleVideoType"),
   moduleVideoTitle: document.getElementById("moduleVideoTitle"),
   moduleVideoIcons: document.getElementById("moduleVideoIcons"),
   moduleVideoComboName: document.getElementById("moduleVideoComboName"),
   moduleVideoComboEffect: document.getElementById("moduleVideoComboEffect"),
   moduleVideoSkip: document.getElementById("moduleVideoSkip"),
-  awakeningButton: document.getElementById("awakeningButton"),
-  awakeningButtonLabel: document.getElementById("awakeningButtonLabel"),
-  awakeningBar: document.getElementById("awakeningBar"),
-  awakeningRing: document.getElementById("awakeningRing"),
-  awakeningText: document.getElementById("awakeningText"),
+  soulUltimateButton: document.getElementById("soulUltimateButton"),
+  soulCancelTarget: document.getElementById("soulCancelTarget"),
+  ultimateButtonLabel: document.getElementById("ultimateButtonLabel"),
+  ultimateControlHint: document.getElementById("ultimateControlHint"),
+  soulTierMarks: document.querySelectorAll(".soul-stage-pips b"),
+  ultimateCinematic: document.getElementById("ultimateCinematic"),
+  ultimateCinematicTier: document.getElementById("ultimateCinematicTier"),
+  ultimateCinematicCost: document.getElementById("ultimateCinematicCost"),
+  ultimateCinematicName: document.getElementById("ultimateCinematicName"),
+  ultimateCinematicEffect: document.getElementById("ultimateCinematicEffect"),
   awakeningConsole: document.getElementById("awakeningConsole"),
   awakeningPreviewTitle: document.getElementById("awakeningPreviewTitle"),
   awakeningPreviewEffect: document.getElementById("awakeningPreviewEffect"),
@@ -324,8 +403,13 @@ let battleTimer = 0;
 let messageTimer = 0;
 let logTimer = 0;
 let resolvedChainTimer = 0;
+let modulePresentationTimer = 0;
+let modulePresentationWatchdog = 0;
+let modulePresentationSerial = 0;
 let audioContext = null;
 let runToken = 0;
+let preparedStyleId = "fists";
+let preparationStep = "monster";
 
 function createParts() {
   const output = {};
@@ -355,7 +439,7 @@ function shuffleItems(items) {
   return output;
 }
 
-function takeUniqueCard(drawPile, hand) {
+function findUniqueCardIndex(drawPile, hand) {
   const handNames = new Set(
     hand.map(function (instance) {
       return instance.cardId;
@@ -364,6 +448,11 @@ function takeUniqueCard(drawPile, hand) {
   const candidateIndex = drawPile.findIndex(function (instance) {
     return !handNames.has(instance.cardId);
   });
+  return candidateIndex;
+}
+
+function takeUniqueCard(drawPile, hand) {
+  const candidateIndex = findUniqueCardIndex(drawPile, hand);
   if (candidateIndex < 0) {
     return null;
   }
@@ -392,23 +481,32 @@ function createDeckState() {
     }
     hand.push(nextCard);
   }
-  return { drawPile: drawPile, hand: hand, discardPile: [] };
+  const nextDrawIndex = findUniqueCardIndex(drawPile, hand);
+  return {
+    drawPile: drawPile,
+    hand: hand,
+    discardPile: [],
+    nextDrawUid: nextDrawIndex >= 0 ? drawPile[nextDrawIndex].uid : null,
+  };
 }
 
-function createInitialState() {
+function createInitialState(selectedStyleId, phase) {
   const now = performance.now();
   const deckState = createDeckState();
   return {
     runId: runToken,
     playerHp: MAX_PLAYER_HP,
     bossHp: MAX_BOSS_HP,
-    energy: 6,
+    energy: 1,
     parts: createParts(),
     intentIndex: 0,
     intentPressure: 0,
     intentInterrupted: false,
     turnActor: "player",
     actionActor: null,
+    actionSerial: 0,
+    activeActionId: 0,
+    lastAutoActor: null,
     nextTurnAt: now + FIRST_TURN_DELAY,
     lastPlayerActionAt: now,
     nextPlayerAt: now + FIRST_TURN_DELAY,
@@ -418,7 +516,16 @@ function createInitialState() {
     interventionActive: false,
     interventionEndsAt: 0,
     interventionShownForAttack: -1,
-    awakening: 0,
+    soulEnergy: 0,
+    ultimateHolding: false,
+    ultimateHoldStartedAt: 0,
+    ultimateHoldTier: 0,
+    ultimateHoldAvailableTier: 0,
+    ultimateCancelHovered: false,
+    ultimatePointerId: null,
+    ultimateInputKey: null,
+    ultimateCasting: false,
+    ultimateCastStartedAt: 0,
     awakeningActivationPending: false,
     awakeningSelecting: false,
     awakeningSelectedUids: [],
@@ -431,11 +538,7 @@ function createInitialState() {
     awakenedVideoShown: false,
     bossImpactAt: 0,
     actionIndex: 0,
-    selectedWeaponId: "fists",
-    weaponSwitchPending: null,
-    weaponSwitching: false,
-    weaponSwitchStartedAt: 0,
-    weaponSwitchFromId: null,
+    selectedWeaponId: selectedStyleId || "fists",
     nextEnergyAt: now + ENERGY_INTERVAL,
     nextAutoBonus: 0,
     reactionActive: false,
@@ -443,6 +546,7 @@ function createInitialState() {
     drawPile: deckState.drawPile,
     hand: deckState.hand,
     discardPile: deckState.discardPile,
+    nextDrawUid: deckState.nextDrawUid,
     chain: [],
     chainDeadline: 0,
     chainWindow: BASE_CHAIN_WINDOW,
@@ -456,6 +560,7 @@ function createInitialState() {
     videoStartedAt: 0,
     activeVideoEffect: null,
     ended: false,
+    phase: phase || "preparation",
   };
 }
 
@@ -467,6 +572,64 @@ function getCard(cardId) {
   return cards.find(function (card) {
     return card.id === cardId;
   });
+}
+
+function reserveNextDraw(announceShuffle) {
+  if (!state) {
+    return null;
+  }
+
+  if (state.nextDrawUid) {
+    const reservedCard = state.drawPile.find(function (instance) {
+      return instance.uid === state.nextDrawUid;
+    });
+    if (reservedCard) {
+      return reservedCard;
+    }
+    state.nextDrawUid = null;
+  }
+
+  let candidateIndex = findUniqueCardIndex(state.drawPile, state.hand);
+  if (candidateIndex < 0 && state.discardPile.length) {
+    state.drawPile = shuffleItems(state.drawPile.concat(state.discardPile));
+    state.discardPile = [];
+    if (announceShuffle) {
+      showLog("弃牌重新洗入牌库，下一张补充卡已预载");
+    }
+    candidateIndex = findUniqueCardIndex(state.drawPile, state.hand);
+  }
+
+  if (candidateIndex < 0) {
+    return null;
+  }
+  state.nextDrawUid = state.drawPile[candidateIndex].uid;
+  return state.drawPile[candidateIndex];
+}
+
+function takeReservedNextDraw(announceShuffle) {
+  const reservedCard = reserveNextDraw(announceShuffle);
+  if (!reservedCard) {
+    return null;
+  }
+  const reservedIndex = state.drawPile.findIndex(function (instance) {
+    return instance.uid === reservedCard.uid;
+  });
+  if (reservedIndex < 0) {
+    state.nextDrawUid = null;
+    return null;
+  }
+  state.nextDrawUid = null;
+  return state.drawPile.splice(reservedIndex, 1)[0];
+}
+
+function drawOneCardIntoHand(announceShuffle) {
+  const nextCard = takeReservedNextDraw(announceShuffle);
+  if (!nextCard) {
+    return null;
+  }
+  state.hand.push(nextCard);
+  reserveNextDraw(announceShuffle);
+  return nextCard;
 }
 
 function currentWeaponMode() {
@@ -498,47 +661,173 @@ function getWeaponCardLink(card) {
   return { name: "独立启动", bonus: 0 };
 }
 
-function resetGame() {
+function resetGame(mode) {
+  const shouldStartBattle = mode === "battle";
+  preparationStep = shouldStartBattle ? "battle" : "monster";
   clearInterval(battleTimer);
+  battleTimer = 0;
   clearTimeout(messageTimer);
   clearTimeout(logTimer);
   clearTimeout(resolvedChainTimer);
+  if (state && state.ultimateHolding) {
+    clearSoulUltimateHoldState();
+  }
   hideModuleVideo();
-  hideWeaponSwitchFx();
+  hideUltimateCinematic();
   runToken += 1;
-  state = createInitialState();
+  state = createInitialState(preparedStyleId, shouldStartBattle ? "battle" : "preparation");
   ui.resultOverlay.classList.add("hidden");
+  ui.battlePreparation.classList.toggle("hidden", shouldStartBattle);
+  ui.battlePreparation.setAttribute("aria-hidden", String(shouldStartBattle));
+  ui.gameShell.classList.toggle("preparing", !shouldStartBattle);
   ui.commandDeck.classList.remove(
     "locked",
     "intervention-window",
     "intervention-release",
-    "awakening-selecting",
-    "armor-awakened",
+    "ultimate-holding",
+    "ultimate-casting",
   );
   ui.battlefield.className = "battlefield";
-  ui.awakeningConsole.classList.add("hidden");
-  ui.awakeningConsole.setAttribute("aria-hidden", "true");
-  ui.armorTransformCinematic.classList.add("hidden");
-  ui.armorTransformCinematic.setAttribute("aria-hidden", "true");
-  ui.awakenedStatus.classList.add("hidden");
   ui.effectLayer.innerHTML = "";
   ui.floatingLayer.innerHTML = "";
+  ui.battleMessage.classList.remove("visible");
   ui.compactLog.classList.remove("visible");
   renderAll();
-  showMessage("固定节拍交锋开始：战甲唤醒值将随战斗自动积累");
+  renderPreparationSelection();
+  renderPreparationFlow();
+  if (!shouldStartBattle) {
+    ui.commandDeck.classList.add("locked");
+    ui.autoActionText.textContent = "等待确认拳套流派";
+    ui.autoActionBar.style.width = "0%";
+    window.requestAnimationFrame(function () {
+      ui.preparationMonsterNext.focus({ preventScroll: true });
+    });
+    return;
+  }
+  showMessage("固定节拍交锋开始：挂件卡可直接释放，灵魂能量将自动积累");
   battleTimer = window.setInterval(tickBattle, 80);
+}
+
+function renderPreparationFlow() {
+  const copy = {
+    monster: {
+      eyebrow: "战前准备 · 怪物信息",
+      title: "先读懂这头巨兽",
+      description: "确认Boss的蓄力部位、攻击方式与反制输入，再进入个人装配。",
+    },
+    loadout: {
+      eyebrow: "战前准备 · 个人装配",
+      title: "确认你的战斗解法",
+      description: "拳套负责持续压制，挂件负责在正确时机改变结果；确认后直接进入战斗。",
+    },
+    battle: {
+      eyebrow: "战前准备完成",
+      title: "正在进入战斗",
+      description: "敌情与装配均已确认。",
+    },
+  }[preparationStep];
+  const isMonsterStep = preparationStep === "monster";
+  const isLoadoutStep = preparationStep === "loadout";
+  const order = ["monster", "loadout", "battle"];
+  const activeIndex = Math.max(0, order.indexOf(preparationStep));
+
+  ui.battlePreparation.classList.toggle("monster-step", isMonsterStep);
+  ui.battlePreparation.classList.toggle("loadout-step", isLoadoutStep);
+  ui.preparationEyebrow.textContent = copy.eyebrow;
+  ui.preparationTitle.textContent = copy.title;
+  ui.preparationDescription.textContent = copy.description;
+  ui.preparationMonsterStage.classList.toggle("hidden", !isMonsterStep);
+  ui.preparationMonsterStage.setAttribute("aria-hidden", String(!isMonsterStep));
+  ui.preparationLoadoutStage.classList.toggle("hidden", !isLoadoutStep);
+  ui.preparationLoadoutStage.setAttribute("aria-hidden", String(!isLoadoutStep));
+  ui.preparationProgressItems.forEach(function (item) {
+    const itemIndex = order.indexOf(item.dataset.preparationProgress);
+    const isActive = itemIndex === activeIndex;
+    item.classList.toggle("active", isActive);
+    item.classList.toggle("completed", itemIndex < activeIndex);
+    if (isActive) {
+      item.setAttribute("aria-current", "step");
+    } else {
+      item.removeAttribute("aria-current");
+    }
+  });
+}
+
+function setPreparationStep(nextStep, shouldFocus) {
+  if (
+    !state ||
+    state.phase !== "preparation" ||
+    (nextStep !== "monster" && nextStep !== "loadout")
+  ) {
+    return;
+  }
+  preparationStep = nextStep;
+  renderPreparationFlow();
+  renderStatus();
+  if (shouldFocus !== false) {
+    window.requestAnimationFrame(function () {
+      const focusTarget = nextStep === "monster" ? ui.preparationMonsterNext : ui.preparationConfirm;
+      focusTarget.focus({ preventScroll: true });
+    });
+  }
+}
+
+function renderPreparationSelection() {
+  const selected = weaponModes.find(function (weapon) {
+    return weapon.id === preparedStyleId;
+  }) || weaponModes[0];
+  ui.preparationStyleName.textContent = selected.name + " · " + selected.style;
+  ui.preparationStyleMeta.textContent =
+    (selected.attackInterval / 1000).toFixed(1) + "秒 / 次 · " + selected.cadence;
+  ui.preparationSelectionName.textContent = selected.name + "流派 · " + selected.style;
+  ui.preparationPreviewImage.src = selected.playerSprite;
+  ui.preparationPreviewImage.alt = selected.name + "流派战斗化身";
+  ui.preparationConfirm.disabled = !availableStyleIds.has(selected.id);
+  ui.preparationStyleOptions.forEach(function (button) {
+    const isSelected = button.dataset.styleId === selected.id;
+    button.classList.toggle("selected", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
+  });
+}
+
+function selectPreparedStyle(styleId) {
+  if (
+    !state ||
+    state.phase !== "preparation" ||
+    preparationStep !== "loadout" ||
+    !availableStyleIds.has(styleId)
+  ) {
+    return;
+  }
+  preparedStyleId = styleId;
+  renderPreparationSelection();
+}
+
+function startPreparedBattle() {
+  if (!state || state.phase !== "preparation" || !availableStyleIds.has(preparedStyleId)) {
+    return;
+  }
+  if (preparationStep !== "loadout") {
+    setPreparationStep("loadout");
+    return;
+  }
+  preparationStep = "battle";
+  renderPreparationFlow();
+  state.phase = "launching";
+  getAudioContext();
+  resetGame("battle");
 }
 
 function renderAll() {
   renderStatus();
-  renderWeaponControls();
+  renderCombatStyleSummary();
   renderCards();
   renderChain();
   renderIntentBase();
   renderBossParts();
   renderBossSprite();
   renderReactionControls();
-  renderAwakening();
+  renderSoulUltimate();
 }
 
 function renderStatus() {
@@ -549,14 +838,14 @@ function renderStatus() {
   ui.bossHpBar.style.width = bossPercent + "%";
   ui.bossHpText.textContent = Math.max(0, state.bossHp) + " / " + MAX_BOSS_HP;
   const displayedActor = state.actionActor || state.turnActor;
-  ui.turnLabel.textContent = state.ended
-    ? "战斗结束"
-    : state.awakeningSelecting
-      ? "唤醒时刻 · 选择部件"
-      : state.transforming
-        ? "核心形态 · 变身"
-        : state.awakened
-          ? "战甲状态 · " + state.awakenedAttacksRemaining + "回合"
+  ui.turnLabel.textContent = state.phase === "preparation"
+    ? "战前准备 · " + (preparationStep === "monster" ? "怪物信息" : "个人装配")
+    : state.ended
+      ? "战斗结束"
+      : state.ultimateCasting
+        ? "灵魂终结 · 奥义释放"
+        : state.ultimateHolding
+          ? "灵魂终结 · 蓄力选档"
       : "自动回合 · " + (displayedActor === "player" ? "玩家行动" : "Boss行动");
   ui.energyCells.innerHTML = "";
   for (let index = 0; index < MAX_ENERGY; index += 1) {
@@ -567,18 +856,113 @@ function renderStatus() {
     ui.energyCells.appendChild(cell);
   }
   ui.energyText.textContent = state.energy + " / " + MAX_ENERGY;
-  ui.cardEnergyValue.textContent = state.energy;
-  ui.energyCapText.textContent = "上限 " + MAX_ENERGY;
-  ui.cardHand.style.setProperty("--energy-stock", (state.energy / MAX_ENERGY) * 100 + "%");
-  ui.energyRate.setAttribute("aria-label", "战甲能量：当前" + state.energy + "，上限" + MAX_ENERGY);
-  renderAwakening();
+  ui.cardEnergyCurrent.textContent = state.energy;
+  ui.cardEnergyMax.textContent = MAX_ENERGY;
+  renderEnergyRecoveryProgress(performance.now());
+  ui.energyRate.setAttribute(
+    "aria-label",
+    "当前战术能量" + state.energy + "点，上限" + MAX_ENERGY + "点",
+  );
+  renderPlayerStatuses();
+  renderSoulUltimate();
 }
 
-function syncWeaponPresentation(weapon) {
+function getEnergyRecoveryProgress(now) {
+  if (
+    !state ||
+    state.phase !== "battle" ||
+    state.ended ||
+    state.energy >= MAX_ENERGY
+  ) {
+    return 0;
+  }
+  const remaining = Math.max(0, state.nextEnergyAt - now);
+  return Math.max(0, Math.min(1, 1 - remaining / ENERGY_INTERVAL));
+}
+
+function renderEnergyRecoveryProgress(now) {
+  const progress = getEnergyRecoveryProgress(now);
+  const chargingIndex = state && state.energy < MAX_ENERGY ? state.energy : -1;
+  Array.from(ui.cardEnergyPips.children).forEach(function (pip, index) {
+    pip.classList.toggle("filled", index < state.energy);
+    pip.classList.toggle(
+      "charging",
+      state.phase === "battle" && !state.ended && index === chargingIndex,
+    );
+    pip.style.setProperty(
+      "--pip-charge",
+      index === chargingIndex ? (progress * 100).toFixed(2) + "%" : "0%",
+    );
+  });
+  ui.cardEnergyPips.style.setProperty(
+    "--energy-flow-progress",
+    (progress * 100).toFixed(2) + "%",
+  );
+}
+
+function renderPlayerStatuses() {
+  if (!ui.playerStatusStrip) {
+    return;
+  }
+  const weapon = currentWeaponMode();
+  const displayedActor = state.actionActor || state.turnActor;
+  const statuses = [
+    { label: weapon.name + "流派", icon: weapon.icon, tone: "style" },
+    {
+      label: displayedActor === "player" ? "玩家行动" : "等待Boss行动",
+      glyph: displayedActor === "player" ? "▶" : "Ⅱ",
+      tone: displayedActor === "player" ? "turn" : "wait",
+    },
+  ];
+  if (state.armorGuard > 0) {
+    statuses.push({ label: "战甲承压 " + state.armorGuard, icon: "./assets/soul-armor-skill.jpg", count: state.armorGuard, tone: "armor" });
+  }
+  if (state.jetGuard) {
+    statuses.push({ label: "喷气闪避待命", icon: "./assets/jet.png", tone: "jet" });
+  }
+  if (state.moduleBoost > 0) {
+    statuses.push({ label: "挂件强化 " + state.moduleBoost, icon: "./assets/arc-reactor.jpeg", count: state.moduleBoost, tone: "boost" });
+  }
+  if (state.awakenedAttacksRemaining > 0) {
+    statuses.push({
+      label: "灵魂战甲 " + state.awakenedAttacksRemaining,
+      icon: "./assets/soul-armor-skill.jpg",
+      count: state.awakenedAttacksRemaining,
+      tone: "awakened",
+    });
+  }
+  ui.playerStatusStrip.innerHTML = "";
+  statuses.slice(0, 6).forEach(function (status) {
+    const item = document.createElement("span");
+    item.className = "fighter-status-item " + status.tone;
+    item.title = status.label;
+    item.setAttribute("aria-label", status.label);
+    if (status.icon) {
+      const image = document.createElement("img");
+      image.src = status.icon;
+      image.alt = "";
+      item.appendChild(image);
+    } else {
+      item.textContent = status.glyph;
+    }
+    if (status.count && status.count > 1) {
+      const count = document.createElement("b");
+      count.textContent = status.count;
+      item.appendChild(count);
+    }
+    ui.playerStatusStrip.appendChild(item);
+  });
+  ui.playerStatusStrip.setAttribute(
+    "aria-label",
+    statuses.map(function (status) { return status.label; }).join("，"),
+  );
+}
+
+function syncCombatStylePresentation(weapon) {
   ui.autoWeaponIcon.src = weapon.icon;
   ui.autoWeaponName.textContent = weapon.name + " · " + weapon.style;
-  ui.weaponToggle.title = "切换武器 · 当前" + weapon.name;
-  ui.weaponToggle.setAttribute("aria-label", "武器切换，当前" + weapon.name + "，" + weapon.cadence);
+  ui.combatStyleSummary.title = "当前出战流派：" + weapon.name + " · " + weapon.style;
+  ui.combatStyleSummary.setAttribute("aria-label", "当前出战流派：" + weapon.name + "，战前已锁定");
   ui.weaponCadenceText.textContent = weapon.cadence + " · " + (weapon.attackInterval / 1000).toFixed(1) + "秒蓄势";
   ui.weaponAttackRing.style.setProperty("--weapon-color", weapon.color);
   ui.gameShell.style.setProperty("--active-weapon-color", weapon.color);
@@ -593,170 +977,31 @@ function syncWeaponPresentation(weapon) {
   ui.battlefield.classList.add("weapon-mode-" + weapon.id);
 }
 
-function renderWeaponControls() {
-  const current = currentWeaponMode();
-  syncWeaponPresentation(current);
-  ui.weaponSwitchMenu.innerHTML = "";
-  weaponModes.forEach(function (weapon) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "weapon-switch-option" + (weapon.id === current.id ? " active" : "");
-    button.style.setProperty("--weapon-color", weapon.color);
-    button.dataset.weaponId = weapon.id;
-
-    const icon = document.createElement("img");
-    icon.src = weapon.icon;
-    icon.alt = "";
-    const copy = document.createElement("span");
-    const name = document.createElement("strong");
-    const style = document.createElement("small");
-    name.textContent = weapon.name;
-    style.textContent = weapon.cadence + " · " + weapon.style;
-    copy.appendChild(name);
-    copy.appendChild(style);
-    button.appendChild(icon);
-    button.appendChild(copy);
-    button.addEventListener("click", function () {
-      selectWeapon(weapon.id);
-    });
-    ui.weaponSwitchMenu.appendChild(button);
-  });
-  closeWeaponMenu();
-  updateWeaponControlState();
+function renderCombatStyleSummary() {
+  syncCombatStylePresentation(currentWeaponMode());
 }
 
-function updateWeaponControlState() {
-  const locked =
-    state.ended ||
-    state.videoPlaying ||
-    Boolean(state.videoPending) ||
-    Boolean(state.weaponSwitchPending) ||
-    state.weaponSwitching ||
-    state.awakeningSelecting ||
-    state.transforming ||
-    state.awakened;
-  ui.weaponToggle.disabled = locked;
-  ui.weaponSwitchMenu.querySelectorAll("button").forEach(function (button) {
-    button.disabled = locked || button.dataset.weaponId === state.selectedWeaponId;
-  });
-  if (locked) {
-    closeWeaponMenu();
-  }
-}
-
-function toggleWeaponMenu() {
-  if (ui.weaponToggle.disabled) {
+function renderNextCardPreview() {
+  const nextInstance = reserveNextDraw(false);
+  const nextCard = nextInstance ? getCard(nextInstance.cardId) : null;
+  const hasNextCard = Boolean(nextCard);
+  ui.nextCardPreview.hidden = !hasNextCard;
+  ui.nextCardPreview.classList.toggle("empty", !hasNextCard);
+  ui.nextCardPreview.setAttribute("aria-hidden", String(!hasNextCard));
+  if (!nextCard) {
+    ui.nextCardPreview.setAttribute("aria-label", "暂无可补充卡牌");
     return;
   }
-  const opening = ui.weaponSwitchMenu.classList.contains("hidden");
-  ui.weaponSwitchMenu.classList.toggle("hidden", !opening);
-  ui.weaponToggle.setAttribute("aria-expanded", String(opening));
-}
 
-function closeWeaponMenu() {
-  ui.weaponSwitchMenu.classList.add("hidden");
-  ui.weaponToggle.setAttribute("aria-expanded", "false");
-}
-
-function selectWeapon(weaponId) {
-  if (state.selectedWeaponId === weaponId) {
-    closeWeaponMenu();
-    return;
-  }
-  const weapon = weaponModes.find(function (item) {
-    return item.id === weaponId;
-  });
-  if (!weapon || ui.weaponToggle.disabled) {
-    return;
-  }
-  state.weaponSwitchPending = weapon;
-  closeWeaponMenu();
-  updateCardStates(performance.now());
-  if (!state.actionActor && !state.reactionActive) {
-    startPendingWeaponSwitch();
-  } else {
-    showLog("已选择“" + weapon.name + "”，当前动作结束后切换");
-  }
-}
-
-function startPendingWeaponSwitch() {
-  if (!state.weaponSwitchPending || state.weaponSwitching || state.ended) {
-    return;
-  }
-  const weapon = state.weaponSwitchPending;
-  state.weaponSwitchPending = null;
-  startWeaponSwitch(weapon);
-}
-
-function startWeaponSwitch(weapon) {
-  const now = performance.now();
-  const currentRun = state.runId;
-  endIntervention("weapon", now);
-  state.weaponSwitchFromId = state.selectedWeaponId;
-  state.weaponSwitching = true;
-  state.weaponSwitchStartedAt = now;
-  closeWeaponMenu();
-  ui.weaponSwitchCinematic.className = "weapon-switch-cinematic switch-" + weapon.id;
-  ui.weaponSwitchCinematic.style.setProperty("--switch-color", weapon.color);
-  ui.weaponSwitchCinematic.setAttribute("aria-hidden", "false");
-  ui.weaponSwitchIcon.src = weapon.icon;
-  ui.weaponSwitchName.textContent = weapon.name;
-  ui.weaponSwitchStyle.textContent = weapon.style;
-  playWeaponSwitchSound(weapon);
-  updateCardStates(now);
-
-  window.setTimeout(function () {
-    if (!state || state.runId !== currentRun || !state.weaponSwitching) {
-      return;
-    }
-    state.selectedWeaponId = weapon.id;
-    state.actionIndex = 0;
-    syncWeaponPresentation(weapon);
-  }, 300);
-
-  window.setTimeout(function () {
-    finishWeaponSwitch(currentRun, weapon);
-  }, 820);
-}
-
-function finishWeaponSwitch(currentRun, weapon) {
-  if (!state || state.runId !== currentRun || !state.weaponSwitching) {
-    return;
-  }
-  const elapsed = Math.max(0, performance.now() - state.weaponSwitchStartedAt);
-  const previousWeapon =
-    weaponModes.find(function (item) {
-      return item.id === state.weaponSwitchFromId;
-    }) || weapon;
-  const cadenceDelta = weapon.attackInterval - previousWeapon.attackInterval;
-  state.weaponSwitching = false;
-  state.weaponSwitchStartedAt = 0;
-  state.nextTurnAt +=
-    elapsed + (state.turnActor === "player" && !state.actionActor ? cadenceDelta : 0);
-  state.nextEnergyAt += elapsed;
-  state.lastPlayerActionAt += elapsed;
-  state.nextPlayerAt += elapsed + cadenceDelta;
-  state.playerCycleDuration = Math.max(600, state.nextPlayerAt - state.lastPlayerActionAt);
-  if (state.chainDeadline) {
-    state.chainDeadline += elapsed;
-  }
-  state.weaponSwitchFromId = null;
-  hideWeaponSwitchFx();
-  renderWeaponControls();
-  updateCardStates(performance.now());
-  ui.autoActionText.textContent = weapon.name + "已接管 · " + weapon.cadence;
-  showMessage("切换为“" + weapon.name + "” · " + weapon.cadence);
-  showLog(
-    "武器已切换：" + weapon.style + "，每 " + (weapon.attackInterval / 1000).toFixed(1) + " 秒准备一次攻击",
+  ui.nextCardPreview.style.setProperty("--next-card-color", nextCard.color);
+  ui.nextCardImage.src = nextCard.icon;
+  ui.nextCardImage.alt = "";
+  ui.nextCardCost.textContent = nextCard.cost;
+  ui.nextCardName.textContent = nextCard.name;
+  ui.nextCardPreview.setAttribute(
+    "aria-label",
+    "下一张补充卡牌：" + nextCard.name + "，消耗" + nextCard.cost + "点能量",
   );
-}
-
-function hideWeaponSwitchFx() {
-  if (!ui.weaponSwitchCinematic) {
-    return;
-  }
-  ui.weaponSwitchCinematic.className = "weapon-switch-cinematic hidden";
-  ui.weaponSwitchCinematic.setAttribute("aria-hidden", "true");
 }
 
 function renderCards() {
@@ -764,11 +1009,6 @@ function renderCards() {
   state.hand.forEach(function (instance) {
     const card = getCard(instance.cardId);
     const button = document.createElement("button");
-    const effectTags = (card.effectTags || [])
-      .map(function (tag) {
-        return "<span>" + tag + "</span>";
-      })
-      .join("");
     button.type = "button";
     button.className = "module-card live-card";
     button.style.setProperty("--card-color", card.color);
@@ -784,16 +1024,21 @@ function renderCards() {
       card.role +
       '</b><i>' +
       card.type +
-      '</i></span></div><div class="card-effect-tags">' +
-      effectTags +
-      '</div><span class="weapon-fit"></span><span class="card-cost"><b>' +
+      '</i></span></div><span class="weapon-fit"></span><span class="card-cost"><b>' +
       card.cost +
-      '</b></span><span class="awakening-card-state">核心充能中</span>';
+      '</b></span><i class="card-energy-shadow" aria-hidden="true"></i>' +
+      '<i class="card-ready-flare" aria-hidden="true"></i>';
     button.addEventListener("click", function () {
       activateCard(instance.uid, button);
     });
+    button.addEventListener("animationend", function (event) {
+      if (event.animationName === "card-energy-ready-glow") {
+        button.classList.remove("energy-ready-flash");
+      }
+    });
     ui.cardHand.appendChild(button);
   });
+  renderNextCardPreview();
   updateCardStates(performance.now());
 }
 
@@ -820,14 +1065,12 @@ function selectedAwakeningCost() {
 }
 
 function updateCardStates(now) {
-  const cinematicLocked =
+  const resolutionLocked =
     state.videoPlaying ||
     Boolean(state.videoPending) ||
-    Boolean(state.weaponSwitchPending) ||
-    state.weaponSwitching ||
-    state.transforming ||
-    state.awakened;
-  const selectedCost = selectedAwakeningCost();
+    state.ultimateHolding ||
+    state.ultimateCasting;
+  const battleActive = state.phase === "battle" && !state.ended;
   state.hand.forEach(function (instance) {
     const card = getCard(instance.cardId);
     const weapon = currentWeaponMode();
@@ -836,62 +1079,76 @@ function updateCardStates(now) {
     if (!button) {
       return;
     }
-    const selected = state.awakeningSelectedUids.includes(instance.uid);
-    const selectionFull =
-      state.awakeningSelectedUids.length >= MAX_AWAKENING_SELECTION && !selected;
-    const lacksEnergy = selected
-      ? false
-      : selectedCost + card.cost > state.energy;
+    const lacksEnergy = card.cost > state.energy;
+    const visualEnergy = Math.min(
+      MAX_ENERGY,
+      state.energy + getEnergyRecoveryProgress(now),
+    );
+    const energyRatio = card.cost > 0 ? Math.min(1, visualEnergy / card.cost) : 1;
+    const energyAccess = lacksEnergy ? "locked" : "ready";
+    const previousEnergyAccess = instance.energyAccessState;
+    const targetPartId = card.targetsIntentPart ? getIntent().part : "general";
     const fitLabel = button.querySelector(".weapon-fit");
-    const stateLabel = button.querySelector(".awakening-card-state");
+    button.style.setProperty(
+      "--energy-shadow-height",
+      ((1 - energyRatio) * 100).toFixed(2) + "%",
+    );
+    if (lacksEnergy) {
+      button.classList.remove("energy-ready-flash");
+    }
+    if (previousEnergyAccess === "locked" && energyAccess === "ready") {
+      instance.energyReadyFlashPending = true;
+    }
+    if (
+      instance.energyReadyFlashPending &&
+      energyAccess === "ready" &&
+      battleActive &&
+      !resolutionLocked
+    ) {
+      button.classList.remove("energy-ready-flash");
+      void button.offsetWidth;
+      button.classList.add("energy-ready-flash");
+      instance.energyReadyFlashPending = false;
+    }
+    instance.energyAccessState = energyAccess;
     button.disabled =
-      state.ended ||
-      cinematicLocked ||
-      !state.awakeningSelecting ||
-      selectionFull ||
+      !battleActive ||
+      resolutionLocked ||
       lacksEnergy;
     button.classList.toggle("energy-locked", lacksEnergy);
-    button.classList.toggle("awakening-selectable", state.awakeningSelecting && !button.disabled);
-    button.classList.toggle("awakening-selected", selected);
+    button.classList.toggle("card-ready", battleActive && !button.disabled);
+    button.classList.remove("awakening-selectable", "awakening-selected");
     button.classList.toggle("weapon-linked", affinity === "linked");
     button.classList.toggle("weapon-neutral", affinity === "neutral");
     button.classList.toggle("weapon-unlinked", affinity === "unlinked");
+    button.classList.remove("target-arms", "target-core", "target-legs", "target-general");
+    button.classList.add("target-" + targetPartId);
     if (fitLabel) {
-      fitLabel.textContent =
-        selected
-          ? "已接入形态"
-          : affinity === "linked"
-            ? weapon.name + "协同"
-            : affinity === "neutral"
-              ? "通用"
-              : "独立启动";
+      fitLabel.textContent = targetPartId === "general"
+        ? "通用"
+        : partBlueprints[targetPartId].name;
     }
-    if (stateLabel) {
-      stateLabel.textContent = selected
-        ? "已选择"
-        : state.awakeningSelecting
-          ? selectionFull
-            ? "选择已满"
-            : lacksEnergy
-              ? "能量不足"
-              : "点亮部件"
-          : state.awakened
-            ? "形态生效中"
-            : state.awakening >= MAX_AWAKENING
-              ? "先唤醒核心"
-              : "核心充能中";
-    }
-    button.title = state.awakeningSelecting
-      ? selected
-        ? "点击取消选择 · " + card.summary
+    const stateDescription = !battleActive
+      ? "等待开战"
+      : state.ultimateHolding
+        ? "终结技蓄力中"
+        : state.ultimateCasting
+          ? "终结技释放中"
+          : lacksEnergy
+            ? "能量不足"
+            : "可释放";
+    button.setAttribute(
+      "aria-label",
+      card.name + "，消耗" + card.cost + "点战术能量，" + stateDescription,
+    );
+    button.title = !battleActive
+      ? "进入战斗后可使用 · " + card.summary
+      : resolutionLocked
+        ? "终结技结算中 · " + card.summary
         : lacksEnergy
-          ? "本次唤醒能量不足 · " + card.summary
-          : "点击将“" + card.name + "”接入本次核心形态"
-      : cinematicLocked
-      ? "当前表现结算中"
-      : "战甲唤醒后可选择 · " + card.summary;
+          ? "战甲能量不足 · " + card.summary
+          : "点击立即激活 · " + card.summary;
   });
-  updateWeaponControlState();
 }
 
 function drawNextCard() {
@@ -899,17 +1156,7 @@ function drawNextCard() {
     return false;
   }
 
-  let nextCard = takeUniqueCard(state.drawPile, state.hand);
-  if (!nextCard && state.discardPile.length) {
-    state.drawPile = shuffleItems(state.drawPile.concat(state.discardPile));
-    state.discardPile = [];
-    showLog("弃牌重新洗入牌库，卡组开始下一轮循环");
-    nextCard = takeUniqueCard(state.drawPile, state.hand);
-  }
-
-  if (nextCard) {
-    state.hand.push(nextCard);
-  }
+  const nextCard = drawOneCardIntoHand(true);
   renderCards();
   return Boolean(nextCard);
 }
@@ -958,13 +1205,24 @@ function describeAwakeningSequence(modules) {
 }
 
 function renderChain() {
-  const selectedCards = selectedAwakeningCards();
-  const preview = describeAwakeningSequence(selectedCards);
-  ui.awakeningPreviewTitle.textContent = preview.title;
-  ui.awakeningPreviewEffect.textContent = preview.effect;
-  ui.awakeningSelection.innerHTML = selectedCards.length
-    ? moduleSequenceMarkup(selectedCards)
-    : '<span class="selection-placeholder">点选下方战甲或挂件能力</span>';
+  if (!state || !ui.liveHint) {
+    return;
+  }
+  if (state.chain.length) {
+    const names = state.chain.map(function (entry) {
+      return entry.card.name;
+    });
+    ui.liveHint.textContent =
+      names.join(" → ") + " · " + state.chain.length + "段连携建立中";
+  } else if (
+    state.phase === "battle" &&
+    !state.ended &&
+    !state.ultimateHolding &&
+    !state.ultimateCasting &&
+    !state.lastResolvedChain.length
+  ) {
+    ui.liveHint.textContent = "挂件卡随时释放 · 长按终结技逐档蓄力";
+  }
 }
 
 function hasAwakenedModule(cardId) {
@@ -992,8 +1250,6 @@ function canOpenAwakeningSelection() {
     state.awakening >= MAX_AWAKENING &&
     !state.actionActor &&
     !state.reactionActive &&
-    !state.weaponSwitchPending &&
-    !state.weaponSwitching &&
     !state.videoPending &&
     !state.videoPlaying &&
     !state.awakeningSelecting &&
@@ -1096,6 +1352,416 @@ function renderAwakening() {
   );
 }
 
+function soulTierForEnergy(value) {
+  return Math.max(0, Math.min(4, Math.floor(value / SOUL_TIER_COST)));
+}
+
+function getUltimateTier(tier) {
+  return ultimateTiers[Math.max(0, Math.min(3, tier - 1))] || ultimateTiers[0];
+}
+
+function canStartSoulUltimate() {
+  return Boolean(
+    state &&
+    state.phase === "battle" &&
+    !state.ended &&
+    !state.ultimateHolding &&
+    !state.ultimateCasting &&
+    !state.actionActor &&
+    !state.reactionActive &&
+    !state.videoPending &&
+    !state.videoPlaying &&
+    soulTierForEnergy(state.soulEnergy) > 0
+  );
+}
+
+function renderSoulUltimate(now) {
+  if (!state || !ui.soulUltimateButton) {
+    return;
+  }
+  const currentTime = typeof now === "number" ? now : performance.now();
+  const availableTier = soulTierForEnergy(state.soulEnergy);
+  const selectedTier = state.ultimateHolding ? state.ultimateHoldTier : availableTier;
+  const selectedUltimate = selectedTier > 0 ? getUltimateTier(selectedTier) : null;
+  const heldFor = state.ultimateHolding
+    ? Math.max(0, currentTime - state.ultimateHoldStartedAt)
+    : 0;
+  const holdProgress = state.ultimateHolding
+    ? Math.min(1, heldFor / (ULTIMATE_MIN_HOLD_MS + ULTIMATE_TIER_HOLD_MS * 3))
+    : 0;
+  let holdPreviewCost = 0;
+  if (state.ultimateHolding) {
+    holdPreviewCost = heldFor < ULTIMATE_MIN_HOLD_MS
+      ? (heldFor / ULTIMATE_MIN_HOLD_MS) * SOUL_TIER_COST
+      : SOUL_TIER_COST +
+        ((heldFor - ULTIMATE_MIN_HOLD_MS) / ULTIMATE_TIER_HOLD_MS) * SOUL_TIER_COST;
+    holdPreviewCost = Math.min(
+      state.ultimateHoldAvailableTier * SOUL_TIER_COST,
+      holdPreviewCost,
+    );
+  }
+  const previewSoulEnergy = state.ultimateCancelHovered
+    ? state.soulEnergy
+    : Math.max(0, state.soulEnergy - holdPreviewCost);
+
+  ui.soulUltimateButton.style.setProperty("--ultimate-hold-progress", holdProgress * 100 + "%");
+  ui.soulUltimateButton.style.setProperty(
+    "--ultimate-tier-color",
+    selectedUltimate ? selectedUltimate.color : "#efb761",
+  );
+  ui.soulUltimateButton.disabled = !canStartSoulUltimate() && !state.ultimateHolding;
+  ui.soulUltimateButton.classList.toggle(
+    "ready",
+    availableTier > 0 && !state.ultimateHolding && !state.ultimateCasting && state.phase === "battle",
+  );
+  ui.soulUltimateButton.classList.toggle("holding", state.ultimateHolding);
+  ui.soulUltimateButton.classList.toggle(
+    "cancel-hover",
+    state.ultimateHolding && state.ultimateCancelHovered,
+  );
+  ui.soulUltimateButton.classList.toggle("casting", state.ultimateCasting);
+  ui.soulUltimateButton.classList.toggle("fully-charged", availableTier === 4);
+  ui.soulUltimateButton.dataset.tier = String(selectedTier);
+  ui.soulTierMarks.forEach(function (mark, index) {
+    const tier = index + 1;
+    const segmentStart = index * SOUL_TIER_COST;
+    const baseFill = Math.max(
+      0,
+      Math.min(1, (state.soulEnergy - segmentStart) / SOUL_TIER_COST),
+    );
+    const previewFill = Math.max(
+      0,
+      Math.min(1, (previewSoulEnergy - segmentStart) / SOUL_TIER_COST),
+    );
+    mark.style.setProperty("--segment-fill-angle", (previewFill * 82).toFixed(2) + "deg");
+    mark.classList.toggle("unlocked", previewFill >= 0.999);
+    mark.classList.toggle("partial", previewFill > 0.001 && previewFill < 0.999);
+    mark.classList.toggle(
+      "draining",
+      state.ultimateHolding && previewFill < baseFill && previewFill > 0.001,
+    );
+    mark.classList.toggle(
+      "consumed",
+      state.ultimateHolding && baseFill > 0.001 && previewFill <= 0.001,
+    );
+    mark.classList.toggle("selected", state.ultimateHolding && selectedTier === tier);
+    mark.classList.toggle("full", availableTier === 4);
+  });
+
+  if (state.phase !== "battle") {
+    ui.ultimateButtonLabel.textContent = "进入战斗后自动积累";
+    ui.ultimateControlHint.textContent = "四档终结 · 每满一档点亮一枚";
+  } else if (state.ultimateCasting) {
+    ui.ultimateButtonLabel.textContent = "终结技释放中";
+    ui.ultimateControlHint.textContent = "灵魂铠甲全功率输出";
+  } else if (state.ultimateHolding) {
+    if (selectedUltimate) {
+      ui.ultimateButtonLabel.textContent =
+        heldFor >= ULTIMATE_MIN_HOLD_MS
+          ? "松手释放 · " + selectedUltimate.name
+          : "继续按住 · 锁定一式";
+      ui.ultimateControlHint.textContent =
+        selectedUltimate.roman + "档 · 消耗" + selectedUltimate.tier + "枚能量豆";
+    } else {
+      ui.ultimateButtonLabel.textContent = "继续按住 · 正在锁定";
+      ui.ultimateControlHint.textContent = "短按不会释放";
+    }
+  } else if (availableTier > 0) {
+    const highest = getUltimateTier(availableTier);
+    ui.ultimateButtonLabel.textContent = highest.roman + "档就绪 · " + highest.name;
+    ui.ultimateControlHint.textContent = "按住蓄力 · 松手释放低于等于当前档位的终结技";
+  } else {
+    ui.ultimateButtonLabel.textContent = "终结技蓄能中";
+    ui.ultimateControlHint.textContent = "第一枚点亮后可长按释放";
+  }
+
+  ui.soulUltimateButton.setAttribute(
+    "aria-label",
+    state.ultimateHolding && selectedUltimate
+      ? "正在蓄力" + selectedUltimate.name + "，松手消耗" + selectedUltimate.tier + "枚阶段能量释放，拖到左上叉号可取消"
+      : "当前点亮" + availableTier + "枚阶段能量，可释放" + availableTier + "档终结技",
+  );
+}
+
+function addSoulEnergy(amount, source) {
+  if (!state || state.ended || amount <= 0 || state.soulEnergy >= MAX_SOUL_ENERGY) {
+    return 0;
+  }
+  const before = state.soulEnergy;
+  const beforeTier = soulTierForEnergy(before);
+  state.soulEnergy = Math.min(MAX_SOUL_ENERGY, state.soulEnergy + amount);
+  const gained = state.soulEnergy - before;
+  const afterTier = soulTierForEnergy(state.soulEnergy);
+  if (source && gained >= 1) {
+    showLog(source + "，灵魂能量 +" + Math.round(gained));
+  }
+  if (afterTier > beforeTier) {
+    const unlocked = getUltimateTier(afterTier);
+    createFloat(unlocked.roman + "档就绪", true, "awaken");
+    showMessage(unlocked.name + "已就绪 · 长按终结技选择释放档位");
+    playFrequencySweep(
+      { wave: "sine", start: 160 + afterTier * 45, end: 360 + afterTier * 80, duration: 0.28 },
+      0,
+      0.04,
+    );
+  }
+  renderSoulUltimate();
+  return gained;
+}
+
+function advanceSoulEnergyAutomatically(frameDelta) {
+  if (
+    state.ended ||
+    state.phase !== "battle" ||
+    state.ultimateHolding ||
+    state.ultimateCasting ||
+    state.videoPlaying ||
+    state.soulEnergy >= MAX_SOUL_ENERGY
+  ) {
+    return;
+  }
+  const beforeFloor = Math.floor(state.soulEnergy);
+  addSoulEnergy((frameDelta / SOUL_ENERGY_CHARGE_DURATION) * MAX_SOUL_ENERGY, "");
+  if (Math.floor(state.soulEnergy) !== beforeFloor) {
+    renderSoulUltimate();
+  }
+}
+
+function updateSoulUltimateHold(now) {
+  if (!state || !state.ultimateHolding) {
+    return;
+  }
+  const elapsed = Math.max(0, now - state.ultimateHoldStartedAt);
+  const previousTier = state.ultimateHoldTier;
+  const requestedTier = elapsed < ULTIMATE_MIN_HOLD_MS
+    ? 0
+    : 1 + Math.floor((elapsed - ULTIMATE_MIN_HOLD_MS) / ULTIMATE_TIER_HOLD_MS);
+  state.ultimateHoldTier = Math.min(state.ultimateHoldAvailableTier, requestedTier, 4);
+  if (state.ultimateHoldTier > 0 && state.ultimateHoldTier !== previousTier) {
+    const selected = getUltimateTier(state.ultimateHoldTier);
+    createFloat(selected.roman + "档", true, "awaken");
+    playTone(state.ultimateHoldTier - 1, state.ultimateHoldTier >= 3, false);
+    showMessage(selected.name + "已锁定 · 松手立即释放，继续按住可升档");
+  }
+  renderSoulUltimate(now);
+}
+
+function beginSoulUltimateHold(options) {
+  if (!canStartSoulUltimate()) {
+    if (state && state.soulEnergy < SOUL_TIER_COST) {
+      showMessage("灵魂能量不足25点，暂时无法释放终结技");
+    }
+    return false;
+  }
+  const now = performance.now();
+  endIntervention("ultimate", now);
+  state.ultimateHolding = true;
+  state.ultimateHoldStartedAt = now;
+  state.ultimateHoldTier = 0;
+  state.ultimateHoldAvailableTier = soulTierForEnergy(state.soulEnergy);
+  state.ultimateCancelHovered = false;
+  state.ultimatePointerId = options && typeof options.pointerId === "number"
+    ? options.pointerId
+    : null;
+  state.ultimateInputKey = options && options.key ? options.key : null;
+  ui.commandDeck.classList.add("ultimate-holding");
+  ui.battlefield.classList.add("ultimate-holding");
+  ui.liveHint.textContent = "灵魂终结技蓄力中 · 松手释放，继续按住逐档提升";
+  showMessage("按住蓄力 · 0.3秒锁定一式，最高可到当前灵魂档位");
+  updateCardStates(now);
+  renderStatus();
+  return true;
+}
+
+function clearSoulUltimateHoldState() {
+  if (!state) {
+    return;
+  }
+  state.ultimateHolding = false;
+  state.ultimateHoldStartedAt = 0;
+  state.ultimateHoldTier = 0;
+  state.ultimateHoldAvailableTier = 0;
+  state.ultimateCancelHovered = false;
+  state.ultimatePointerId = null;
+  state.ultimateInputKey = null;
+  ui.commandDeck.classList.remove("ultimate-holding");
+  ui.battlefield.classList.remove("ultimate-holding");
+  ui.soulUltimateButton.classList.remove("cancel-hover");
+}
+
+function cancelSoulUltimateHold(silent) {
+  if (!state || !state.ultimateHolding) {
+    return;
+  }
+  clearSoulUltimateHoldState();
+  if (!silent) {
+    showMessage("终结技蓄力已取消，灵魂能量未消耗");
+  }
+  updateCardStates(performance.now());
+  renderStatus();
+  renderChain();
+}
+
+function releaseSoulUltimateHold() {
+  if (!state || !state.ultimateHolding) {
+    return;
+  }
+  updateSoulUltimateHold(performance.now());
+  const tier = state.ultimateHoldTier;
+  clearSoulUltimateHoldState();
+  if (tier <= 0) {
+    showMessage("按住至少0.3秒后松手，才会释放终结技");
+    updateCardStates(performance.now());
+    renderStatus();
+    renderChain();
+    return;
+  }
+  castSoulUltimate(tier);
+}
+
+function castSoulUltimate(tier) {
+  const ultimate = getUltimateTier(tier);
+  if (
+    !state ||
+    state.phase !== "battle" ||
+    state.ended ||
+    state.ultimateCasting ||
+    state.soulEnergy < ultimate.cost
+  ) {
+    renderSoulUltimate();
+    return;
+  }
+  const now = performance.now();
+  const currentRun = state.runId;
+  state.soulEnergy = Math.max(0, state.soulEnergy - ultimate.cost);
+  state.ultimateCasting = true;
+  state.ultimateCastStartedAt = now;
+  ui.commandDeck.classList.add("ultimate-casting");
+  ui.battlefield.classList.add("ultimate-casting", "ultimate-tier-" + tier);
+  ui.ultimateCinematic.className = "ultimate-cinematic ultimate-tier-" + tier;
+  ui.ultimateCinematic.setAttribute("aria-hidden", "false");
+  ui.ultimateCinematic.style.setProperty("--ultimate-color", ultimate.color);
+  ui.ultimateCinematicTier.textContent = ultimate.roman;
+  ui.ultimateCinematicCost.textContent = ultimate.cost;
+  ui.ultimateCinematicName.textContent = ultimate.name;
+  ui.ultimateCinematicEffect.textContent = ultimate.effect;
+  ui.liveHint.textContent = ultimate.name + " · 灵魂铠甲正在兑现高光";
+  ui.autoActionText.textContent = "灵魂终结 · " + ultimate.name;
+  showMessage(ultimate.name + "释放 · 锁定Boss当前蓄力部位");
+  playFrequencySweep(
+    { wave: tier >= 3 ? "sawtooth" : "triangle", start: 92 + tier * 16, end: 430 + tier * 90, duration: 0.62 },
+    0,
+    0.055,
+  );
+  updateCardStates(now);
+  renderStatus();
+
+  window.setTimeout(function () {
+    resolveSoulUltimateImpact(ultimate, currentRun);
+  }, 360);
+  window.setTimeout(function () {
+    finishSoulUltimateCast(currentRun);
+  }, ULTIMATE_CAST_DURATION);
+}
+
+function applySoulUltimateDamage(ultimate, targetId) {
+  if (ultimate.tier < 4) {
+    return damagePart(targetId, ultimate.damage, ultimate.armorDamage);
+  }
+  const part = state.parts[targetId];
+  const hadArmor = part.armor > 0;
+  const armorHit = Math.min(part.armor, ultimate.armorDamage);
+  part.armor -= armorHit;
+  const lifeDamage = Math.min(part.hp, hadArmor ? ultimate.damage : Math.round(ultimate.damage * 1.25));
+  part.hp -= lifeDamage;
+  state.bossHp = Math.max(0, state.bossHp - lifeDamage);
+  return {
+    bossDamage: lifeDamage,
+    armorHit: armorHit,
+    partHit: lifeDamage,
+    armorBroken: hadArmor && part.armor <= 0,
+    partBroken: part.hp <= 0,
+  };
+}
+
+function resolveSoulUltimateImpact(ultimate, currentRun) {
+  if (!state || state.runId !== currentRun || state.ended || !state.ultimateCasting) {
+    return;
+  }
+  const targetId = getIntent().part;
+  const target = state.parts[targetId];
+  const result = applySoulUltimateDamage(ultimate, targetId);
+  state.intentPressure += ultimate.pressure;
+  createFloat("奥义 -" + result.bossDamage, false);
+  createUnitBurst(ui.bossUnit, 0.5, 0.42, ultimate.color);
+  createUnitBeam(ui.playerUnit, 0.58, 0.34, ui.bossUnit, 0.48, 0.42, ultimate.color);
+  if (ultimate.tier >= 2) {
+    window.setTimeout(function () {
+      if (state && state.runId === currentRun && !state.ended) {
+        createUnitBurst(ui.bossUnit, 0.58, 0.5, ultimate.color);
+      }
+    }, 110);
+  }
+  if (ultimate.tier >= 3) {
+    pulseCombatClass("boss-stagger", 920);
+  }
+  pulseCombatClass("boss-hit", 520 + ultimate.tier * 90);
+  pulseCombatClass("shake", 360 + ultimate.tier * 120);
+  showMessage(
+    ultimate.name + "命中" + target.name + "，造成" + result.bossDamage + "点伤害" +
+      (result.armorHit ? "、" + result.armorHit + "点破甲" : "") +
+      (result.partBroken ? " · 部位摧毁" : ""),
+  );
+  showLog(ultimate.name + "完成结算，灵魂铠甲消耗" + ultimate.cost + "点灵魂能量");
+  renderStatus();
+  renderBossParts();
+  renderBossSprite();
+  checkIntentInterrupted(performance.now());
+  checkBattleEnd();
+}
+
+function finishSoulUltimateCast(currentRun) {
+  if (!state || state.runId !== currentRun) {
+    return;
+  }
+  const now = performance.now();
+  const elapsed = Math.max(0, now - state.ultimateCastStartedAt);
+  if (!state.ended) {
+    state.nextTurnAt += elapsed;
+    state.lastPlayerActionAt += elapsed;
+    state.nextPlayerAt += elapsed;
+    state.playerCycleDuration += elapsed;
+    if (state.chainDeadline) {
+      state.chainDeadline += elapsed;
+    }
+  }
+  state.ultimateCasting = false;
+  state.ultimateCastStartedAt = 0;
+  ui.commandDeck.classList.remove("ultimate-casting");
+  ui.battlefield.classList.remove(
+    "ultimate-casting",
+    "ultimate-tier-1",
+    "ultimate-tier-2",
+    "ultimate-tier-3",
+    "ultimate-tier-4",
+  );
+  hideUltimateCinematic();
+  if (!state.ended) {
+    ui.liveHint.textContent = "终结技结算完成 · 挂件卡可继续自由释放";
+    updateCardStates(now);
+    renderStatus();
+    renderChain();
+  }
+}
+
+function hideUltimateCinematic() {
+  if (!ui.ultimateCinematic) {
+    return;
+  }
+  ui.ultimateCinematic.className = "ultimate-cinematic hidden";
+  ui.ultimateCinematic.setAttribute("aria-hidden", "true");
+}
+
 function advanceAwakeningAutomatically(frameDelta) {
   if (
     state.ended ||
@@ -1145,7 +1811,6 @@ function openAwakeningSelection() {
   state.awakeningActivationPending = false;
   state.awakeningSelecting = true;
   state.awakeningSelectedUids = [];
-  closeWeaponMenu();
   ui.battlefield.classList.add("awakening-selecting", "intervention-focus");
   ui.commandDeck.classList.add("awakening-selecting");
   ui.awakeningConsole.classList.remove("hidden");
@@ -1222,16 +1887,10 @@ function consumeAwakeningSelection() {
   });
   state.discardPile.push.apply(state.discardPile, consumed);
   while (state.hand.length < MAX_HAND_SIZE) {
-    let nextCard = takeUniqueCard(state.drawPile, state.hand);
-    if (!nextCard && state.discardPile.length) {
-      state.drawPile = shuffleItems(state.drawPile.concat(state.discardPile));
-      state.discardPile = [];
-      nextCard = takeUniqueCard(state.drawPile, state.hand);
-    }
+    const nextCard = drawOneCardIntoHand(false);
     if (!nextCard) {
       break;
     }
-    state.hand.push(nextCard);
   }
 }
 
@@ -1287,7 +1946,6 @@ function finishArmorTransform(currentRun) {
   const now = performance.now();
   const elapsed = Math.max(0, now - state.transformStartedAt);
   state.nextTurnAt += elapsed;
-  state.nextEnergyAt += elapsed;
   state.lastPlayerActionAt += elapsed;
   state.nextPlayerAt += elapsed;
   state.transforming = false;
@@ -1452,6 +2110,7 @@ function updateIntentTimer(now) {
   const percent = Math.max(0, Math.min(1, remaining / duration));
   ui.intentCounter.textContent = state.intentInterrupted ? "已打断" : (remaining / 1000).toFixed(1) + "s";
   ui.intentBanner.style.setProperty("--intent-charge", (1 - percent) * 100 + "%");
+  ui.partBars.style.setProperty("--part-intent-charge", (1 - percent) * 100 + "%");
   ui.intentBanner.classList.toggle("danger", !state.intentInterrupted && remaining < 1200);
   ui.intentBanner.classList.toggle("interrupted", state.intentInterrupted);
 }
@@ -1476,7 +2135,7 @@ function timeUntilActor(actor, now) {
 }
 
 function updateChainTimer(now) {
-  if (!state.chain.length) {
+  if (!state.chain.length || state.videoPending || state.videoPlaying) {
     return;
   }
   const remaining = state.chainDeadline - now;
@@ -1485,55 +2144,68 @@ function updateChainTimer(now) {
   }
 }
 
-function updateEnergyCharge(now) {
-  if (state.energy >= MAX_ENERGY) {
-    state.nextEnergyAt = now + ENERGY_INTERVAL;
-    ui.energyChargeBar.style.width = "100%";
-    ui.energyRate.style.setProperty("--energy-charge-angle", "270deg");
-    ui.energyRate.style.setProperty("--energy-charge-mid-angle", "157deg");
-    ui.energyRate.style.setProperty("--energy-needle-angle", "120deg");
-    ui.energyChargeLabel.textContent = "能量已满";
-    return;
-  }
-  const remaining = Math.max(0, state.nextEnergyAt - now);
-  const progress = Math.max(0, Math.min(1, 1 - remaining / ENERGY_INTERVAL));
-  ui.energyChargeBar.style.width = progress * 100 + "%";
-  ui.energyRate.style.setProperty("--energy-charge-angle", progress * 270 + "deg");
-  ui.energyRate.style.setProperty("--energy-charge-mid-angle", progress * 157 + "deg");
-  ui.energyRate.style.setProperty("--energy-needle-angle", -120 + progress * 240 + "deg");
-  ui.energyChargeLabel.textContent = "恢复 +1 / 3s";
-}
-
 function renderBossParts() {
   ui.partBars.innerHTML = "";
-  Object.keys(state.parts).forEach(function (partId) {
+  const activePartId = getIntent().part;
+  ["arms", "core", "legs"].forEach(function (partId) {
     const part = state.parts[partId];
     const hasArmor = part.armor > 0;
     const broken = part.hp <= 0;
-    const current = hasArmor ? part.armor : part.hp;
-    const max = hasArmor ? part.maxArmor : part.maxHp;
-    const percent = max ? Math.max(0, current / max) * 100 : 0;
+    const hpValue = Math.max(0, Math.ceil(part.hp));
+    const armorValue = Math.max(0, Math.ceil(part.armor));
+    const hpPercent = part.maxHp ? Math.max(0, Math.min(1, part.hp / part.maxHp)) * 100 : 0;
+    const armorPercent = part.maxArmor ? Math.max(0, Math.min(1, part.armor / part.maxArmor)) * 100 : 0;
+    const layerPercent = broken ? 0 : hasArmor ? armorPercent : hpPercent;
+    const layerState = broken ? "broken" : hasArmor ? "armored" : "exposed";
+    const isIntent = partId === activePartId;
+    const statusLabel = broken
+      ? "已破坏"
+      : isIntent && state.intentInterrupted
+        ? "已打断"
+        : isIntent
+          ? "蓄力中"
+          : hasArmor
+            ? "硬甲"
+            : "裸露";
     const item = document.createElement("div");
-    item.className = "part-state" + (broken ? " broken" : "");
+    item.className =
+      "part-state " +
+      (broken ? "broken" : hasArmor ? "armored" : "exposed") +
+      (isIntent ? " is-intent" : "") +
+      (isIntent && state.intentInterrupted ? " interrupted" : "");
+    item.dataset.partId = partId;
+    item.setAttribute(
+      "aria-label",
+      part.name + "，" + statusLabel +
+        (part.maxArmor ? "，护甲" + armorValue + "/" + part.maxArmor : "，无护甲") +
+        "，本体" + hpValue + "/" + part.maxHp,
+    );
     item.innerHTML =
-      '<img src="' +
+      '<span class="part-icon-shell"><img class="part-icon" src="' +
       part.icon +
-      '" alt="" /><span class="part-meter"><i style="width:' +
-      percent +
-      '%"></i></span><b>' +
-      (broken ? "破坏" : hasArmor ? "甲 " + Math.ceil(percent) + "%" : Math.ceil(percent) + "%") +
-      "</b>";
+      '" alt="" /><span class="part-layer-badge ' +
+      layerState +
+      '" aria-hidden="true"><img src="./assets/armor-shield.png" alt="" /><i></i></span>' +
+      '<i class="part-broken-cross" aria-hidden="true"></i></span>' +
+      '<span class="part-shared-gauge ' +
+      layerState +
+      '" aria-hidden="true"><i style="width:' +
+      layerPercent +
+      '%"></i></span>';
     ui.partBars.appendChild(item);
   });
 }
 
 function renderBossSprite() {
+  let sprite = "./assets/boss.png";
   if (state.parts.arms.hp <= 0) {
-    ui.bossImage.src = "./assets/boss-arms-broken.png";
+    sprite = "./assets/boss-arms-broken.png";
   } else if (state.parts.legs.hp <= 0) {
-    ui.bossImage.src = "./assets/boss-legs-broken.png";
-  } else {
-    ui.bossImage.src = "./assets/boss.png";
+    sprite = "./assets/boss-legs-broken.png";
+  }
+  ui.bossImage.src = sprite;
+  if (ui.bossHudAvatar) {
+    ui.bossHudAvatar.src = sprite;
   }
 }
 
@@ -1551,8 +2223,6 @@ function maybeStartIntervention(now) {
     state.turnActor !== "player" ||
     state.actionActor ||
     state.reactionActive ||
-    state.weaponSwitchPending ||
-    state.weaponSwitching ||
     state.videoPending ||
     state.videoPlaying ||
     state.chain.length ||
@@ -1583,7 +2253,6 @@ function applyInterventionSlowdown(frameDelta) {
   const delayedTime = Math.max(0, Math.min(160, frameDelta)) * (1 - INTERVENTION_TIME_SCALE);
   state.nextTurnAt += delayedTime;
   state.nextPlayerAt += delayedTime;
-  state.nextEnergyAt += delayedTime;
   state.playerCycleDuration += delayedTime;
   if (state.chainDeadline) {
     state.chainDeadline += delayedTime;
@@ -1622,31 +2291,26 @@ function endIntervention(reason, now) {
 }
 
 function tickBattle() {
-  if (!state || state.ended) {
+  if (!state || state.phase !== "battle" || state.ended) {
     return;
   }
   const now = performance.now();
   const frameDelta = Math.max(0, now - state.lastFrameAt);
   state.lastFrameAt = now;
-  advanceAwakeningAutomatically(frameDelta);
-  if (state.awakeningActivationPending && canOpenAwakeningSelection()) {
-    openAwakeningSelection();
-    return;
-  }
-  if (state.awakeningSelecting) {
+  advanceTimedEnergy(now);
+  renderEnergyRecoveryProgress(now);
+  advanceSoulEnergyAutomatically(frameDelta);
+  if (state.ultimateHolding) {
+    updateSoulUltimateHold(now);
     state.nextTurnAt += frameDelta;
     state.nextPlayerAt += frameDelta;
-    state.nextEnergyAt += frameDelta;
     state.playerCycleDuration += frameDelta;
     updateAutoActionMeter(now);
     updateIntentTimer(now);
-    updateEnergyCharge(now);
+    updateCardStates(now);
     return;
   }
-  if (state.transforming) {
-    return;
-  }
-  if (state.weaponSwitching) {
+  if (state.ultimateCasting) {
     return;
   }
   if (state.videoPlaying) {
@@ -1656,22 +2320,11 @@ function tickBattle() {
   if (state.interventionActive && now >= state.interventionEndsAt) {
     endIntervention("timeout", now);
   }
-  if (state.weaponSwitchPending && !state.actionActor && !state.reactionActive) {
-    startPendingWeaponSwitch();
-    return;
-  }
   if (state.videoPending && !state.actionActor && !state.reactionActive) {
     startPendingModuleVideo();
     return;
   }
-  if (now >= state.nextEnergyAt) {
-    state.nextEnergyAt = now + ENERGY_INTERVAL;
-    if (state.energy < MAX_ENERGY) {
-      state.energy += 1;
-      renderStatus();
-    }
-  }
-  if (now >= state.nextTurnAt) {
+  if (now >= state.nextTurnAt && isAutoTurnIdle()) {
     if (state.turnActor === "player") {
       executeAutoAttack(now);
     } else {
@@ -1680,25 +2333,63 @@ function tickBattle() {
   }
   updateAutoActionMeter(now);
   updateIntentTimer(now);
-  updateEnergyCharge(now);
   updateChainTimer(now);
   updateCardStates(now);
 }
 
+function advanceTimedEnergy(now) {
+  if (!state || state.phase !== "battle" || state.ended || now < state.nextEnergyAt) {
+    return;
+  }
+  const recoveredPoints = Math.floor((now - state.nextEnergyAt) / ENERGY_INTERVAL) + 1;
+  state.nextEnergyAt += recoveredPoints * ENERGY_INTERVAL;
+  if (state.energy >= MAX_ENERGY) {
+    return;
+  }
+  state.energy = Math.min(MAX_ENERGY, state.energy + recoveredPoints);
+  renderStatus();
+  updateCardStates(now);
+}
+
+function isAutoTurnIdle() {
+  return Boolean(
+    state &&
+    !state.ended &&
+    !state.actionActor &&
+    !state.reactionActive &&
+    !state.videoPending &&
+    !state.videoPlaying &&
+    !state.ultimateHolding &&
+    !state.ultimateCasting &&
+    state.lastAutoActor !== state.turnActor
+  );
+}
+
 function executeAutoAttack(now) {
+  if (
+    state.ended ||
+    state.turnActor !== "player" ||
+    state.actionActor ||
+    state.reactionActive ||
+    state.lastAutoActor === "player"
+  ) {
+    return;
+  }
   const weapon = currentWeaponMode();
   const action = weapon.actions[state.actionIndex % weapon.actions.length];
+  const actionId = ++state.actionSerial;
   endIntervention("attack", now);
   state.playerAttackSerial += 1;
   state.actionIndex += 1;
   state.actionActor = "player";
+  state.activeActionId = actionId;
+  state.lastAutoActor = "player";
   state.turnActor = "boss";
-  state.nextTurnAt = now + BOSS_TURN_INTERVAL;
+  state.nextTurnAt = now + Math.max(BOSS_TURN_INTERVAL, weapon.recoverDelay + MIN_TURN_GAP);
   state.lastPlayerActionAt = now;
   state.playerCycleDuration = BOSS_TURN_INTERVAL + weapon.attackInterval;
   state.nextPlayerAt = now + state.playerCycleDuration;
-  const formBonus = state.awakened ? 5 + state.awakenedModules.length * 3 : 0;
-  const bonus = state.nextAutoBonus + formBonus;
+  const bonus = state.nextAutoBonus;
   state.nextAutoBonus = 0;
   ui.autoActionText.textContent = "玩家回合 · " + action.name;
   pulseCombatClass("player-turn", weapon.recoverDelay);
@@ -1707,13 +2398,26 @@ function executeAutoAttack(now) {
 
   const currentRun = state.runId;
   window.setTimeout(function () {
-    if (state && state.runId === currentRun && !state.ended) {
+    if (
+      state &&
+      state.runId === currentRun &&
+      !state.ended &&
+      state.activeActionId === actionId &&
+      state.actionActor === "player"
+    ) {
       state.actionActor = null;
+      state.activeActionId = 0;
       renderStatus();
     }
   }, weapon.recoverDelay);
   window.setTimeout(function () {
-    if (!state || state.runId !== currentRun || state.ended) {
+    if (
+      !state ||
+      state.runId !== currentRun ||
+      state.ended ||
+      state.activeActionId !== actionId ||
+      state.actionActor !== "player"
+    ) {
       return;
     }
     settlePlayerAttack(action, bonus, now);
@@ -1735,8 +2439,14 @@ function settlePlayerAttack(action, bonus, now) {
   triggerWeaponAttackFx(currentWeaponMode(), Boolean(bonus));
   playWeaponAttackSound(currentWeaponMode());
   showLog(currentWeaponMode().name + "自动使用“" + action.name + "”，造成 " + result.bossDamage + " 点伤害");
-  if (state.awakened) {
-    handleAwakenedAttackResolved();
+  if (getIntent().part === action.target) {
+    addSoulEnergy(1, "拳套命中Boss蓄力部位");
+  }
+  if (result.armorBroken) {
+    addSoulEnergy(8, action.targetLabel + "护甲被击破");
+  }
+  if (result.partBroken) {
+    addSoulEnergy(10, action.targetLabel + "部位被摧毁");
   }
   renderStatus();
   renderBossParts();
@@ -1746,7 +2456,73 @@ function settlePlayerAttack(action, bonus, now) {
 }
 
 function activateCard(cardInstanceId, sourceButton) {
-  toggleAwakeningCard(cardInstanceId);
+  if (
+    !state ||
+    state.phase !== "battle" ||
+    state.ended ||
+    state.videoPlaying ||
+    state.videoPending ||
+    state.ultimateHolding ||
+    state.ultimateCasting
+  ) {
+    return;
+  }
+  const handIndex = state.hand.findIndex(function (instance) {
+    return instance.uid === cardInstanceId;
+  });
+  if (handIndex < 0) {
+    return;
+  }
+  const instance = state.hand[handIndex];
+  const card = getCard(instance.cardId);
+  const now = performance.now();
+  if (state.energy < card.cost) {
+    showMessage("战术能量不足，无法激活“" + card.name + "”");
+    updateCardStates(now);
+    return;
+  }
+  if (state.chain.length && now >= state.chainDeadline) {
+    resolveChain();
+    if (state.ended) {
+      return;
+    }
+  }
+  endIntervention("card", now);
+
+  const previous = state.chain.length ? state.chain[state.chain.length - 1].card : null;
+  const link = previous ? getLink(previous, card) : getWeaponCardLink(card);
+  const chainIndex = state.chain.length;
+  const comboBonus = Math.round((chainIndex * 0.13 + link.bonus) * 100);
+
+  state.energy -= card.cost;
+  state.chain.push({ card: card, link: link.name, bonus: link.bonus, comboBonus: comboBonus });
+  state.chainWindow = BASE_CHAIN_WINDOW + (hasCardInChain("armor") ? 650 : 0);
+  state.chainDeadline = now + state.chainWindow;
+  const presentationPayload = {
+    card: card,
+    chainIndex: chainIndex,
+    link: link,
+    comboBonus: comboBonus,
+    previous: previous,
+    queuedAt: now,
+    runId: state.runId,
+    presentationId: ++modulePresentationSerial,
+    resolved: false,
+  };
+  state.videoPending = presentationPayload;
+  createCardProjectile(card, sourceButton);
+  state.hand.splice(handIndex, 1);
+  state.discardPile.push(instance);
+  drawNextCard();
+  renderStatus();
+  renderChain();
+  playTone(state.chain.length - 1, state.chain.length >= 3, false);
+  ui.liveHint.textContent = card.name + "已释放 · 表现完成后结算效果";
+  showLog(card.name + "挂件协议已提交，等待释放表现");
+
+  if (!state.actionActor && !state.reactionActive) {
+    startPendingModuleVideo();
+  }
 }
 
 function scheduleMaxChainResolve(currentRun, delay) {
@@ -1769,6 +2545,10 @@ function startPendingModuleVideo() {
   }
 
   const payload = state.videoPending;
+  if (payload.runId !== state.runId || payload.resolved) {
+    state.videoPending = null;
+    return;
+  }
   const now = performance.now();
   state.videoPending = null;
   state.activeVideoEffect = payload;
@@ -1779,24 +2559,48 @@ function startPendingModuleVideo() {
   ui.moduleVideoType.textContent = payload.card.type + "介入";
   ui.moduleVideoTitle.textContent = payload.card.name;
   renderModuleVideoCombo(payload);
-  ui.moduleCinematic.classList.remove("hidden");
+  ui.moduleCinematic.className =
+    "cinematic module-cinematic " +
+    (payload.card.video ? "video-presentation" : "frame-presentation frame-" + payload.card.id);
+  ui.moduleCinematic.style.setProperty("--module-color", payload.card.color);
   ui.moduleCinematic.setAttribute("aria-hidden", "false");
+  updateCardStates(now);
+
+  if (!payload.card.video) {
+    ui.moduleVideo.classList.add("hidden");
+    ui.moduleFrameStage.classList.remove("hidden");
+    ui.moduleFrameStage.setAttribute("aria-hidden", "false");
+    ui.moduleFrameIcon.src = payload.card.icon;
+    ui.moduleFrameIcon.alt = "";
+    ui.moduleFrameName.textContent = payload.card.name;
+    modulePresentationTimer = window.setTimeout(function () {
+      finishModuleVideo(false, payload);
+    }, MODULE_FRAME_DURATION);
+    return;
+  }
+
+  ui.moduleFrameStage.classList.add("hidden");
+  ui.moduleFrameStage.setAttribute("aria-hidden", "true");
+  ui.moduleVideo.classList.remove("hidden");
   ui.moduleVideo.loop = false;
   ui.moduleVideo.onended = function () {
-    finishModuleVideo(false);
+    finishModuleVideo(false, payload);
   };
   ui.moduleVideo.onerror = function () {
-    showLog(payload.card.name + "视频加载失败，直接结算挂件效果");
-    finishModuleVideo(false);
+    showLog(payload.card.name + "视频加载失败，改用即时结算");
+    finishModuleVideo(false, payload);
   };
   ui.moduleVideo.src = payload.card.video;
   ui.moduleVideo.load();
-  updateCardStates(now);
+  modulePresentationWatchdog = window.setTimeout(function () {
+    showLog(payload.card.name + "表现播放超时，自动继续结算");
+    finishModuleVideo(false, payload);
+  }, MODULE_VIDEO_TIMEOUT);
 
   const playback = ui.moduleVideo.play();
   if (playback && typeof playback.catch === "function") {
     playback.catch(function () {
-      finishModuleVideo(false);
+      finishModuleVideo(false, payload);
     });
   }
 }
@@ -1822,23 +2626,31 @@ function renderModuleVideoCombo(payload) {
       payload.link.name + " · 前置部件完成后触发当前挂件";
   } else {
     ui.moduleVideoComboName.textContent = "独立启动";
-    ui.moduleVideoComboEffect.textContent = "无前置条件，直接结算自身效果";
+    ui.moduleVideoComboEffect.textContent = "释放表现完成后，结算自身效果";
   }
 }
 
-function finishModuleVideo(skipped) {
-  if (!state || !state.videoPlaying || !state.activeVideoEffect) {
+function finishModuleVideo(skipped, expectedPayload) {
+  const payload = expectedPayload || (state && state.activeVideoEffect);
+  if (
+    !state ||
+    !payload ||
+    !state.videoPlaying ||
+    state.activeVideoEffect !== payload ||
+    payload.resolved ||
+    payload.runId !== state.runId ||
+    state.ended
+  ) {
     return;
   }
 
-  const payload = state.activeVideoEffect;
+  payload.resolved = true;
   const elapsed = Math.max(0, performance.now() - state.videoStartedAt);
-  hideModuleVideo();
   state.videoPlaying = false;
   state.activeVideoEffect = null;
   state.videoStartedAt = 0;
+  hideModuleVideo();
   state.nextTurnAt += elapsed;
-  state.nextEnergyAt += elapsed;
   state.lastPlayerActionAt += elapsed;
   state.nextPlayerAt += elapsed;
   if (state.chainDeadline) {
@@ -1849,6 +2661,9 @@ function finishModuleVideo(skipped) {
   }
 
   applyCardEffect(payload.card, payload.chainIndex, payload.link);
+  if (!state || state.runId !== payload.runId || state.ended) {
+    return;
+  }
   updateCardStates(performance.now());
   if (state.chain.length >= 5) {
     scheduleMaxChainResolve(payload.runId, 360);
@@ -1859,12 +2674,20 @@ function hideModuleVideo() {
   if (!ui.moduleVideo || !ui.moduleCinematic) {
     return;
   }
+  clearTimeout(modulePresentationTimer);
+  clearTimeout(modulePresentationWatchdog);
+  modulePresentationTimer = 0;
+  modulePresentationWatchdog = 0;
   ui.moduleVideo.onended = null;
   ui.moduleVideo.onerror = null;
   ui.moduleVideo.pause();
   ui.moduleVideo.removeAttribute("src");
   ui.moduleVideo.load();
-  ui.moduleCinematic.classList.add("hidden");
+  ui.moduleVideo.classList.remove("hidden");
+  ui.moduleFrameStage.classList.add("hidden");
+  ui.moduleFrameStage.setAttribute("aria-hidden", "true");
+  ui.moduleCinematic.className = "cinematic module-cinematic hidden";
+  ui.moduleCinematic.style.removeProperty("--module-color");
   ui.moduleCinematic.setAttribute("aria-hidden", "true");
 }
 
@@ -1893,8 +2716,8 @@ function applyCardEffect(card, chainIndex, link) {
   } else if (card.id === "reactor") {
     state.energy = Math.min(MAX_ENERGY, state.energy + 3);
     state.moduleBoost = 2;
-    createFloat("+3 能量", true);
-    showMessage("方舟反应炉脉冲，后续两个挂件获得强化");
+    createFloat("+3 战术能量", true);
+    showMessage("方舟反应炉恢复3点战术能量，后续两个挂件获得强化");
   } else if (card.id === "jet") {
     state.jetGuard = true;
     state.nextAutoBonus += Math.round(13 * multiplier);
@@ -1925,6 +2748,12 @@ function applyModuleHit(card, damage, armorDamage, pressure) {
   const target = state.parts[targetId];
   const result = damagePart(targetId, damage, armorDamage);
   state.intentPressure += pressure;
+  if (result.armorBroken) {
+    addSoulEnergy(8, target.name + "护甲被挂件击破");
+  }
+  if (result.partBroken) {
+    addSoulEnergy(10, target.name + "部位被挂件摧毁");
+  }
   createFloat("-" + result.bossDamage, false);
   createUnitBurst(ui.bossUnit, 0.5, 0.42, card.color);
   pulseCombatClass("boss-hit", 360);
@@ -1939,6 +2768,7 @@ function applyModuleHit(card, damage, armorDamage, pressure) {
 function damagePart(partId, damage, armorDamage) {
   const part = state.parts[partId];
   const armorBefore = part.armor;
+  const hpBefore = part.hp;
   let armorHit = 0;
   let partHit = 0;
   if (part.armor > 0) {
@@ -1955,7 +2785,13 @@ function damagePart(partId, damage, armorDamage) {
   }
   const bossDamage = armorBefore > 0 ? Math.max(2, Math.round(damage * 0.2)) : damage;
   state.bossHp = Math.max(0, state.bossHp - bossDamage);
-  return { bossDamage: bossDamage, armorHit: armorHit, partHit: partHit };
+  return {
+    bossDamage: bossDamage,
+    armorHit: armorHit,
+    partHit: partHit,
+    armorBroken: armorBefore > 0 && part.armor <= 0,
+    partBroken: hpBefore > 0 && part.hp <= 0,
+  };
 }
 
 function resolveChain() {
@@ -2022,24 +2858,36 @@ function checkIntentInterrupted(now) {
   state.bossImpactAt = 0;
   state.reactionActive = false;
   state.reactionChoice = null;
+  addSoulEnergy(6, "成功打断Boss攻势");
   showMessage(intent.name + "被模块联携打断，Boss失去进攻节奏");
   showLog("玩家的实时介入改变了Boss行动");
   createFloat("打断", false);
   pulseCombatClass("shake", 420);
   pulseCombatClass("boss-stagger", 620);
+  renderBossParts();
   renderReactionControls();
 }
 
 function resolveBossAttack(now) {
-  if (state.ended) {
+  if (
+    state.ended ||
+    state.turnActor !== "boss" ||
+    state.actionActor ||
+    state.reactionActive ||
+    state.lastAutoActor === "boss"
+  ) {
     return;
   }
   const intent = getIntent();
   const currentRun = state.runId;
+  const actionId = ++state.actionSerial;
   state.actionActor = "boss";
+  state.activeActionId = actionId;
+  state.lastAutoActor = "boss";
   state.bossImpactAt = state.intentInterrupted ? 0 : now + BOSS_IMPACT_DELAY;
   state.turnActor = "player";
-  state.nextTurnAt = now + currentWeaponMode().attackInterval;
+  state.nextTurnAt =
+    now + Math.max(currentWeaponMode().attackInterval, ATTACK_RECOVER_DELAY + MIN_TURN_GAP);
   state.nextPlayerAt = state.nextTurnAt;
   state.reactionActive = !state.intentInterrupted;
   state.reactionChoice = null;
@@ -2050,7 +2898,13 @@ function resolveBossAttack(now) {
 
   if (state.intentInterrupted) {
     window.setTimeout(function () {
-      if (!state || state.runId !== currentRun || state.ended) {
+      if (
+        !state ||
+        state.runId !== currentRun ||
+        state.ended ||
+        state.activeActionId !== actionId ||
+        state.actionActor !== "boss"
+      ) {
         return;
       }
       showMessage(intent.name + "已被打断，Boss本回合无法攻击");
@@ -2061,7 +2915,13 @@ function resolveBossAttack(now) {
   } else {
     showMessage(intent.responseHint);
     window.setTimeout(function () {
-      if (!state || state.runId !== currentRun || state.ended) {
+      if (
+        !state ||
+        state.runId !== currentRun ||
+        state.ended ||
+        state.activeActionId !== actionId ||
+        state.actionActor !== "boss"
+      ) {
         return;
       }
       settleBossAttack(intent);
@@ -2069,8 +2929,15 @@ function resolveBossAttack(now) {
   }
 
   window.setTimeout(function () {
-    if (state && state.runId === currentRun && !state.ended) {
+    if (
+      state &&
+      state.runId === currentRun &&
+      !state.ended &&
+      state.activeActionId === actionId &&
+      state.actionActor === "boss"
+    ) {
       state.actionActor = null;
+      state.activeActionId = 0;
       state.reactionActive = false;
       state.bossImpactAt = 0;
       renderStatus();
@@ -2102,25 +2969,20 @@ function settleBossAttack(intent) {
     damage = 0;
     feedback.push(choice === "left" ? "左闪成功" : "右闪成功");
     pulseCombatClass(choice === "left" ? "player-dodge-left" : "player-dodge-right", 620);
-    if (state.awakened && hasAwakenedModule("jet")) {
-      feedback.push("喷气变轨");
-      pulseCombatClass("awakened-dodge", 720);
-      createUnitBurst(ui.playerUnit, 0.54, 0.48, "#62dfff");
-    }
   } else if (validResponse && choice === "block") {
     damage = Math.max(1, Math.round(damage * 0.28));
     feedback.push("格挡成功");
     pulseCombatClass("player-block", 620);
     state.bossHp = Math.max(0, state.bossHp - 4);
     createFloat("弹反 -4", false);
-    if (state.awakened && hasAwakenedModule("armor")) {
-      damage = Math.max(1, Math.round(damage * 0.45));
-      feedback.push("战甲稳固");
-    }
   } else if (choice) {
     feedback.push("应对方向错误");
   } else {
     feedback.push("未进行防御");
+  }
+
+  if (validResponse) {
+    addSoulEnergy(4, choice === "block" ? "成功格挡Boss攻击" : "成功闪避Boss攻击");
   }
 
   if (damage > 0 && state.armorGuard > 0) {
@@ -2132,10 +2994,6 @@ function settleBossAttack(intent) {
     damage = Math.round(damage * 0.62);
     state.jetGuard = false;
     feedback.push("喷气变轨");
-  }
-  if (damage > 0 && state.awakened) {
-    damage = Math.max(1, Math.round(damage * 0.84));
-    feedback.push("核心形态承压");
   }
   state.playerHp = Math.max(0, state.playerHp - damage);
   if (damage > 0) {
@@ -2152,6 +3010,10 @@ function settleBossAttack(intent) {
   );
   showLog("Boss完成" + intent.name + "，固定回合节拍继续");
   renderStatus();
+  checkBattleEnd();
+  if (state.ended) {
+    return;
+  }
   if (state.playerHp <= 0) {
     endBattle(false, "没有及时用战甲与挂件改变Boss的进攻节奏。");
     return;
@@ -2170,6 +3032,7 @@ function advanceIntent() {
   state.reactionChoice = null;
   state.reactionActive = false;
   renderIntentBase();
+  renderBossParts();
   renderReactionControls();
 }
 
@@ -2190,7 +3053,7 @@ function renderReactionControls() {
 }
 
 function handleDefenseInput(choice) {
-  if (!state || state.ended || state.weaponSwitching || !state.reactionActive || state.reactionChoice) {
+  if (!state || state.ended || !state.reactionActive || state.reactionChoice) {
     return;
   }
   state.reactionChoice = choice;
@@ -2433,23 +3296,6 @@ function playWeaponAttackSound(weapon) {
   }
 }
 
-function playWeaponSwitchSound(weapon) {
-  try {
-    playFrequencySweep(
-      { wave: "sine", start: 190, end: 420, duration: 0.16 },
-      0,
-      0.035,
-    );
-    playFrequencySweep(
-      { wave: weapon.sound.wave, start: weapon.sound.start, end: weapon.sound.end, duration: 0.2 },
-      0.13,
-      0.04,
-    );
-  } catch (error) {
-    // Weapon switch audio is supplementary feedback.
-  }
-}
-
 function playTone(chainIndex, strong, failed) {
   try {
     if (!audioContext) {
@@ -2481,7 +3327,40 @@ function checkBattleEnd() {
 }
 
 function endBattle(victory, copy) {
+  if (!state || state.ended) {
+    return;
+  }
   state.ended = true;
+  state.phase = "ended";
+  state.actionActor = null;
+  state.activeActionId = 0;
+  state.reactionActive = false;
+  state.bossImpactAt = 0;
+  state.videoPending = null;
+  if (state.activeVideoEffect) {
+    state.activeVideoEffect.resolved = true;
+  }
+  state.activeVideoEffect = null;
+  state.videoPlaying = false;
+  state.videoStartedAt = 0;
+  hideModuleVideo();
+  if (state.ultimateHolding) {
+    clearSoulUltimateHoldState();
+  }
+  state.ultimateCasting = false;
+  state.ultimateCastStartedAt = 0;
+  hideUltimateCinematic();
+  ui.commandDeck.classList.remove("ultimate-holding", "ultimate-casting");
+  ui.battlefield.classList.remove(
+    "ultimate-holding",
+    "ultimate-casting",
+    "ultimate-tier-1",
+    "ultimate-tier-2",
+    "ultimate-tier-3",
+    "ultimate-tier-4",
+  );
+  clearInterval(battleTimer);
+  battleTimer = 0;
   ui.commandDeck.classList.add("locked");
   ui.resultEyebrow.textContent = victory ? "挑战完成" : "战斗失败";
   ui.resultTitle.textContent = victory ? "巨兽已倒下" : "战斗化身失去行动";
@@ -2492,19 +3371,113 @@ function endBattle(victory, copy) {
   renderReactionControls();
 }
 
-ui.resetButton.addEventListener("click", resetGame);
-ui.resultRestart.addEventListener("click", resetGame);
-ui.weaponToggle.addEventListener("click", toggleWeaponMenu);
-ui.awakeningButton.addEventListener("click", beginAwakeningSelection);
-ui.awakeningCancel.addEventListener("click", cancelAwakeningSelection);
-ui.awakeningConfirm.addEventListener("click", confirmAwakeningSelection);
-document.addEventListener("pointerdown", function (event) {
+ui.resetButton.addEventListener("click", function () {
+  resetGame("preparation");
+});
+ui.resultRestart.addEventListener("click", function () {
+  resetGame("preparation");
+});
+ui.preparationMonsterNext.addEventListener("click", function () {
+  setPreparationStep("loadout");
+});
+ui.preparationBackToMonster.addEventListener("click", function () {
+  setPreparationStep("monster");
+});
+ui.preparationConfirm.addEventListener("click", startPreparedBattle);
+ui.preparationStyleOptions.forEach(function (button) {
+  button.addEventListener("click", function () {
+    selectPreparedStyle(button.dataset.styleId);
+  });
+});
+ui.soulUltimateButton.addEventListener("pointerdown", function (event) {
+  if (event.button !== 0) {
+    return;
+  }
+  if (!beginSoulUltimateHold({ pointerId: event.pointerId })) {
+    return;
+  }
+  event.preventDefault();
+  try {
+    ui.soulUltimateButton.setPointerCapture(event.pointerId);
+  } catch (error) {
+    // Pointer capture is an enhancement; pointerup still works when the pointer stays on the control.
+  }
+});
+ui.soulUltimateButton.addEventListener("pointerup", function (event) {
+  if (!state || !state.ultimateHolding || state.ultimatePointerId !== event.pointerId) {
+    return;
+  }
+  event.preventDefault();
+  if (state.ultimateCancelHovered) {
+    cancelSoulUltimateHold(false);
+  } else {
+    releaseSoulUltimateHold();
+  }
+  try {
+    if (ui.soulUltimateButton.hasPointerCapture(event.pointerId)) {
+      ui.soulUltimateButton.releasePointerCapture(event.pointerId);
+    }
+  } catch (error) {
+    // Capture may already have been released by the browser.
+  }
+});
+ui.soulUltimateButton.addEventListener("pointermove", function (event) {
   if (
-    !ui.weaponSwitchMenu.classList.contains("hidden") &&
-    !ui.weaponSwitchMenu.contains(event.target) &&
-    !ui.weaponToggle.contains(event.target)
+    !state ||
+    !state.ultimateHolding ||
+    state.ultimatePointerId !== event.pointerId ||
+    !ui.soulCancelTarget
   ) {
-    closeWeaponMenu();
+    return;
+  }
+  const rect = ui.soulCancelTarget.getBoundingClientRect();
+  const padding = 5;
+  const isInside =
+    event.clientX >= rect.left - padding &&
+    event.clientX <= rect.right + padding &&
+    event.clientY >= rect.top - padding &&
+    event.clientY <= rect.bottom + padding;
+  if (state.ultimateCancelHovered === isInside) {
+    return;
+  }
+  state.ultimateCancelHovered = isInside;
+  ui.liveHint.textContent = isInside
+    ? "松手取消终结技 · 灵魂能量不会消耗"
+    : "灵魂终结技蓄力中 · 松手释放，拖至左上叉号取消";
+  renderSoulUltimate(performance.now());
+});
+ui.soulUltimateButton.addEventListener("pointercancel", function (event) {
+  if (state && state.ultimateHolding && state.ultimatePointerId === event.pointerId) {
+    cancelSoulUltimateHold(true);
+  }
+});
+ui.soulUltimateButton.addEventListener("lostpointercapture", function (event) {
+  if (state && state.ultimateHolding && state.ultimatePointerId === event.pointerId) {
+    cancelSoulUltimateHold(true);
+  }
+});
+ui.soulUltimateButton.addEventListener("contextmenu", function (event) {
+  event.preventDefault();
+});
+ui.soulUltimateButton.addEventListener("keydown", function (event) {
+  if (event.key !== " " && event.key !== "Enter") {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  if (event.repeat) {
+    return;
+  }
+  beginSoulUltimateHold({ key: event.key });
+});
+ui.soulUltimateButton.addEventListener("keyup", function (event) {
+  if (event.key !== " " && event.key !== "Enter") {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  if (state && state.ultimateHolding && state.ultimateInputKey === event.key) {
+    releaseSoulUltimateHold();
   }
 });
 ui.reactionControls.querySelectorAll("button[data-defense]").forEach(function (button) {
@@ -2513,13 +3486,44 @@ ui.reactionControls.querySelectorAll("button[data-defense]").forEach(function (b
   });
 });
 ui.moduleVideoSkip.addEventListener("click", function () {
-  finishModuleVideo(true);
+  finishModuleVideo(true, state && state.activeVideoEffect);
 });
 window.addEventListener("keydown", function (event) {
+  if (!state) {
+    return;
+  }
+  if (state.phase === "preparation") {
+    if (event.isComposing) {
+      return;
+    }
+    if (event.key === "Escape" && preparationStep === "loadout") {
+      event.preventDefault();
+      setPreparationStep("monster");
+      return;
+    }
+    if (event.key === "Enter") {
+      const interactiveTarget = event.target instanceof Element
+        ? event.target.closest("button, a, input, select, textarea")
+        : null;
+      if (event.repeat || interactiveTarget) {
+        return;
+      }
+      event.preventDefault();
+      if (preparationStep === "monster") {
+        setPreparationStep("loadout");
+      } else {
+        startPreparedBattle();
+      }
+    }
+    return;
+  }
+  if (state.phase !== "battle") {
+    return;
+  }
   const key = event.key.toLowerCase();
   if (key === "m" && state && state.videoPlaying) {
     event.preventDefault();
-    finishModuleVideo(true);
+    finishModuleVideo(true, state.activeVideoEffect);
     return;
   }
   if (key === "a" || key === "w" || key === "d") {
@@ -2527,7 +3531,7 @@ window.addEventListener("keydown", function (event) {
     return;
   }
   const index = Number(event.key) - 1;
-  if (index >= 0 && index < state.hand.length) {
+  if (!event.repeat && index >= 0 && index < state.hand.length) {
     const instance = state.hand[index];
     const button = ui.cardHand.querySelector('[data-card-instance="' + instance.uid + '"]');
     if (button && !button.disabled) {
@@ -2535,6 +3539,14 @@ window.addEventListener("keydown", function (event) {
     }
   }
 });
+window.addEventListener("blur", function () {
+  cancelSoulUltimateHold(true);
+});
+document.addEventListener("visibilitychange", function () {
+  if (document.hidden) {
+    cancelSoulUltimateHold(true);
+  }
+});
 
 document.title = "M98 卡牌版战斗 Demo · " + DEMO_VERSION;
-resetGame();
+resetGame("preparation");
