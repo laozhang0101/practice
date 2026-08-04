@@ -1,9 +1,14 @@
 "use strict";
 
-const DEMO_VERSION = "卡牌版-2026.07.16-慢动作介入";
+const DEMO_VERSION = "卡牌版-2026.08.04-自动充能手动唤醒";
 const MAX_PLAYER_HP = 220;
 const MAX_BOSS_HP = 420;
 const MAX_ENERGY = 10;
+const MAX_AWAKENING = 100;
+const MAX_AWAKENING_SELECTION = 3;
+const AWAKENED_PLAYER_TURNS = 2;
+const ARMOR_TRANSFORM_DURATION = 1280;
+const AWAKENING_CHARGE_DURATION = 12000;
 const BOSS_TURN_INTERVAL = 2400;
 const FIRST_TURN_DELAY = 900;
 const BOSS_IMPACT_DELAY = 980;
@@ -17,6 +22,7 @@ const INTERVENTION_TIME_SCALE = 0.3;
 const INTERVENTION_RELEASE_DELAY = 460;
 
 const deckRecipe = ["armor", "reactor", "jet", "cannon", "drone", "gourd", "reactor", "cannon"];
+const openingHandRecipe = ["reactor", "jet", "cannon", "gourd"];
 
 const weaponModes = [
   {
@@ -87,15 +93,15 @@ const weaponModes = [
 const cards = [
   {
     id: "armor",
-    name: "战甲过载",
-    type: "战甲卡",
+    name: "战甲承压",
+    type: "战甲技能",
     role: "稳定",
     icon: "./assets/armor-overdrive.jpeg",
     cost: 2,
     color: "#e0ae4f",
-    summary: "立即强化战甲，抵消下一次Boss攻击并延长连携窗口。",
-    usage: "受击前使用 · 抵消一次重击",
-    effectTags: ["抵消重击", "延长连携"],
+    summary: "唤醒战甲承压结构，强化形态期间的格挡稳定性。",
+    usage: "形态技能 · 强化防御",
+    effectTags: ["受击减伤", "稳定架势"],
   },
   {
     id: "reactor",
@@ -219,10 +225,10 @@ const linkRules = {
 };
 
 const chainTiers = [
-  "等待玩家介入",
-  "模块接入",
-  "双模块共振",
-  "战甲联携",
+  "常态战斗",
+  "局部唤醒",
+  "双部件协同",
+  "核心形态联动",
   "过载协同",
   "全武装齐射",
 ];
@@ -260,14 +266,6 @@ const ui = {
   battleMessage: document.getElementById("battleMessage"),
   floatingLayer: document.getElementById("floatingLayer"),
   effectLayer: document.getElementById("effectLayer"),
-  liveChainPanel: document.getElementById("liveChainPanel"),
-  chainTitle: document.getElementById("chainTitle"),
-  chainCount: document.getElementById("chainCount"),
-  chainLane: document.getElementById("chainLane"),
-  chainComboReadout: document.getElementById("chainComboReadout"),
-  chainComboName: document.getElementById("chainComboName"),
-  chainComboEffect: document.getElementById("chainComboEffect"),
-  chainTimerBar: document.getElementById("chainTimerBar"),
   resultOverlay: document.getElementById("resultOverlay"),
   resultEyebrow: document.getElementById("resultEyebrow"),
   resultTitle: document.getElementById("resultTitle"),
@@ -300,6 +298,25 @@ const ui = {
   moduleVideoComboName: document.getElementById("moduleVideoComboName"),
   moduleVideoComboEffect: document.getElementById("moduleVideoComboEffect"),
   moduleVideoSkip: document.getElementById("moduleVideoSkip"),
+  awakeningButton: document.getElementById("awakeningButton"),
+  awakeningButtonLabel: document.getElementById("awakeningButtonLabel"),
+  awakeningBar: document.getElementById("awakeningBar"),
+  awakeningRing: document.getElementById("awakeningRing"),
+  awakeningText: document.getElementById("awakeningText"),
+  awakeningConsole: document.getElementById("awakeningConsole"),
+  awakeningPreviewTitle: document.getElementById("awakeningPreviewTitle"),
+  awakeningPreviewEffect: document.getElementById("awakeningPreviewEffect"),
+  awakeningSelection: document.getElementById("awakeningSelection"),
+  awakeningSelectionCount: document.getElementById("awakeningSelectionCount"),
+  awakeningSelectionCost: document.getElementById("awakeningSelectionCost"),
+  awakeningCancel: document.getElementById("awakeningCancel"),
+  awakeningConfirm: document.getElementById("awakeningConfirm"),
+  armorTransformCinematic: document.getElementById("armorTransformCinematic"),
+  transformModules: document.getElementById("transformModules"),
+  awakenedStatus: document.getElementById("awakenedStatus"),
+  awakenedStatusName: document.getElementById("awakenedStatusName"),
+  awakenedStatusModules: document.getElementById("awakenedStatusModules"),
+  awakenedTurns: document.getElementById("awakenedTurns"),
 };
 
 let state;
@@ -360,6 +377,14 @@ function createDeckState() {
     }),
   );
   const hand = [];
+  openingHandRecipe.forEach(function (cardId) {
+    const openingIndex = drawPile.findIndex(function (instance) {
+      return instance.cardId === cardId;
+    });
+    if (openingIndex >= 0) {
+      hand.push(drawPile.splice(openingIndex, 1)[0]);
+    }
+  });
   while (hand.length < MAX_HAND_SIZE && drawPile.length) {
     const nextCard = takeUniqueCard(drawPile, hand);
     if (!nextCard) {
@@ -393,6 +418,17 @@ function createInitialState() {
     interventionActive: false,
     interventionEndsAt: 0,
     interventionShownForAttack: -1,
+    awakening: 0,
+    awakeningActivationPending: false,
+    awakeningSelecting: false,
+    awakeningSelectedUids: [],
+    transforming: false,
+    transformStartedAt: 0,
+    awakened: false,
+    awakenedModules: [],
+    awakenedAttacksRemaining: 0,
+    awakenedVolleyReleased: false,
+    awakenedVideoShown: false,
     bossImpactAt: 0,
     actionIndex: 0,
     selectedWeaponId: "fists",
@@ -472,13 +508,24 @@ function resetGame() {
   runToken += 1;
   state = createInitialState();
   ui.resultOverlay.classList.add("hidden");
-  ui.commandDeck.classList.remove("locked", "intervention-window", "intervention-release");
+  ui.commandDeck.classList.remove(
+    "locked",
+    "intervention-window",
+    "intervention-release",
+    "awakening-selecting",
+    "armor-awakened",
+  );
   ui.battlefield.className = "battlefield";
+  ui.awakeningConsole.classList.add("hidden");
+  ui.awakeningConsole.setAttribute("aria-hidden", "true");
+  ui.armorTransformCinematic.classList.add("hidden");
+  ui.armorTransformCinematic.setAttribute("aria-hidden", "true");
+  ui.awakenedStatus.classList.add("hidden");
   ui.effectLayer.innerHTML = "";
   ui.floatingLayer.innerHTML = "";
   ui.compactLog.classList.remove("visible");
   renderAll();
-  showMessage("固定节拍交锋开始：玩家与Boss将轮流行动");
+  showMessage("固定节拍交锋开始：战甲唤醒值将随战斗自动积累");
   battleTimer = window.setInterval(tickBattle, 80);
 }
 
@@ -491,6 +538,7 @@ function renderAll() {
   renderBossParts();
   renderBossSprite();
   renderReactionControls();
+  renderAwakening();
 }
 
 function renderStatus() {
@@ -503,8 +551,12 @@ function renderStatus() {
   const displayedActor = state.actionActor || state.turnActor;
   ui.turnLabel.textContent = state.ended
     ? "战斗结束"
-    : state.interventionActive
-      ? "介入时刻 · 慢动作"
+    : state.awakeningSelecting
+      ? "唤醒时刻 · 选择部件"
+      : state.transforming
+        ? "核心形态 · 变身"
+        : state.awakened
+          ? "战甲状态 · " + state.awakenedAttacksRemaining + "回合"
       : "自动回合 · " + (displayedActor === "player" ? "玩家行动" : "Boss行动");
   ui.energyCells.innerHTML = "";
   for (let index = 0; index < MAX_ENERGY; index += 1) {
@@ -517,7 +569,9 @@ function renderStatus() {
   ui.energyText.textContent = state.energy + " / " + MAX_ENERGY;
   ui.cardEnergyValue.textContent = state.energy;
   ui.energyCapText.textContent = "上限 " + MAX_ENERGY;
+  ui.cardHand.style.setProperty("--energy-stock", (state.energy / MAX_ENERGY) * 100 + "%");
   ui.energyRate.setAttribute("aria-label", "战甲能量：当前" + state.energy + "，上限" + MAX_ENERGY);
+  renderAwakening();
 }
 
 function syncWeaponPresentation(weapon) {
@@ -577,7 +631,10 @@ function updateWeaponControlState() {
     state.videoPlaying ||
     Boolean(state.videoPending) ||
     Boolean(state.weaponSwitchPending) ||
-    state.weaponSwitching;
+    state.weaponSwitching ||
+    state.awakeningSelecting ||
+    state.transforming ||
+    state.awakened;
   ui.weaponToggle.disabled = locked;
   ui.weaponSwitchMenu.querySelectorAll("button").forEach(function (button) {
     button.disabled = locked || button.dataset.weaponId === state.selectedWeaponId;
@@ -731,7 +788,7 @@ function renderCards() {
       effectTags +
       '</div><span class="weapon-fit"></span><span class="card-cost"><b>' +
       card.cost +
-      "</b></span>";
+      '</b></span><span class="awakening-card-state">核心充能中</span>';
     button.addEventListener("click", function () {
       activateCard(instance.uid, button);
     });
@@ -740,12 +797,37 @@ function renderCards() {
   updateCardStates(performance.now());
 }
 
+function selectedAwakeningInstances() {
+  return state.awakeningSelectedUids
+    .map(function (uid) {
+      return state.hand.find(function (instance) {
+        return instance.uid === uid;
+      });
+    })
+    .filter(Boolean);
+}
+
+function selectedAwakeningCards() {
+  return selectedAwakeningInstances().map(function (instance) {
+    return getCard(instance.cardId);
+  });
+}
+
+function selectedAwakeningCost() {
+  return selectedAwakeningCards().reduce(function (total, card) {
+    return total + card.cost;
+  }, 0);
+}
+
 function updateCardStates(now) {
   const cinematicLocked =
     state.videoPlaying ||
     Boolean(state.videoPending) ||
     Boolean(state.weaponSwitchPending) ||
-    state.weaponSwitching;
+    state.weaponSwitching ||
+    state.transforming ||
+    state.awakened;
+  const selectedCost = selectedAwakeningCost();
   state.hand.forEach(function (instance) {
     const card = getCard(instance.cardId);
     const weapon = currentWeaponMode();
@@ -754,26 +836,60 @@ function updateCardStates(now) {
     if (!button) {
       return;
     }
-    const lacksEnergy = state.energy < card.cost;
+    const selected = state.awakeningSelectedUids.includes(instance.uid);
+    const selectionFull =
+      state.awakeningSelectedUids.length >= MAX_AWAKENING_SELECTION && !selected;
+    const lacksEnergy = selected
+      ? false
+      : selectedCost + card.cost > state.energy;
     const fitLabel = button.querySelector(".weapon-fit");
-    button.disabled = state.ended || lacksEnergy || cinematicLocked;
+    const stateLabel = button.querySelector(".awakening-card-state");
+    button.disabled =
+      state.ended ||
+      cinematicLocked ||
+      !state.awakeningSelecting ||
+      selectionFull ||
+      lacksEnergy;
     button.classList.toggle("energy-locked", lacksEnergy);
+    button.classList.toggle("awakening-selectable", state.awakeningSelecting && !button.disabled);
+    button.classList.toggle("awakening-selected", selected);
     button.classList.toggle("weapon-linked", affinity === "linked");
     button.classList.toggle("weapon-neutral", affinity === "neutral");
     button.classList.toggle("weapon-unlinked", affinity === "unlinked");
     if (fitLabel) {
       fitLabel.textContent =
-        affinity === "linked" ? weapon.name + "协同" : affinity === "neutral" ? "通用" : "独立启动";
+        selected
+          ? "已接入形态"
+          : affinity === "linked"
+            ? weapon.name + "协同"
+            : affinity === "neutral"
+              ? "通用"
+              : "独立启动";
     }
-    button.title = cinematicLocked
+    if (stateLabel) {
+      stateLabel.textContent = selected
+        ? "已选择"
+        : state.awakeningSelecting
+          ? selectionFull
+            ? "选择已满"
+            : lacksEnergy
+              ? "能量不足"
+              : "点亮部件"
+          : state.awakened
+            ? "形态生效中"
+            : state.awakening >= MAX_AWAKENING
+              ? "先唤醒核心"
+              : "核心充能中";
+    }
+    button.title = state.awakeningSelecting
+      ? selected
+        ? "点击取消选择 · " + card.summary
+        : lacksEnergy
+          ? "本次唤醒能量不足 · " + card.summary
+          : "点击将“" + card.name + "”接入本次核心形态"
+      : cinematicLocked
       ? "当前表现结算中"
-      : lacksEnergy
-        ? "能量不足 · " + card.summary
-        : affinity === "linked"
-          ? weapon.name + "协同 · " + card.summary
-          : affinity === "neutral"
-            ? "通用挂件 · " + card.summary
-            : "可独立使用，与当前武器无额外连接 · " + card.summary;
+      : "战甲唤醒后可选择 · " + card.summary;
   });
   updateWeaponControlState();
 }
@@ -798,55 +914,523 @@ function drawNextCard() {
   return Boolean(nextCard);
 }
 
-function chainNodeMarkup(entry, status) {
-  const card = entry.card || entry;
-  const link = entry.link
-    ? '<small><em>COMBO</em> ' + entry.link + (entry.comboBonus ? " +" + entry.comboBonus + "%" : "") + "</small>"
-    : "";
-  return (
-    '<div class="chain-node ' +
-    (status || "") +
-    '" style="--node-color:' +
-    card.color +
-    '"><img src="' +
-    card.icon +
-    '" alt="" /><span>' +
-    card.name +
-    "</span>" +
-    link +
-    "</div>"
-  );
+function sortAwakeningModules(modules) {
+  const priority = { reactor: 0, armor: 1, jet: 2, gourd: 3, cannon: 4, drone: 5 };
+  return modules.slice().sort(function (left, right) {
+    return priority[left.id] - priority[right.id];
+  });
+}
+
+function moduleSequenceMarkup(modules) {
+  return sortAwakeningModules(modules)
+    .map(function (card, index) {
+      const arrow = index
+        ? '<span class="module-sequence-arrow" aria-hidden="true">→</span>'
+        : "";
+      return arrow + moduleIconMarkup(card);
+    })
+    .join("");
+}
+
+function describeAwakeningSequence(modules) {
+  const ordered = sortAwakeningModules(modules);
+  if (!ordered.length) {
+    return {
+      title: "选择本次唤醒部件",
+      effect: "选择后将按实际介入顺序预览协同路径",
+    };
+  }
+  if (ordered.length === 1) {
+    return {
+      title: ordered[0].name + " · 独立接入",
+      effect: ordered[0].role + "部件将在首轮攻击中独立生效",
+    };
+  }
+  const relations = ordered.slice(1).map(function (card, index) {
+    const previous = ordered[index];
+    const rule = linkRules[previous.id + ">" + card.id];
+    return rule ? rule.name : previous.role + "接续" + card.role;
+  });
+  return {
+    title: ordered.map(function (card) { return card.name; }).join(" → "),
+    effect: relations.join(" · ") + "，将按此路径自动介入",
+  };
 }
 
 function renderChain() {
-  const active = state.chain.length > 0;
-  const displayed = active ? state.chain : state.lastResolvedChain;
-  const count = displayed.length;
-  ui.liveChainPanel.classList.toggle("active", active);
-  ui.liveChainPanel.classList.toggle("resolved", !active && count > 0);
-  ui.chainCount.textContent = count ? "×" + count : "0";
-  ui.chainTitle.textContent = active
-    ? chainTiers[Math.min(count, chainTiers.length - 1)]
-    : state.lastChainTitle || chainTiers[0];
-  if (!count) {
-    ui.chainLane.innerHTML = '<span class="chain-placeholder">选择挂件卡接入下一次攻击</span>';
-    ui.chainComboReadout.classList.add("hidden");
-    ui.chainTimerBar.style.width = "0%";
+  const selectedCards = selectedAwakeningCards();
+  const preview = describeAwakeningSequence(selectedCards);
+  ui.awakeningPreviewTitle.textContent = preview.title;
+  ui.awakeningPreviewEffect.textContent = preview.effect;
+  ui.awakeningSelection.innerHTML = selectedCards.length
+    ? moduleSequenceMarkup(selectedCards)
+    : '<span class="selection-placeholder">点选下方战甲或挂件能力</span>';
+}
+
+function hasAwakenedModule(cardId) {
+  return state.awakenedModules.some(function (card) {
+    return card.id === cardId;
+  });
+}
+
+function canBeginAwakening() {
+  return (
+    !state.ended &&
+    state.awakening >= MAX_AWAKENING &&
+    !state.videoPending &&
+    !state.videoPlaying &&
+    !state.awakeningActivationPending &&
+    !state.awakeningSelecting &&
+    !state.transforming &&
+    !state.awakened
+  );
+}
+
+function canOpenAwakeningSelection() {
+  return (
+    !state.ended &&
+    state.awakening >= MAX_AWAKENING &&
+    !state.actionActor &&
+    !state.reactionActive &&
+    !state.weaponSwitchPending &&
+    !state.weaponSwitching &&
+    !state.videoPending &&
+    !state.videoPlaying &&
+    !state.awakeningSelecting &&
+    !state.transforming &&
+    !state.awakened
+  );
+}
+
+function moduleIconMarkup(card, index) {
+  return (
+    '<span class="awakened-module-icon" style="--module-color:' +
+    card.color +
+    '"><img src="' +
+    card.icon +
+    '" alt="" /><b>' +
+    (typeof index === "number" ? index + 1 : "") +
+    '</b><small>' +
+    card.name +
+    "</small></span>"
+  );
+}
+
+function renderAwakening() {
+  if (!state || !ui.awakeningButton) {
     return;
   }
-  ui.chainLane.innerHTML = displayed
-    .map(function (entry) {
-      return chainNodeMarkup(entry, active ? "active" : "resolved");
-    })
-    .join("");
+  const percent = Math.max(0, Math.min(100, (state.awakening / MAX_AWAKENING) * 100));
+  const selectedCards = selectedAwakeningCards();
+  const selectedCost = selectedAwakeningCost();
+  const ready = state.awakening >= MAX_AWAKENING;
+  const tierName =
+    state.awakenedModules.length >= 3
+      ? "核心形态联动"
+      : state.awakenedModules.length === 2
+        ? "双部件协同"
+        : "局部唤醒";
 
-  const currentEntry = displayed[count - 1];
-  const previousEntry = count > 1 ? displayed[count - 2] : null;
-  ui.chainComboReadout.classList.toggle("hidden", !previousEntry);
-  if (previousEntry) {
-    ui.chainComboName.textContent = previousEntry.card.name + " × " + currentEntry.card.name;
-    ui.chainComboEffect.textContent = currentEntry.link + " · 效果 +" + currentEntry.comboBonus + "%";
+  ui.awakeningBar.style.width = percent + "%";
+  ui.awakeningRing.style.setProperty("--awakening-progress", percent + "%");
+  ui.awakeningText.textContent = Math.round(state.awakening) + " / " + MAX_AWAKENING;
+  ui.awakeningButton.disabled = !canBeginAwakening();
+  ui.awakeningButton.classList.toggle(
+    "ready",
+    ready && !state.awakeningSelecting && !state.transforming && !state.awakened,
+  );
+  ui.awakeningButton.classList.toggle("active", state.awakened);
+  ui.awakeningButtonLabel.textContent = state.awakeningSelecting
+    ? "选择唤醒部件"
+    : state.transforming
+      ? "核心展开中"
+      : state.awakened
+        ? tierName
+        : state.awakeningActivationPending
+          ? "等待动作结束"
+        : ready
+          ? "手动激活"
+          : "自动积累中";
+  ui.awakeningButton.setAttribute(
+    "aria-label",
+    state.awakened
+      ? "战甲状态生效，剩余" + state.awakenedAttacksRemaining + "回合"
+      : "战甲唤醒进度" + Math.round(percent) + "%",
+  );
+
+  ui.awakeningSelectionCount.textContent = selectedCards.length
+    ? selectedCards.length + "个部件 · " + (selectedCards.length > 1 ? "协同路径" : "独立接入")
+    : "未选择 · 最多" + MAX_AWAKENING_SELECTION + "个";
+  ui.awakeningSelectionCost.textContent = "消耗 " + selectedCost + " / " + state.energy;
+  ui.awakeningConfirm.disabled = !selectedCards.length || selectedCost > state.energy;
+
+  ui.awakenedStatus.classList.toggle("hidden", !state.awakened);
+  if (state.awakened) {
+    const orderedModules = sortAwakeningModules(state.awakenedModules);
+    ui.awakenedStatusName.textContent =
+      orderedModules.length > 1 ? "协同路径已装载" : orderedModules[0].name + "已唤醒";
+    ui.awakenedStatusModules.innerHTML = moduleSequenceMarkup(orderedModules);
+    ui.awakenedTurns.textContent =
+      state.awakenedAttacksRemaining === AWAKENED_PLAYER_TURNS ? "待介入" : "待终结";
   }
+
+  const persistentCards = state.awakeningSelecting ? selectedCards : state.awakenedModules;
+  ui.playerUnit.querySelectorAll(".module-socket").forEach(function (socket) {
+    const active = persistentCards.some(function (card) {
+      return card.id === socket.dataset.socket;
+    });
+    socket.classList.toggle("selected", active && state.awakeningSelecting);
+    socket.classList.toggle("awakened", active && (state.awakened || state.transforming));
+  });
+  ui.playerUnit.classList.toggle(
+    "armor-module-active",
+    persistentCards.some(function (card) {
+      return card.id === "armor";
+    }),
+  );
+  ui.droneUnit.classList.toggle(
+    "selected",
+    persistentCards.some(function (card) {
+      return card.id === "drone";
+    }),
+  );
+}
+
+function advanceAwakeningAutomatically(frameDelta) {
+  if (
+    state.ended ||
+    state.awakeningSelecting ||
+    state.transforming ||
+    state.awakened ||
+    state.videoPlaying ||
+    state.awakening >= MAX_AWAKENING
+  ) {
+    return;
+  }
+  const before = state.awakening;
+  state.awakening = Math.min(
+    MAX_AWAKENING,
+    state.awakening + (frameDelta / AWAKENING_CHARGE_DURATION) * MAX_AWAKENING,
+  );
+  if (before < MAX_AWAKENING && state.awakening >= MAX_AWAKENING) {
+    createFloat("战甲就绪", true, "awaken");
+    showMessage("战甲充能完成，可由你选择激活时机与唤醒部件");
+    showLog("修罗战甲完成自动充能，核心保持待命");
+    playFrequencySweep({ wave: "sine", start: 150, end: 520, duration: 0.34 }, 0, 0.045);
+  }
+  if (Math.floor(before) !== Math.floor(state.awakening) || state.awakening >= MAX_AWAKENING) {
+    renderAwakening();
+    renderChain();
+  }
+}
+
+function beginAwakeningSelection() {
+  if (!canBeginAwakening()) {
+    if (state.awakening < MAX_AWAKENING) {
+      showMessage("战甲正在自动积累唤醒值");
+    }
+    return;
+  }
+  if (!canOpenAwakeningSelection()) {
+    state.awakeningActivationPending = true;
+    ui.liveHint.textContent = "已下达唤醒指令 · 当前动作结束后打开部件选择";
+    showMessage("已决定激活核心，等待当前攻防动作结束");
+    renderAwakening();
+    return;
+  }
+  openAwakeningSelection();
+}
+
+function openAwakeningSelection() {
+  state.awakeningActivationPending = false;
+  state.awakeningSelecting = true;
+  state.awakeningSelectedUids = [];
+  closeWeaponMenu();
+  ui.battlefield.classList.add("awakening-selecting", "intervention-focus");
+  ui.commandDeck.classList.add("awakening-selecting");
+  ui.awakeningConsole.classList.remove("hidden");
+  ui.awakeningConsole.setAttribute("aria-hidden", "false");
+  ui.liveHint.textContent = "时间放缓 · 选择要接入核心形态的部件";
+  showMessage("修罗战甲响应，选择本次要唤醒的战甲与挂件能力");
+  playFrequencySweep({ wave: "sine", start: 118, end: 54, duration: 0.48 }, 0, 0.034);
+  renderStatus();
+  renderCards();
+  renderChain();
+}
+
+function cancelAwakeningSelection() {
+  if (!state.awakeningSelecting) {
+    return;
+  }
+  state.awakeningSelecting = false;
+  state.awakeningSelectedUids = [];
+  state.awakeningActivationPending = false;
+  ui.battlefield.classList.remove("awakening-selecting", "intervention-focus");
+  ui.commandDeck.classList.remove("awakening-selecting");
+  ui.awakeningConsole.classList.add("hidden");
+  ui.awakeningConsole.setAttribute("aria-hidden", "true");
+  ui.liveHint.textContent = "核心保持待命，你可以稍后再次手动激活";
+  renderStatus();
+  renderCards();
+  renderChain();
+}
+
+function toggleAwakeningCard(cardInstanceId) {
+  if (!state.awakeningSelecting) {
+    showMessage(
+      state.awakening >= MAX_AWAKENING
+        ? "先点击“唤醒核心”，再选择要激活的部件"
+        : "唤醒值会随战斗时间自动积累",
+    );
+    return;
+  }
+  const instance = state.hand.find(function (item) {
+    return item.uid === cardInstanceId;
+  });
+  if (!instance) {
+    return;
+  }
+  const selectedIndex = state.awakeningSelectedUids.indexOf(cardInstanceId);
+  if (selectedIndex >= 0) {
+    state.awakeningSelectedUids.splice(selectedIndex, 1);
+  } else {
+    const card = getCard(instance.cardId);
+    if (state.awakeningSelectedUids.length >= MAX_AWAKENING_SELECTION) {
+      showMessage("一次核心形态最多唤醒三个部件");
+      return;
+    }
+    if (selectedAwakeningCost() + card.cost > state.energy) {
+      showMessage("战甲能量不足，无法把该部件接入本次形态");
+      return;
+    }
+    state.awakeningSelectedUids.push(cardInstanceId);
+    pulseSocket(card.id);
+    playTone(state.awakeningSelectedUids.length - 1, state.awakeningSelectedUids.length >= 3, false);
+  }
+  renderCards();
+  renderAwakening();
+  renderChain();
+}
+
+function consumeAwakeningSelection() {
+  const selectedSet = new Set(state.awakeningSelectedUids);
+  const consumed = state.hand.filter(function (instance) {
+    return selectedSet.has(instance.uid);
+  });
+  state.hand = state.hand.filter(function (instance) {
+    return !selectedSet.has(instance.uid);
+  });
+  state.discardPile.push.apply(state.discardPile, consumed);
+  while (state.hand.length < MAX_HAND_SIZE) {
+    let nextCard = takeUniqueCard(state.drawPile, state.hand);
+    if (!nextCard && state.discardPile.length) {
+      state.drawPile = shuffleItems(state.drawPile.concat(state.discardPile));
+      state.discardPile = [];
+      nextCard = takeUniqueCard(state.drawPile, state.hand);
+    }
+    if (!nextCard) {
+      break;
+    }
+    state.hand.push(nextCard);
+  }
+}
+
+function confirmAwakeningSelection() {
+  if (!state.awakeningSelecting) {
+    return;
+  }
+  const modules = selectedAwakeningCards();
+  const totalCost = selectedAwakeningCost();
+  if (!modules.length || totalCost > state.energy) {
+    return;
+  }
+  const now = performance.now();
+  const currentRun = state.runId;
+  state.energy -= totalCost;
+  state.awakening = 0;
+  state.awakeningActivationPending = false;
+  state.awakeningSelecting = false;
+  state.transforming = true;
+  state.transformStartedAt = now;
+  state.awakenedModules = modules.slice();
+  state.awakenedAttacksRemaining = AWAKENED_PLAYER_TURNS;
+  state.awakenedVolleyReleased = false;
+  state.awakenedVideoShown = false;
+  consumeAwakeningSelection();
+  state.awakeningSelectedUids = [];
+
+  ui.battlefield.classList.remove("awakening-selecting", "intervention-focus");
+  ui.battlefield.classList.add("armor-transforming");
+  ui.commandDeck.classList.remove("awakening-selecting");
+  ui.awakeningConsole.classList.add("hidden");
+  ui.awakeningConsole.setAttribute("aria-hidden", "true");
+  ui.armorTransformCinematic.classList.remove("hidden");
+  ui.armorTransformCinematic.setAttribute("aria-hidden", "false");
+  ui.transformModules.innerHTML = moduleSequenceMarkup(modules);
+  ui.liveHint.textContent = "核心启动 · 战甲部件正在展开";
+  showMessage("修罗战甲唤醒，" + modules.length + "个部件接入核心形态");
+  pulseCombatClass("shake", 520);
+  playFrequencySweep({ wave: "sawtooth", start: 86, end: 390, duration: 0.52 }, 0, 0.05);
+  renderCards();
+  renderStatus();
+  renderChain();
+
+  window.setTimeout(function () {
+    finishArmorTransform(currentRun);
+  }, ARMOR_TRANSFORM_DURATION);
+}
+
+function finishArmorTransform(currentRun) {
+  if (!state || state.runId !== currentRun || !state.transforming || state.ended) {
+    return;
+  }
+  const now = performance.now();
+  const elapsed = Math.max(0, now - state.transformStartedAt);
+  state.nextTurnAt += elapsed;
+  state.nextEnergyAt += elapsed;
+  state.lastPlayerActionAt += elapsed;
+  state.nextPlayerAt += elapsed;
+  state.transforming = false;
+  state.transformStartedAt = 0;
+  state.awakened = true;
+  state.nextTurnAt = Math.max(state.nextTurnAt, now + 360);
+  state.nextPlayerAt = Math.max(state.nextPlayerAt, state.nextTurnAt);
+  ui.battlefield.classList.remove("armor-transforming");
+  ui.battlefield.classList.add("armor-awakened");
+  ui.commandDeck.classList.add("armor-awakened");
+  ui.armorTransformCinematic.classList.add("hidden");
+  ui.armorTransformCinematic.setAttribute("aria-hidden", "true");
+  ui.liveHint.textContent = "核心形态生效 · 下一次攻击将由已选部件依次介入";
+  showMessage("核心形态完成，部件联动将在接下来的两个玩家回合生效");
+  renderStatus();
+  renderCards();
+  renderChain();
+}
+
+function sortedAwakenedModules() {
+  return sortAwakeningModules(state.awakenedModules);
+}
+
+function applyAwakenedModule(card, index, previous) {
+  if (!state || state.ended) {
+    return;
+  }
+  const link = {
+    name: previous ? previous.name + "协同" : "核心形态供能",
+    bonus: 0.12 + index * 0.04,
+  };
+  if (card.video && !state.awakenedVideoShown && !state.videoPending && !state.videoPlaying) {
+    state.awakenedVideoShown = true;
+    state.videoPending = {
+      card: card,
+      chainIndex: index + 1,
+      link: link,
+      comboBonus: Math.round((index * 0.13 + link.bonus) * 100),
+      previous: previous,
+      queuedAt: performance.now(),
+      runId: state.runId,
+    };
+    return;
+  }
+  applyCardEffect(card, index + 1, link);
+}
+
+function triggerAwakenedVolley() {
+  const modules = sortedAwakenedModules();
+  const currentRun = state.runId;
+  modules.forEach(function (card, index) {
+    window.setTimeout(function () {
+      if (!state || state.runId !== currentRun || state.ended) {
+        return;
+      }
+      applyAwakenedModule(card, index, index > 0 ? modules[index - 1] : null);
+    }, 180 + index * 230);
+  });
+  showMessage(
+    (modules.length > 1 ? "协同路径启动：" : "部件介入：") +
+      modules.map(function (card) { return card.name; }).join(" → "),
+  );
+}
+
+function resolveAwakenedFinisher() {
+  const count = state.awakenedModules.length;
+  const finisherDamage = [0, 10, 22, 38][Math.min(3, count)];
+  const targetId = getIntent().part;
+  const result = damagePart(targetId, finisherDamage, Math.round(finisherDamage * 1.5));
+  state.intentPressure += Math.round(finisherDamage * 0.9);
+  createFloat("形态终结 -" + result.bossDamage, false);
+  createUnitBurst(ui.bossUnit, 0.5, 0.42, count >= 3 ? "#fff1a0" : "#71dfff");
+  if (count >= 2) {
+    createUnitBeam(ui.playerUnit, 0.58, 0.32, ui.bossUnit, 0.48, 0.4, "#73dcff");
+  }
+  if (count >= 3) {
+    createUnitBeam(ui.playerUnit, 0.58, 0.48, ui.bossUnit, 0.52, 0.48, "#ffae56");
+    pulseCombatClass("boss-stagger", 760);
+    pulseCombatClass("shake", 560);
+  }
+  showMessage(
+    chainTiers[Math.min(count, chainTiers.length - 1)] +
+      "完成，Boss出现明显失衡，追加 " +
+      result.bossDamage +
+      " 点伤害",
+  );
+  renderStatus();
+  renderBossParts();
+  renderBossSprite();
+  checkIntentInterrupted(performance.now());
+  checkBattleEnd();
+}
+
+function handleAwakenedAttackResolved() {
+  if (!state.awakened || state.ended) {
+    return;
+  }
+  const isFirstAttack = state.awakenedAttacksRemaining === AWAKENED_PLAYER_TURNS;
+  if (isFirstAttack) {
+    state.awakenedVolleyReleased = true;
+    triggerAwakenedVolley();
+  } else {
+    resolveAwakenedFinisher();
+  }
+  state.awakenedAttacksRemaining = Math.max(0, state.awakenedAttacksRemaining - 1);
+  renderAwakening();
+  renderChain();
+  if (state.awakenedAttacksRemaining <= 0) {
+    const currentRun = state.runId;
+    window.setTimeout(function () {
+      endAwakenedState(currentRun);
+    }, 980);
+  }
+}
+
+function endAwakenedState(currentRun) {
+  if (!state || state.runId !== currentRun || !state.awakened) {
+    return;
+  }
+  state.lastResolvedChain = state.awakenedModules.map(function (card) {
+    return { card: card };
+  });
+  state.lastChainTitle = "核心形态解除";
+  state.awakened = false;
+  state.awakenedModules = [];
+  state.awakenedAttacksRemaining = 0;
+  state.awakenedVolleyReleased = false;
+  state.awakenedVideoShown = false;
+  ui.battlefield.classList.remove("armor-awakened");
+  ui.commandDeck.classList.remove("armor-awakened");
+  ui.liveHint.textContent = "战甲回归常态，下一轮唤醒值开始自动积累";
+  showMessage("核心形态解除，战甲进入新一轮充能");
+  renderStatus();
+  renderCards();
+  renderChain();
+  window.setTimeout(function () {
+    if (!state || state.runId !== currentRun || state.awakened) {
+      return;
+    }
+    state.lastResolvedChain = [];
+    state.lastChainTitle = "";
+    renderChain();
+  }, 1800);
 }
 
 function renderIntentBase() {
@@ -896,8 +1480,6 @@ function updateChainTimer(now) {
     return;
   }
   const remaining = state.chainDeadline - now;
-  const progress = Math.max(0, Math.min(1, remaining / state.chainWindow));
-  ui.chainTimerBar.style.width = progress * 100 + "%";
   if (remaining <= 0) {
     resolveChain();
   }
@@ -907,13 +1489,19 @@ function updateEnergyCharge(now) {
   if (state.energy >= MAX_ENERGY) {
     state.nextEnergyAt = now + ENERGY_INTERVAL;
     ui.energyChargeBar.style.width = "100%";
+    ui.energyRate.style.setProperty("--energy-charge-angle", "270deg");
+    ui.energyRate.style.setProperty("--energy-charge-mid-angle", "157deg");
+    ui.energyRate.style.setProperty("--energy-needle-angle", "120deg");
     ui.energyChargeLabel.textContent = "能量已满";
     return;
   }
   const remaining = Math.max(0, state.nextEnergyAt - now);
   const progress = Math.max(0, Math.min(1, 1 - remaining / ENERGY_INTERVAL));
   ui.energyChargeBar.style.width = progress * 100 + "%";
-  ui.energyChargeLabel.textContent = "+1 / 3s";
+  ui.energyRate.style.setProperty("--energy-charge-angle", progress * 270 + "deg");
+  ui.energyRate.style.setProperty("--energy-charge-mid-angle", progress * 157 + "deg");
+  ui.energyRate.style.setProperty("--energy-needle-angle", -120 + progress * 240 + "deg");
+  ui.energyChargeLabel.textContent = "恢复 +1 / 3s";
 }
 
 function renderBossParts() {
@@ -983,7 +1571,6 @@ function maybeStartIntervention(now) {
   state.interventionShownForAttack = state.playerAttackSerial;
   ui.battlefield.classList.add("intervention-focus");
   ui.commandDeck.classList.add("intervention-window");
-  ui.liveChainPanel.classList.add("intervention-window");
   ui.liveHint.textContent = "慢动作介入 · 在下一次武器攻击前接入挂件";
   renderStatus();
   playFrequencySweep({ wave: "sine", start: 118, end: 62, duration: 0.42 }, 0, 0.028);
@@ -1012,7 +1599,6 @@ function endIntervention(reason, now) {
   state.interventionEndsAt = 0;
   ui.battlefield.classList.remove("intervention-focus");
   ui.commandDeck.classList.remove("intervention-window");
-  ui.liveChainPanel.classList.remove("intervention-window");
 
   if (reason === "card") {
     const releaseAt = now + INTERVENTION_RELEASE_DELAY;
@@ -1042,6 +1628,24 @@ function tickBattle() {
   const now = performance.now();
   const frameDelta = Math.max(0, now - state.lastFrameAt);
   state.lastFrameAt = now;
+  advanceAwakeningAutomatically(frameDelta);
+  if (state.awakeningActivationPending && canOpenAwakeningSelection()) {
+    openAwakeningSelection();
+    return;
+  }
+  if (state.awakeningSelecting) {
+    state.nextTurnAt += frameDelta;
+    state.nextPlayerAt += frameDelta;
+    state.nextEnergyAt += frameDelta;
+    state.playerCycleDuration += frameDelta;
+    updateAutoActionMeter(now);
+    updateIntentTimer(now);
+    updateEnergyCharge(now);
+    return;
+  }
+  if (state.transforming) {
+    return;
+  }
   if (state.weaponSwitching) {
     return;
   }
@@ -1067,7 +1671,6 @@ function tickBattle() {
       renderStatus();
     }
   }
-  maybeStartIntervention(now);
   if (now >= state.nextTurnAt) {
     if (state.turnActor === "player") {
       executeAutoAttack(now);
@@ -1094,7 +1697,8 @@ function executeAutoAttack(now) {
   state.lastPlayerActionAt = now;
   state.playerCycleDuration = BOSS_TURN_INTERVAL + weapon.attackInterval;
   state.nextPlayerAt = now + state.playerCycleDuration;
-  const bonus = state.nextAutoBonus;
+  const formBonus = state.awakened ? 5 + state.awakenedModules.length * 3 : 0;
+  const bonus = state.nextAutoBonus + formBonus;
   state.nextAutoBonus = 0;
   ui.autoActionText.textContent = "玩家回合 · " + action.name;
   pulseCombatClass("player-turn", weapon.recoverDelay);
@@ -1131,6 +1735,9 @@ function settlePlayerAttack(action, bonus, now) {
   triggerWeaponAttackFx(currentWeaponMode(), Boolean(bonus));
   playWeaponAttackSound(currentWeaponMode());
   showLog(currentWeaponMode().name + "自动使用“" + action.name + "”，造成 " + result.bossDamage + " 点伤害");
+  if (state.awakened) {
+    handleAwakenedAttackResolved();
+  }
   renderStatus();
   renderBossParts();
   renderBossSprite();
@@ -1139,74 +1746,7 @@ function settlePlayerAttack(action, bonus, now) {
 }
 
 function activateCard(cardInstanceId, sourceButton) {
-  if (
-    state.ended ||
-    state.videoPlaying ||
-    state.videoPending ||
-    state.weaponSwitchPending ||
-    state.weaponSwitching
-  ) {
-    return;
-  }
-  const handIndex = state.hand.findIndex(function (instance) {
-    return instance.uid === cardInstanceId;
-  });
-  if (handIndex < 0) {
-    return;
-  }
-  const instance = state.hand[handIndex];
-  const card = getCard(instance.cardId);
-  const now = performance.now();
-  if (state.energy < card.cost) {
-    showMessage("战甲能量不足，模块无法启动");
-    return;
-  }
-  if (state.chain.length && now >= state.chainDeadline) {
-    resolveChain();
-  }
-  endIntervention("card", now);
-
-  const previous = state.chain.length ? state.chain[state.chain.length - 1].card : null;
-  const link = previous ? getLink(previous, card) : getWeaponCardLink(card);
-  const chainIndex = state.chain.length;
-  const comboBonus = Math.round((chainIndex * 0.13 + link.bonus) * 100);
-  state.energy -= card.cost;
-  state.chain.push({ card: card, link: link.name, bonus: link.bonus, comboBonus: comboBonus });
-  state.chainWindow = BASE_CHAIN_WINDOW + (hasCardInChain("armor") ? 650 : 0);
-  state.chainDeadline = now + state.chainWindow;
-  ui.liveHint.textContent = link.name + "，继续接入卡牌可延长并强化连携";
-  createCardProjectile(card, sourceButton);
-  state.hand.splice(handIndex, 1);
-  state.discardPile.push(instance);
-  if (card.video) {
-    state.videoPending = {
-      card: card,
-      chainIndex: chainIndex,
-      link: link,
-      comboBonus: comboBonus,
-      previous: previous,
-      queuedAt: now,
-      runId: state.runId,
-    };
-  }
-  drawNextCard();
-  renderStatus();
-  renderChain();
-  playTone(state.chain.length - 1, state.chain.length >= 3, false);
-
-  const currentRun = state.runId;
-  if (!card.video) {
-    window.setTimeout(function () {
-      if (!state || state.runId !== currentRun || state.ended) {
-        return;
-      }
-      applyCardEffect(card, chainIndex, link);
-    }, 300);
-  }
-
-  if (state.chain.length >= 5 && !card.video) {
-    scheduleMaxChainResolve(currentRun, 640);
-  }
+  toggleAwakeningCard(cardInstanceId);
 }
 
 function scheduleMaxChainResolve(currentRun, delay) {
@@ -1277,11 +1817,12 @@ function renderModuleVideoCombo(payload) {
   });
 
   if (payload.previous) {
-    ui.moduleVideoComboName.textContent = payload.previous.name + " × " + payload.card.name;
-    ui.moduleVideoComboEffect.textContent = payload.link.name + " · 本次效果 +" + payload.comboBonus + "%";
+    ui.moduleVideoComboName.textContent = payload.previous.name + " → " + payload.card.name;
+    ui.moduleVideoComboEffect.textContent =
+      payload.link.name + " · 前置部件完成后触发当前挂件";
   } else {
     ui.moduleVideoComboName.textContent = "独立启动";
-    ui.moduleVideoComboEffect.textContent = "继续接入挂件可形成联动";
+    ui.moduleVideoComboEffect.textContent = "无前置条件，直接结算自身效果";
   }
 }
 
@@ -1366,7 +1907,7 @@ function applyCardEffect(card, chainIndex, link) {
     const healing = Math.min(MAX_PLAYER_HP - state.playerHp, Math.round(24 * multiplier));
     state.playerHp += healing;
     createFloat(healing > 0 ? "+" + healing : "生命已满", true, "heal");
-    createBurst("24%", "52%", card.color);
+    createUnitBurst(ui.playerUnit, 0.5, 0.52, card.color);
     showMessage(healing > 0 ? "酒葫芦恢复 " + healing + " 点生命" : "生命已满，酒意转化为连携节奏");
     showLog("酒葫芦已接入挂件链条");
   }
@@ -1385,7 +1926,7 @@ function applyModuleHit(card, damage, armorDamage, pressure) {
   const result = damagePart(targetId, damage, armorDamage);
   state.intentPressure += pressure;
   createFloat("-" + result.bossDamage, false);
-  createBurst("70%", "42%", card.color);
+  createUnitBurst(ui.bossUnit, 0.5, 0.42, card.color);
   pulseCombatClass("boss-hit", 360);
   pulseCombatClass("shake", 360);
   showMessage(
@@ -1430,19 +1971,18 @@ function resolveChain() {
   state.chainDeadline = 0;
   state.lastResolvedChain = resolved;
   state.lastChainTitle = title;
-  ui.chainTimerBar.style.width = "0%";
 
   if (finisher > 0) {
     const targetId = getIntent().part;
     const result = damagePart(targetId, finisher, Math.round(finisher * 1.35));
     state.intentPressure += Math.round(finisher * 0.8);
     createFloat("联携 -" + result.bossDamage, false);
-    createBurst("69%", "42%", count >= 4 ? "#fff0a7" : "#67d5ff");
+    createUnitBurst(ui.bossUnit, 0.5, 0.42, count >= 4 ? "#fff0a7" : "#67d5ff");
     if (count >= 3) {
-      createBeam("28%", "32%", "47%", "7deg", "#71dcff");
+      createUnitBeam(ui.playerUnit, 0.58, 0.32, ui.bossUnit, 0.48, 0.4, "#71dcff");
     }
     if (count >= 4) {
-      createBeam("31%", "40%", "43%", "-8deg", "#ffb25c");
+      createUnitBeam(ui.playerUnit, 0.58, 0.48, ui.bossUnit, 0.52, 0.48, "#ffb25c");
       pulseCombatClass("shake", 520);
     }
     showMessage(title + "完成，追加 " + result.bossDamage + " 点连携伤害");
@@ -1562,12 +2102,21 @@ function settleBossAttack(intent) {
     damage = 0;
     feedback.push(choice === "left" ? "左闪成功" : "右闪成功");
     pulseCombatClass(choice === "left" ? "player-dodge-left" : "player-dodge-right", 620);
+    if (state.awakened && hasAwakenedModule("jet")) {
+      feedback.push("喷气变轨");
+      pulseCombatClass("awakened-dodge", 720);
+      createUnitBurst(ui.playerUnit, 0.54, 0.48, "#62dfff");
+    }
   } else if (validResponse && choice === "block") {
     damage = Math.max(1, Math.round(damage * 0.28));
     feedback.push("格挡成功");
     pulseCombatClass("player-block", 620);
     state.bossHp = Math.max(0, state.bossHp - 4);
     createFloat("弹反 -4", false);
+    if (state.awakened && hasAwakenedModule("armor")) {
+      damage = Math.max(1, Math.round(damage * 0.45));
+      feedback.push("战甲稳固");
+    }
   } else if (choice) {
     feedback.push("应对方向错误");
   } else {
@@ -1584,12 +2133,16 @@ function settleBossAttack(intent) {
     state.jetGuard = false;
     feedback.push("喷气变轨");
   }
+  if (damage > 0 && state.awakened) {
+    damage = Math.max(1, Math.round(damage * 0.84));
+    feedback.push("核心形态承压");
+  }
   state.playerHp = Math.max(0, state.playerHp - damage);
   if (damage > 0) {
     pulseCombatClass("shake", 460);
     pulseCombatClass("player-hit", 420);
     createFloat("-" + damage, true);
-    createBurst("24%", "53%", "#de554d");
+    createUnitBurst(ui.playerUnit, 0.5, 0.53, "#de554d");
   } else {
     createFloat("闪避", true);
   }
@@ -1683,7 +2236,7 @@ function triggerModuleFx(card, chainIndex) {
   }, 780);
 
   if (card.id === "armor") {
-    createBurst("22%", "48%", card.color);
+    createUnitBurst(ui.playerUnit, 0.42, 0.48, card.color);
   } else if (card.id === "reactor") {
     pulseSocket("reactor");
   } else if (card.id === "jet") {
@@ -1691,15 +2244,15 @@ function triggerModuleFx(card, chainIndex) {
     pulseCombatClass("jet-lift", 760);
   } else if (card.id === "cannon") {
     pulseSocket("cannon");
-    createBeam("31%", "34%", "42%", "4deg", card.color);
+    createUnitBeam(ui.playerUnit, 0.68, 0.28, ui.bossUnit, 0.46, 0.42, card.color);
   } else if (card.id === "drone") {
     ui.droneUnit.classList.add("active");
-    createBeam("35%", "29%", "38%", "12deg", card.color);
+    createUnitBeam(ui.droneUnit, 0.5, 0.5, ui.bossUnit, 0.45, 0.36, card.color);
     window.setTimeout(function () {
       ui.droneUnit.classList.remove("active");
     }, 720);
   } else if (card.id === "gourd") {
-    createBurst("24%", "51%", card.color);
+    createUnitBurst(ui.playerUnit, 0.5, 0.51, card.color);
     pulseCombatClass("player-heal", 720);
   }
   if (chainIndex >= 2) {
@@ -1710,19 +2263,19 @@ function triggerModuleFx(card, chainIndex) {
 function triggerWeaponAttackFx(weapon, boosted) {
   const hitColor = boosted ? "#79e7ff" : weapon.color;
   if (weapon.id === "fists") {
-    createBurst("68%", "40%", hitColor);
+    createUnitBurst(ui.bossUnit, 0.43, 0.38, hitColor);
     window.setTimeout(function () {
-      createBurst("72%", "46%", hitColor);
+      createUnitBurst(ui.bossUnit, 0.6, 0.48, hitColor);
     }, 115);
     pulseCombatClass("weapon-hit-fists", 360);
   } else if (weapon.id === "greatsword") {
-    createBeam("35%", "31%", "39%", "-9deg", hitColor);
-    createBurst("70%", "43%", hitColor);
+    createUnitBeam(ui.playerUnit, 0.62, 0.34, ui.bossUnit, 0.5, 0.43, hitColor);
+    createUnitBurst(ui.bossUnit, 0.5, 0.43, hitColor);
     pulseCombatClass("weapon-hit-greatsword", 520);
     pulseCombatClass("shake", 280);
   } else {
-    createBeam("31%", "43%", "43%", "-2deg", hitColor);
-    createBurst("70%", "42%", hitColor);
+    createUnitBeam(ui.playerUnit, 0.58, 0.42, ui.bossUnit, 0.5, 0.42, hitColor);
+    createUnitBurst(ui.bossUnit, 0.5, 0.42, hitColor);
     pulseCombatClass("weapon-hit-bow", 420);
   }
 }
@@ -1747,15 +2300,48 @@ function pulseCombatClass(className, duration) {
 }
 
 function createFloat(text, player, kind) {
+  const point = getCombatPoint(player ? ui.playerUnit : ui.bossUnit, 0.5, player ? 0.28 : 0.34);
   const item = document.createElement("b");
   item.className = "damage-float" + (player ? " player" : "") + (kind ? " " + kind : "");
-  item.style.setProperty("--x", player ? "24%" : "70%");
-  item.style.setProperty("--y", player ? "55%" : "42%");
+  item.style.setProperty("--x", point.x);
+  item.style.setProperty("--y", point.y);
   item.textContent = text;
   ui.floatingLayer.appendChild(item);
   window.setTimeout(function () {
     item.remove();
   }, 950);
+}
+
+function getCombatPoint(element, xRatio, yRatio) {
+  const stageRect = ui.battlefield.getBoundingClientRect();
+  const elementRect = element.getBoundingClientRect();
+  const x = Math.max(0, Math.min(stageRect.width, elementRect.left - stageRect.left + elementRect.width * xRatio));
+  const y = Math.max(0, Math.min(stageRect.height, elementRect.top - stageRect.top + elementRect.height * yRatio));
+  return {
+    x: (x / stageRect.width) * 100 + "%",
+    y: (y / stageRect.height) * 100 + "%",
+    xPixels: x,
+    yPixels: y,
+  };
+}
+
+function createUnitBurst(element, xRatio, yRatio, color) {
+  const point = getCombatPoint(element, xRatio, yRatio);
+  createBurst(point.x, point.y, color);
+}
+
+function createUnitBeam(fromElement, fromX, fromY, toElement, toX, toY, color) {
+  const start = getCombatPoint(fromElement, fromX, fromY);
+  const end = getCombatPoint(toElement, toX, toY);
+  const deltaX = end.xPixels - start.xPixels;
+  const deltaY = end.yPixels - start.yPixels;
+  createBeam(
+    start.x,
+    start.y,
+    Math.hypot(deltaX, deltaY) + "px",
+    (Math.atan2(deltaY, deltaX) * 180) / Math.PI + "deg",
+    color,
+  );
 }
 
 function createBurst(x, y, color) {
@@ -1909,6 +2495,9 @@ function endBattle(victory, copy) {
 ui.resetButton.addEventListener("click", resetGame);
 ui.resultRestart.addEventListener("click", resetGame);
 ui.weaponToggle.addEventListener("click", toggleWeaponMenu);
+ui.awakeningButton.addEventListener("click", beginAwakeningSelection);
+ui.awakeningCancel.addEventListener("click", cancelAwakeningSelection);
+ui.awakeningConfirm.addEventListener("click", confirmAwakeningSelection);
 document.addEventListener("pointerdown", function (event) {
   if (
     !ui.weaponSwitchMenu.classList.contains("hidden") &&

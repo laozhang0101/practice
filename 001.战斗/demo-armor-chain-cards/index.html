@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0d10" />
     <title>M98 卡牌版战斗 Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=20260716-intervention-focus-v2" />
+    <link rel="stylesheet" href="./styles.css?v=20260804-card-release" />
   </head>
   <body>
     <main class="game-shell" id="gameShell">
-      <div class="demo-version" aria-label="演示版本">卡牌版 · 2026.07.16 · 慢动作介入</div>
+      <div class="demo-version" aria-label="演示版本">卡牌版 · 2026.08.04 · 自动充能 / 手动唤醒</div>
       <header class="top-hud">
         <section class="fighter-hud" aria-label="玩家状态">
           <img src="./assets/player-avatar.png" alt="" />
@@ -76,9 +76,13 @@
         </div>
 
         <div class="player-unit" id="playerUnit">
+          <div class="armor-form-aura" aria-hidden="true"></div>
+          <div class="armor-energy-route route-left" aria-hidden="true"></div>
+          <div class="armor-energy-route route-right" aria-hidden="true"></div>
           <div class="module-socket socket-reactor" data-socket="reactor"></div>
           <div class="module-socket socket-jet" data-socket="jet"></div>
           <div class="module-socket socket-cannon" data-socket="cannon"></div>
+          <div class="module-socket socket-gourd" data-socket="gourd"></div>
           <img id="playerImage" src="./assets/player-fists.png" alt="玩家战斗化身" />
           <div class="unit-shadow"></div>
         </div>
@@ -95,22 +99,39 @@
           <div class="unit-shadow"></div>
         </div>
 
-        <section class="live-chain-panel" id="liveChainPanel" aria-label="实时连携">
-          <header>
-            <span>实时连携</span>
-            <strong id="chainTitle">等待玩家介入</strong>
-            <b id="chainCount">0</b>
-          </header>
-          <div class="chain-lane" id="chainLane">
-            <span class="chain-placeholder">选择挂件卡接入下一次攻击</span>
+        <section class="awakening-console hidden" id="awakeningConsole" aria-label="选择唤醒部件" aria-hidden="true">
+          <div class="awakening-console-copy">
+            <span>核心形态已响应</span>
+            <strong id="awakeningPreviewTitle">选择本次唤醒部件</strong>
+            <small id="awakeningPreviewEffect">选择后将按实际介入顺序预览协同路径</small>
           </div>
-          <div class="chain-combo-readout hidden" id="chainComboReadout">
-            <span>COMBO</span>
-            <b id="chainComboName">连续接入</b>
-            <small id="chainComboEffect">挂件效果提升</small>
+          <div class="awakening-selection" id="awakeningSelection"></div>
+          <div class="awakening-selection-meta">
+            <span id="awakeningSelectionCount">已选 0 / 3</span>
+            <b id="awakeningSelectionCost">消耗 0</b>
           </div>
-          <div class="chain-window"><i id="chainTimerBar"></i></div>
+          <div class="awakening-actions">
+            <button id="awakeningCancel" type="button">暂不唤醒</button>
+            <button id="awakeningConfirm" type="button" disabled>确认变身</button>
+          </div>
         </section>
+
+        <section class="armor-transform-cinematic hidden" id="armorTransformCinematic" aria-label="战甲变身" aria-hidden="true">
+          <div class="transform-core">
+            <img src="./assets/armor-overdrive.jpeg" alt="" />
+            <i></i>
+          </div>
+          <span>核心形态</span>
+          <strong>修罗战甲 · 唤醒</strong>
+          <div class="transform-modules" id="transformModules"></div>
+        </section>
+
+        <div class="awakened-status hidden" id="awakenedStatus" aria-live="polite">
+          <span>战甲状态</span>
+          <strong id="awakenedStatusName">部件协同</strong>
+          <div id="awakenedStatusModules"></div>
+          <b id="awakenedTurns">2回合</b>
+        </div>
 
         <div class="battle-message" id="battleMessage" aria-live="polite"></div>
         <div class="floating-layer" id="floatingLayer" aria-hidden="true"></div>
@@ -136,7 +157,7 @@
           <div class="module-video-combo" id="moduleVideoCombo">
             <div class="module-video-icons" id="moduleVideoIcons"></div>
             <div>
-              <span>COMBO</span>
+              <span>部件接续</span>
               <strong id="moduleVideoComboName">独立启动</strong>
               <small id="moduleVideoComboEffect">继续接入挂件可形成联动</small>
             </div>
@@ -169,9 +190,24 @@
           </button>
           <div class="weapon-switch-menu hidden" id="weaponSwitchMenu" aria-label="切换武器"></div>
           <div class="live-intervention-copy">
-            <span>实时介入</span>
-            <strong id="liveHint">自动战斗持续进行，介入时刻可接入挂件</strong>
+            <span>核心形态 + 部件唤醒</span>
+            <strong id="liveHint">自动积累唤醒值，激活时机由你决定</strong>
           </div>
+          <button class="awakening-control" id="awakeningButton" type="button" disabled aria-label="战甲唤醒进度0%">
+            <span class="awakening-emblem">
+              <img src="./assets/armor-overdrive.jpeg" alt="" />
+              <i id="awakeningRing"></i>
+            </span>
+            <span class="awakening-copy">
+              <small>修罗战甲</small>
+              <strong id="awakeningButtonLabel">自动积累中</strong>
+              <span class="awakening-meter"><i id="awakeningBar"></i></span>
+              <b id="awakeningText">0 / 100</b>
+            </span>
+          </button>
+        </header>
+
+        <div class="combat-card-cluster" aria-label="能量恢复与技能卡牌">
           <div class="energy-rate" id="energyRate" aria-label="战甲能量：当前6，上限10">
             <span class="energy-orb">
               <i></i>
@@ -179,16 +215,15 @@
               <span class="energy-cap" id="energyCapText">上限 10</span>
             </span>
             <span class="energy-charge-meter" aria-hidden="true"><i id="energyChargeBar"></i></span>
-            <small id="energyChargeLabel">+1 / 3s</small>
+            <small id="energyChargeLabel">恢复 +1 / 3s</small>
           </div>
-        </header>
-
-        <section class="card-hand" id="cardHand" aria-label="战甲与挂件卡牌"></section>
+          <section class="card-hand" id="cardHand" aria-label="战甲与挂件卡牌"></section>
+        </div>
       </section>
 
       <aside class="compact-log" id="compactLog" aria-live="polite"></aside>
     </main>
 
-    <script src="./game.js?v=20260716-intervention-focus-v2"></script>
+    <script src="./game.js?v=20260804-card-release"></script>
   </body>
 </html>
