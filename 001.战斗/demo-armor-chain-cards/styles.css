@@ -10464,6 +10464,10 @@ button:focus-visible {
   outline: 0;
 }
 
+.gm-actions button[data-gm-action="part-break"] {
+  grid-column: 1 / -1;
+}
+
 @media (max-height: 420px) {
   .gm-tools {
     left: 6px;
@@ -10481,5 +10485,57 @@ button:focus-visible {
 
   .gm-actions button {
     min-height: 23px;
+  }
+}
+
+/* Part destruction: five-second Boss knockdown without changing arena placement. */
+.boss-unit.is-stunned .boss-core-pulse {
+  opacity: 0;
+  animation: none;
+}
+
+.boss-unit.is-stunned .boss-visual > img {
+  filter:
+    drop-shadow(0 18px 15px rgba(0, 0, 0, .78))
+    saturate(.92);
+}
+
+.boss-unit.is-stunned .unit-shadow {
+  width: 88%;
+  height: 10%;
+  background: rgba(0, 0, 0, .68);
+}
+
+.damage-float.stun {
+  color: #ffe29a;
+  text-shadow: 0 0 10px rgba(255, 139, 53, .96), 0 2px 3px #000;
+}
+
+.intent-banner.stunned {
+  border-color: rgba(255, 176, 78, .9);
+  background: linear-gradient(180deg, rgba(66, 37, 16, .96), rgba(19, 13, 9, .94));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .42), 0 0 16px rgba(255, 136, 46, .24);
+  animation: boss-stun-banner-pulse 720ms ease-in-out infinite alternate;
+}
+
+.intent-banner.stunned span,
+.intent-banner.stunned > b {
+  color: #ffd08e;
+}
+
+.intent-banner.stunned::after {
+  background: linear-gradient(90deg, #fff0a0, #ff923f);
+  box-shadow: 0 0 9px rgba(255, 170, 72, .88);
+  transition: width 80ms linear;
+}
+
+@keyframes boss-stun-banner-pulse {
+  from { filter: brightness(.94); }
+  to { filter: brightness(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intent-banner.stunned {
+    animation: none;
   }
 }

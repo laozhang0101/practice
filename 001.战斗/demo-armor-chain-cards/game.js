@@ -25,6 +25,7 @@ const INTERVENTION_RELEASE_DELAY = 900;
 const MODULE_FRAME_DURATION = 900;
 const MODULE_VIDEO_TIMEOUT = 12000;
 const MIN_TURN_GAP = 600;
+const BOSS_STUN_DURATION = 5000;
 
 const deckRecipe = ["armor", "reactor", "jet", "cannon", "drone", "gourd", "reactor", "cannon"];
 const openingHandRecipe = ["reactor", "jet", "cannon", "gourd"];
@@ -533,6 +534,7 @@ function createInitialState(selectedStyleId, phase) {
     ultimateInputKey: null,
     ultimateCasting: false,
     ultimateCastStartedAt: 0,
+    ultimateCastPauseApplied: 0,
     awakeningActivationPending: false,
     awakeningSelecting: false,
     awakeningSelectedUids: [],
@@ -544,6 +546,11 @@ function createInitialState(selectedStyleId, phase) {
     awakenedVolleyReleased: false,
     awakenedVideoShown: false,
     bossImpactAt: 0,
+    bossStunned: false,
+    bossStunStartedAt: 0,
+    bossStunEndsAt: 0,
+    bossStunPartId: null,
+    bossStunAdvanceIntent: false,
     actionIndex: 0,
     selectedWeaponId: selectedStyleId || "fists",
     nextEnergyAt: now + ENERGY_INTERVAL,
@@ -851,6 +858,8 @@ function renderStatus() {
     ? "战前准备 · " + (preparationStep === "monster" ? "怪物信息" : "个人装配")
     : state.ended
       ? "战斗结束"
+      : state.bossStunned
+        ? "部位破坏 · Boss眩晕"
       : state.ultimateCasting
         ? "灵魂终结 · 奥义释放"
         : state.ultimateHolding
@@ -930,6 +939,23 @@ function applyGmAction(action) {
     state.playerHp = MAX_PLAYER_HP;
     showMessage("GM：生命已恢复");
     showLog("GM 调试 · 生命恢复至上限");
+  } else if (action === "part-break") {
+    let targetId = getIntent().part;
+    if (state.parts[targetId].hp <= 0) {
+      targetId = ["arms", "core", "legs"].find(function (partId) {
+        return state.parts[partId].hp > 0;
+      });
+    }
+    if (!targetId) {
+      showMessage("GM：所有部位均已破坏");
+      return;
+    }
+    const part = state.parts[targetId];
+    damagePart(targetId, Math.max(1, part.hp), part.armor + part.hp * 2);
+    showLog("GM 调试 · 破坏当前蓄力部位");
+    renderBossParts();
+    renderBossSprite();
+    checkBattleEnd();
   } else {
     return;
   }
@@ -1688,6 +1714,7 @@ function castSoulUltimate(tier) {
   state.soulEnergy = Math.max(0, state.soulEnergy - ultimate.cost);
   state.ultimateCasting = true;
   state.ultimateCastStartedAt = now;
+  state.ultimateCastPauseApplied = 0;
   ui.commandDeck.classList.add("ultimate-casting");
   ui.battlefield.classList.add("ultimate-casting", "ultimate-tier-" + tier);
   ui.ultimateCinematic.className = "ultimate-cinematic ultimate-tier-" + tier;
@@ -1722,24 +1749,30 @@ function applySoulUltimateDamage(ultimate, targetId) {
   }
   const part = state.parts[targetId];
   const hadArmor = part.armor > 0;
+  const hpBefore = part.hp;
   const armorHit = Math.min(part.armor, ultimate.armorDamage);
   part.armor -= armorHit;
   const lifeDamage = Math.min(part.hp, hadArmor ? ultimate.damage : Math.round(ultimate.damage * 1.25));
   part.hp -= lifeDamage;
   state.bossHp = Math.max(0, state.bossHp - lifeDamage);
-  return {
+  const result = {
     bossDamage: lifeDamage,
     armorHit: armorHit,
     partHit: lifeDamage,
     armorBroken: hadArmor && part.armor <= 0,
-    partBroken: part.hp <= 0,
+    partBroken: hpBefore > 0 && part.hp <= 0,
   };
+  if (result.partBroken) {
+    beginBossStun(targetId, performance.now());
+  }
+  return result;
 }
 
 function resolveSoulUltimateImpact(ultimate, currentRun) {
   if (!state || state.runId !== currentRun || state.ended || !state.ultimateCasting) {
     return;
   }
+  applySoulUltimatePause(performance.now());
   const targetId = getIntent().part;
   const target = state.parts[targetId];
   const result = applySoulUltimateDamage(ultimate, targetId);
@@ -1762,7 +1795,7 @@ function resolveSoulUltimateImpact(ultimate, currentRun) {
   showMessage(
     ultimate.name + "命中" + target.name + "，造成" + result.bossDamage + "点伤害" +
       (result.armorHit ? "、" + result.armorHit + "点破甲" : "") +
-      (result.partBroken ? " · 部位摧毁" : ""),
+      (result.partBroken && state.bossHp > 0 ? " · 部位摧毁，Boss眩晕5秒" : ""),
   );
   showLog(ultimate.name + "完成结算，灵魂铠甲消耗" + ultimate.cost + "点灵魂能量");
   renderStatus();
@@ -1772,23 +1805,37 @@ function resolveSoulUltimateImpact(ultimate, currentRun) {
   checkBattleEnd();
 }
 
+function applySoulUltimatePause(now) {
+  if (!state || state.ended || !state.ultimateCasting) {
+    return;
+  }
+  const totalElapsed = Math.max(0, now - state.ultimateCastStartedAt);
+  const elapsed = Math.max(0, totalElapsed - state.ultimateCastPauseApplied);
+  if (elapsed <= 0) {
+    return;
+  }
+  state.nextTurnAt += elapsed;
+  state.lastPlayerActionAt += elapsed;
+  state.nextPlayerAt += elapsed;
+  state.playerCycleDuration += elapsed;
+  if (state.chainDeadline) {
+    state.chainDeadline += elapsed;
+  }
+  if (state.bossStunned) {
+    state.bossStunEndsAt += elapsed;
+  }
+  state.ultimateCastPauseApplied += elapsed;
+}
+
 function finishSoulUltimateCast(currentRun) {
   if (!state || state.runId !== currentRun) {
     return;
   }
   const now = performance.now();
-  const elapsed = Math.max(0, now - state.ultimateCastStartedAt);
-  if (!state.ended) {
-    state.nextTurnAt += elapsed;
-    state.lastPlayerActionAt += elapsed;
-    state.nextPlayerAt += elapsed;
-    state.playerCycleDuration += elapsed;
-    if (state.chainDeadline) {
-      state.chainDeadline += elapsed;
-    }
-  }
+  applySoulUltimatePause(now);
   state.ultimateCasting = false;
   state.ultimateCastStartedAt = 0;
+  state.ultimateCastPauseApplied = 0;
   ui.commandDeck.classList.remove("ultimate-casting");
   ui.battlefield.classList.remove(
     "ultimate-casting",
@@ -2145,13 +2192,147 @@ function endAwakenedState(currentRun) {
 
 function renderIntentBase() {
   const intent = getIntent();
+  ui.intentBanner.classList.remove("stunned");
   ui.intentName.textContent = intent.name;
   ui.intentPartIcon.src = intent.icon;
   ui.intentCue.textContent = intent.cue;
   ui.intentTitle.textContent = intent.title;
 }
 
+function renderBossStunProgress(now) {
+  if (!state || !state.bossStunned) {
+    return;
+  }
+  const remaining = Math.max(0, state.bossStunEndsAt - now);
+  const progress = Math.max(0, Math.min(1, remaining / BOSS_STUN_DURATION));
+  const part = state.parts[state.bossStunPartId] || state.parts[getIntent().part];
+  ui.intentBanner.classList.remove("danger", "interrupted");
+  ui.intentBanner.classList.add("stunned");
+  ui.intentName.textContent = "眩晕";
+  ui.intentPartIcon.src = part.icon;
+  ui.intentCue.textContent = "部位破坏";
+  ui.intentTitle.textContent = "Boss眩晕";
+  ui.intentCounter.textContent = (remaining / 1000).toFixed(1) + "s";
+  ui.intentBanner.style.setProperty("--intent-charge", progress * 100 + "%");
+  ui.partBars.style.setProperty("--part-intent-charge", "0%");
+  ui.autoActionText.textContent = "Boss眩晕 · " + (remaining / 1000).toFixed(1) + "s";
+}
+
+function beginBossStun(partId, now) {
+  if (
+    !state ||
+    state.phase !== "battle" ||
+    state.ended ||
+    state.bossHp <= 0
+  ) {
+    return;
+  }
+  const currentTime = typeof now === "number" ? now : performance.now();
+  const bossWasActing = state.actionActor === "boss";
+  if (bossWasActing || getIntent().part === partId) {
+    state.bossStunAdvanceIntent = true;
+  }
+  if (bossWasActing) {
+    state.actionActor = null;
+    state.activeActionId = 0;
+    state.bossImpactAt = 0;
+    state.reactionActive = false;
+    state.reactionChoice = null;
+  }
+  if (state.bossStunned) {
+    const refreshedEndAt = currentTime + BOSS_STUN_DURATION;
+    const extension = Math.max(0, refreshedEndAt - state.bossStunEndsAt);
+    state.bossStunStartedAt = currentTime;
+    state.bossStunEndsAt = refreshedEndAt;
+    state.bossStunPartId = partId;
+    state.nextTurnAt += extension;
+    state.nextPlayerAt += extension;
+    state.lastPlayerActionAt += extension;
+    if (state.chainDeadline) {
+      state.chainDeadline += extension;
+    }
+    if (state.interventionEndsAt) {
+      state.interventionEndsAt += extension;
+    }
+    ui.liveHint.textContent = "再次破坏部位 · Boss眩晕刷新为5秒";
+    createFloat("眩晕 5.0s", false, "stun");
+    showMessage(state.parts[partId].name + "被破坏，Boss眩晕重新计时5秒");
+    showLog("连续部位破坏刷新Boss眩晕，行动节拍继续暂停");
+    renderBossSprite();
+    renderBossParts();
+    renderBossStunProgress(currentTime);
+    renderReactionControls();
+    renderStatus();
+    return true;
+  }
+
+  state.bossStunned = true;
+  state.bossStunStartedAt = currentTime;
+  state.bossStunEndsAt = currentTime + BOSS_STUN_DURATION;
+  state.bossStunPartId = partId;
+  state.nextTurnAt += BOSS_STUN_DURATION;
+  state.nextPlayerAt += BOSS_STUN_DURATION;
+  state.lastPlayerActionAt += BOSS_STUN_DURATION;
+  if (state.chainDeadline) {
+    state.chainDeadline += BOSS_STUN_DURATION;
+  }
+  if (state.interventionEndsAt) {
+    state.interventionEndsAt += BOSS_STUN_DURATION;
+  }
+
+  ui.battlefield.classList.remove("boss-turn", "boss-stagger");
+  ui.battlefield.classList.add("boss-stunned");
+  ui.liveHint.textContent = "部位破坏 · Boss倒地眩晕，可继续释放挂件";
+  createFloat("眩晕 5.0s", false, "stun");
+  showMessage(state.parts[partId].name + "被破坏，Boss倒地眩晕5秒");
+  showLog("部位破坏触发硬直，Boss行动节拍暂停5秒");
+  playFrequencySweep({ wave: "triangle", start: 190, end: 66, duration: 0.42 }, 0, 0.05);
+  renderBossSprite();
+  renderBossParts();
+  renderBossStunProgress(currentTime);
+  renderReactionControls();
+  renderStatus();
+  return true;
+}
+
+function finishBossStun(now) {
+  if (!state || !state.bossStunned) {
+    return;
+  }
+  const currentTime = typeof now === "number" ? now : performance.now();
+  const shouldAdvanceIntent = state.bossStunAdvanceIntent;
+  state.bossStunned = false;
+  state.bossStunStartedAt = 0;
+  state.bossStunEndsAt = 0;
+  state.bossStunPartId = null;
+  state.bossStunAdvanceIntent = false;
+  state.nextTurnAt = Math.max(state.nextTurnAt, currentTime + 250);
+  if (state.turnActor === "player") {
+    state.nextPlayerAt = Math.max(state.nextPlayerAt, state.nextTurnAt);
+  }
+  ui.battlefield.classList.remove("boss-stunned");
+  ui.liveHint.textContent = "Boss恢复行动 · 严格交替回合继续";
+  ui.autoActionText.textContent = "Boss起身 · 战斗节拍恢复";
+  if (shouldAdvanceIntent) {
+    advanceIntent();
+  } else {
+    renderIntentBase();
+    checkIntentInterrupted(currentTime);
+    renderBossParts();
+    renderReactionControls();
+  }
+  renderBossSprite();
+  renderStatus();
+  if (!state.intentInterrupted) {
+    showMessage("Boss眩晕结束，恢复行动");
+  }
+}
+
 function updateIntentTimer(now) {
+  if (state.bossStunned) {
+    renderBossStunProgress(now);
+    return;
+  }
   const isResolvingBossAttack = state.actionActor === "boss" && state.reactionActive;
   const remaining = isResolvingBossAttack
     ? Math.max(0, state.bossImpactAt - now)
@@ -2198,7 +2379,7 @@ function updateChainTimer(now) {
 
 function renderBossParts() {
   ui.partBars.innerHTML = "";
-  const activePartId = getIntent().part;
+  const activePartId = state.bossStunned ? null : getIntent().part;
   ["arms", "core", "legs"].forEach(function (partId) {
     const part = state.parts[partId];
     const hasArmor = part.armor > 0;
@@ -2249,15 +2430,17 @@ function renderBossParts() {
 }
 
 function renderBossSprite() {
-  let sprite = "./assets/boss.png";
+  let hudSprite = "./assets/boss.png";
   if (state.parts.arms.hp <= 0) {
-    sprite = "./assets/boss-arms-broken.png";
+    hudSprite = "./assets/boss-arms-broken.png";
   } else if (state.parts.legs.hp <= 0) {
-    sprite = "./assets/boss-legs-broken.png";
+    hudSprite = "./assets/boss-legs-broken.png";
   }
-  ui.bossImage.src = sprite;
+  const battlefieldSprite = state.bossStunned ? "./assets/boss-stunned.png" : hudSprite;
+  ui.bossUnit.classList.toggle("is-stunned", state.bossStunned);
+  ui.bossImage.src = battlefieldSprite;
   if (ui.bossHudAvatar) {
-    ui.bossHudAvatar.src = sprite;
+    ui.bossHudAvatar.src = hudSprite;
   }
 }
 
@@ -2351,6 +2534,13 @@ function tickBattle() {
   state.lastFrameAt = now;
   advanceTimedEnergy(now);
   renderEnergyRecoveryProgress(now);
+  if (state.bossStunned) {
+    if (now >= state.bossStunEndsAt) {
+      finishBossStun(now);
+    } else {
+      renderBossStunProgress(now);
+    }
+  }
   if (state.ultimateHolding) {
     updateSoulUltimateHold(now);
     state.nextTurnAt += frameDelta;
@@ -2367,13 +2557,17 @@ function tickBattle() {
   if (state.videoPlaying) {
     return;
   }
-  applyInterventionSlowdown(frameDelta);
-  if (state.interventionActive && now >= state.interventionEndsAt) {
-    endIntervention("timeout", now);
-  }
   if (state.videoPending && !state.actionActor && !state.reactionActive) {
     startPendingModuleVideo();
     return;
+  }
+  if (state.bossStunned) {
+    updateCardStates(now);
+    return;
+  }
+  applyInterventionSlowdown(frameDelta);
+  if (state.interventionActive && now >= state.interventionEndsAt) {
+    endIntervention("timeout", now);
   }
   if (now >= state.nextTurnAt && isAutoTurnIdle()) {
     if (state.turnActor === "player") {
@@ -2412,6 +2606,7 @@ function isAutoTurnIdle() {
     !state.videoPlaying &&
     !state.ultimateHolding &&
     !state.ultimateCasting &&
+    !state.bossStunned &&
     state.lastAutoActor !== state.turnActor
   );
 }
@@ -2484,7 +2679,9 @@ function settlePlayerAttack(action, bonus, now) {
   if (getIntent().part === action.target) {
     state.intentPressure += action.pressure + Math.round(bonus * 0.4);
   }
-  ui.autoActionText.textContent = action.name + "命中 · " + action.targetLabel;
+  ui.autoActionText.textContent = result.partBroken && state.bossHp > 0
+    ? action.targetLabel + "破坏 · Boss眩晕"
+    : action.name + "命中 · " + action.targetLabel;
   pulseCombatClass("boss-hit", 260);
   createFloat("-" + result.bossDamage, false);
   triggerWeaponAttackFx(currentWeaponMode(), Boolean(bonus));
@@ -2698,6 +2895,9 @@ function finishModuleVideo(skipped, expectedPayload) {
   if (state.chainDeadline) {
     state.chainDeadline += elapsed;
   }
+  if (state.bossStunned) {
+    state.bossStunEndsAt += elapsed;
+  }
   if (skipped) {
     showLog("已跳过“" + payload.card.name + "”表现，继续结算挂件效果");
   }
@@ -2787,6 +2987,7 @@ function applyCardEffect(card, chainIndex, link) {
 
 function applyModuleHit(card, damage, armorDamage, pressure) {
   const targetId = getIntent().part;
+  const target = state.parts[targetId];
   const result = damagePart(targetId, damage, armorDamage);
   state.intentPressure += pressure;
   if (result.bossDamage > 0) {
@@ -2801,7 +3002,8 @@ function applyModuleHit(card, damage, armorDamage, pressure) {
   pulseCombatClass("shake", 360);
   showMessage(
     card.name + "轰击" + target.name + "，造成 " + result.bossDamage + " 点伤害" +
-      (result.armorHit ? "，护甲损坏 " + result.armorHit : ""),
+      (result.armorHit ? "，护甲损坏 " + result.armorHit : "") +
+      (result.partBroken && state.bossHp > 0 ? " · 部位破坏，Boss眩晕5秒" : ""),
   );
   showLog(card.name + "已真实介入自动战斗");
 }
@@ -2826,13 +3028,17 @@ function damagePart(partId, damage, armorDamage) {
   }
   const bossDamage = armorBefore > 0 ? Math.max(2, Math.round(damage * 0.2)) : damage;
   state.bossHp = Math.max(0, state.bossHp - bossDamage);
-  return {
+  const result = {
     bossDamage: bossDamage,
     armorHit: armorHit,
     partHit: partHit,
     armorBroken: armorBefore > 0 && part.armor <= 0,
     partBroken: hpBefore > 0 && part.hp <= 0,
   };
+  if (result.partBroken) {
+    beginBossStun(partId, performance.now());
+  }
+  return result;
 }
 
 function resolveChain() {
@@ -2862,7 +3068,10 @@ function resolveChain() {
       createUnitBeam(ui.playerUnit, 0.58, 0.48, ui.bossUnit, 0.52, 0.48, "#ffb25c");
       pulseCombatClass("shake", 520);
     }
-    showMessage(title + "完成，追加 " + result.bossDamage + " 点连携伤害");
+    showMessage(
+      title + "完成，追加 " + result.bossDamage + " 点连携伤害" +
+        (result.partBroken && state.bossHp > 0 ? " · 部位破坏，Boss眩晕5秒" : ""),
+    );
   } else {
     showMessage("单模块完成介入，自动战斗继续");
   }
@@ -2887,7 +3096,7 @@ function resolveChain() {
 }
 
 function checkIntentInterrupted(now) {
-  if (state.ended || state.intentInterrupted) {
+  if (state.ended || state.intentInterrupted || state.bossStunned) {
     return;
   }
   const intent = getIntent();
@@ -2911,6 +3120,7 @@ function checkIntentInterrupted(now) {
 function resolveBossAttack(now) {
   if (
     state.ended ||
+    state.bossStunned ||
     state.turnActor !== "boss" ||
     state.actionActor ||
     state.reactionActive ||
@@ -3010,7 +3220,7 @@ function settleBossAttack(intent) {
     feedback.push(choice === "left" ? "左闪成功" : "右闪成功");
     pulseCombatClass(choice === "left" ? "player-dodge-left" : "player-dodge-right", 620);
   } else if (validResponse && choice === "block") {
-    damage = Math.max(1, Math.round(damage * 0.28));
+    damage = Math.max(1, Math.round(damage * 0.5));
     feedback.push("格挡成功");
     pulseCombatClass("player-block", 620);
     state.bossHp = Math.max(0, state.bossHp - 4);
@@ -3381,6 +3591,14 @@ function endBattle(victory, copy) {
   state.activeActionId = 0;
   state.reactionActive = false;
   state.bossImpactAt = 0;
+  state.bossStunned = false;
+  state.bossStunStartedAt = 0;
+  state.bossStunEndsAt = 0;
+  state.bossStunPartId = null;
+  state.bossStunAdvanceIntent = false;
+  ui.battlefield.classList.remove("boss-stunned");
+  ui.bossUnit.classList.remove("is-stunned");
+  ui.intentBanner.classList.remove("stunned");
   state.videoPending = null;
   if (state.activeVideoEffect) {
     state.activeVideoEffect.resolved = true;
@@ -3394,6 +3612,7 @@ function endBattle(victory, copy) {
   }
   state.ultimateCasting = false;
   state.ultimateCastStartedAt = 0;
+  state.ultimateCastPauseApplied = 0;
   hideUltimateCinematic();
   ui.commandDeck.classList.remove("ultimate-holding", "ultimate-casting");
   ui.battlefield.classList.remove(
