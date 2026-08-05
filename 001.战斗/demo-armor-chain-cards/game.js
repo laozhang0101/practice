@@ -721,7 +721,7 @@ function resetGame(mode) {
     });
     return;
   }
-  showMessage("固定节拍交锋开始：挂件造成伤害或QTE成功可恢复灵魂能量");
+  showMessage("固定节拍交锋开始：消耗能量的挂件造成伤害，或QTE成功，可恢复灵魂能量");
   battleTimer = window.setInterval(tickBattle, 80);
 }
 
@@ -1163,6 +1163,17 @@ function selectedAwakeningCost() {
   }, 0);
 }
 
+function hasBossStunFreeCards(now) {
+  const currentTime = typeof now === "number" ? now : performance.now();
+  return Boolean(
+    state &&
+    state.phase === "battle" &&
+    !state.ended &&
+    state.bossStunned &&
+    state.bossStunEndsAt > currentTime
+  );
+}
+
 function updateCardStates(now) {
   const resolutionLocked =
     state.videoPlaying ||
@@ -1170,6 +1181,7 @@ function updateCardStates(now) {
     state.ultimateHolding ||
     state.ultimateCasting;
   const battleActive = state.phase === "battle" && !state.ended;
+  const freeDuringBossStun = hasBossStunFreeCards(now);
   state.hand.forEach(function (instance) {
     const card = getCard(instance.cardId);
     const weapon = currentWeaponMode();
@@ -1178,16 +1190,21 @@ function updateCardStates(now) {
     if (!button) {
       return;
     }
-    const lacksEnergy = card.cost > state.energy;
+    const lacksEnergy = !freeDuringBossStun && card.cost > state.energy;
     const visualEnergy = Math.min(
       MAX_ENERGY,
       state.energy + getEnergyRecoveryProgress(now),
     );
-    const energyRatio = card.cost > 0 ? Math.min(1, visualEnergy / card.cost) : 1;
-    const energyAccess = lacksEnergy ? "locked" : "ready";
+    const energyRatio = freeDuringBossStun
+      ? 1
+      : card.cost > 0
+        ? Math.min(1, visualEnergy / card.cost)
+        : 1;
+    const energyAccess = freeDuringBossStun ? "free" : lacksEnergy ? "locked" : "ready";
     const previousEnergyAccess = instance.energyAccessState;
     const targetPartId = card.targetsIntentPart ? getIntent().part : "general";
     const fitLabel = button.querySelector(".weapon-fit");
+    const costLabel = button.querySelector(".card-cost b");
     button.style.setProperty(
       "--energy-shadow-height",
       ((1 - energyRatio) * 100).toFixed(2) + "%",
@@ -1195,12 +1212,15 @@ function updateCardStates(now) {
     if (lacksEnergy) {
       button.classList.remove("energy-ready-flash");
     }
-    if (previousEnergyAccess === "locked" && energyAccess === "ready") {
+    if (
+      (previousEnergyAccess === "locked" && energyAccess === "ready") ||
+      (previousEnergyAccess !== "free" && energyAccess === "free")
+    ) {
       instance.energyReadyFlashPending = true;
     }
     if (
       instance.energyReadyFlashPending &&
-      energyAccess === "ready" &&
+      energyAccess !== "locked" &&
       battleActive &&
       !resolutionLocked
     ) {
@@ -1215,6 +1235,7 @@ function updateCardStates(now) {
       resolutionLocked ||
       lacksEnergy;
     button.classList.toggle("energy-locked", lacksEnergy);
+    button.classList.toggle("stun-free-cast", freeDuringBossStun);
     button.classList.toggle("card-ready", battleActive && !button.disabled);
     button.classList.remove("awakening-selectable", "awakening-selected");
     button.classList.toggle("weapon-linked", affinity === "linked");
@@ -1227,23 +1248,32 @@ function updateCardStates(now) {
         ? "通用"
         : partBlueprints[targetPartId].name;
     }
+    if (costLabel) {
+      costLabel.textContent = freeDuringBossStun ? "0" : card.cost;
+    }
     const stateDescription = !battleActive
       ? "等待开战"
       : state.ultimateHolding
         ? "终结技蓄力中"
         : state.ultimateCasting
           ? "终结技释放中"
+          : freeDuringBossStun
+            ? "Boss倒地，免费释放"
           : lacksEnergy
             ? "能量不足"
             : "可释放";
     button.setAttribute(
       "aria-label",
-      card.name + "，消耗" + card.cost + "点战术能量，" + stateDescription,
+      card.name + "，" +
+        (freeDuringBossStun ? "本次不消耗战术能量，" : "消耗" + card.cost + "点战术能量，") +
+        stateDescription,
     );
     button.title = !battleActive
       ? "进入战斗后可使用 · " + card.summary
       : resolutionLocked
         ? "终结技结算中 · " + card.summary
+        : freeDuringBossStun
+          ? "Boss倒地 · 免费释放 · " + card.summary
         : lacksEnergy
           ? "战甲能量不足 · " + card.summary
           : "点击立即激活 · " + card.summary;
@@ -2307,7 +2337,7 @@ function beginBossStun(partId, now) {
     if (state.interventionEndsAt) {
       state.interventionEndsAt += extension;
     }
-    ui.liveHint.textContent = "再次破坏部位 · Boss眩晕刷新为5秒";
+    ui.liveHint.textContent = "再次破坏部位 · 免费输出窗口刷新为5秒";
     createFloat("眩晕 5.0s", false, "stun");
     showMessage(state.parts[partId].name + "被破坏，Boss眩晕重新计时5秒");
     showLog("连续部位破坏刷新Boss眩晕，行动节拍继续暂停");
@@ -2316,6 +2346,7 @@ function beginBossStun(partId, now) {
     renderBossStunProgress(currentTime);
     renderReactionControls();
     renderStatus();
+    updateCardStates(currentTime);
     return true;
   }
 
@@ -2338,16 +2369,17 @@ function beginBossStun(partId, now) {
 
   ui.battlefield.classList.remove("boss-turn", "boss-stagger");
   ui.battlefield.classList.add("boss-stunned");
-  ui.liveHint.textContent = "部位破坏 · Boss倒地眩晕，可继续释放挂件";
+  ui.liveHint.textContent = "部位破坏 · Boss倒地5秒，挂件免费释放";
   createFloat("眩晕 5.0s", false, "stun");
-  showMessage(state.parts[partId].name + "被破坏，Boss倒地眩晕5秒");
-  showLog("部位破坏触发硬直，Boss行动节拍暂停5秒");
+  showMessage(state.parts[partId].name + "被破坏，获得5秒免费输出窗口");
+  showLog("Boss倒地5秒：任意挂件可释放且不消耗战术能量");
   playFrequencySweep({ wave: "triangle", start: 190, end: 66, duration: 0.42 }, 0, 0.05);
   renderBossSprite();
   renderBossParts();
   renderBossStunProgress(currentTime);
   renderReactionControls();
   renderStatus();
+  updateCardStates(currentTime);
   return true;
 }
 
@@ -2380,6 +2412,7 @@ function finishBossStun(now) {
   }
   renderBossSprite();
   renderStatus();
+  updateCardStates(currentTime);
   if (!state.intentInterrupted) {
     showMessage("Boss眩晕结束，恢复行动");
   }
@@ -2773,16 +2806,18 @@ function activateCard(cardInstanceId, sourceButton) {
   const instance = state.hand[handIndex];
   const card = getCard(instance.cardId);
   const now = performance.now();
-  if (state.energy < card.cost) {
-    showMessage("战术能量不足，无法激活“" + card.name + "”");
-    updateCardStates(now);
-    return;
-  }
   if (state.chain.length && now >= state.chainDeadline) {
     resolveChain();
     if (state.ended) {
       return;
     }
+  }
+  const freeDuringBossStun = hasBossStunFreeCards(now);
+  const energySpent = freeDuringBossStun ? 0 : card.cost;
+  if (state.energy < energySpent) {
+    showMessage("战术能量不足，无法激活“" + card.name + "”");
+    updateCardStates(now);
+    return;
   }
   endIntervention("card", now);
 
@@ -2791,7 +2826,7 @@ function activateCard(cardInstanceId, sourceButton) {
   const chainIndex = state.chain.length;
   const comboBonus = Math.round((chainIndex * 0.13 + link.bonus) * 100);
 
-  state.energy -= card.cost;
+  state.energy -= energySpent;
   state.chain.push({ card: card, link: link.name, bonus: link.bonus, comboBonus: comboBonus });
   state.chainWindow = BASE_CHAIN_WINDOW + (hasCardInChain("armor") ? 650 : 0);
   state.chainDeadline = now + state.chainWindow;
@@ -2804,6 +2839,8 @@ function activateCard(cardInstanceId, sourceButton) {
     queuedAt: now,
     runId: state.runId,
     presentationId: ++modulePresentationSerial,
+    energySpent: energySpent,
+    freeDuringBossStun: freeDuringBossStun,
     resolved: false,
   };
   state.videoPending = presentationPayload;
@@ -2814,8 +2851,13 @@ function activateCard(cardInstanceId, sourceButton) {
   renderStatus();
   renderChain();
   playTone(state.chain.length - 1, state.chain.length >= 3, false);
-  ui.liveHint.textContent = card.name + "已释放 · 表现完成后结算效果";
-  showLog(card.name + "挂件协议已提交，等待释放表现");
+  ui.liveHint.textContent = card.name +
+    (freeDuringBossStun ? "免费释放" : "已释放") +
+    " · 表现完成后结算效果";
+  showLog(
+    card.name + "挂件协议已提交" +
+      (freeDuringBossStun ? "，Boss倒地期间不消耗战术能量" : "，等待释放表现"),
+  );
 
   if (!state.actionActor && !state.reactionActive) {
     startPendingModuleVideo();
@@ -2960,7 +3002,10 @@ function finishModuleVideo(skipped, expectedPayload) {
     showLog("已跳过“" + payload.card.name + "”表现，继续结算挂件效果");
   }
 
-  applyCardEffect(payload.card, payload.chainIndex, payload.link);
+  const energySpent = typeof payload.energySpent === "number"
+    ? payload.energySpent
+    : payload.card.cost;
+  applyCardEffect(payload.card, payload.chainIndex, payload.link, energySpent);
   if (!state || state.runId !== payload.runId || state.ended) {
     return;
   }
@@ -3001,7 +3046,8 @@ function hasCardInChain(cardId) {
   });
 }
 
-function applyCardEffect(card, chainIndex, link) {
+function applyCardEffect(card, chainIndex, link, energySpent) {
+  const resolvedEnergySpent = typeof energySpent === "number" ? energySpent : card.cost;
   let multiplier = 1 + chainIndex * 0.13 + link.bonus;
   const boosted = state.moduleBoost > 0 && card.id !== "reactor";
   if (boosted) {
@@ -3023,9 +3069,9 @@ function applyCardEffect(card, chainIndex, link) {
     state.nextAutoBonus += Math.round(13 * multiplier);
     showMessage("喷气背包强化下一次自动攻击，并准备规避反击");
   } else if (card.id === "cannon") {
-    applyModuleHit(card, Math.round(24 * multiplier), Math.round(48 * multiplier), Math.round(44 * multiplier));
+    applyModuleHit(card, Math.round(24 * multiplier), Math.round(48 * multiplier), Math.round(44 * multiplier), resolvedEnergySpent);
   } else if (card.id === "drone") {
-    applyModuleHit(card, Math.round(18 * multiplier), Math.round(20 * multiplier), Math.round(16 * multiplier));
+    applyModuleHit(card, Math.round(18 * multiplier), Math.round(20 * multiplier), Math.round(16 * multiplier), resolvedEnergySpent);
   } else if (card.id === "gourd") {
     const healing = Math.min(MAX_PLAYER_HP - state.playerHp, Math.round(24 * multiplier));
     state.playerHp += healing;
@@ -3043,15 +3089,15 @@ function applyCardEffect(card, chainIndex, link) {
   checkBattleEnd();
 }
 
-function applyModuleHit(card, damage, armorDamage, pressure) {
+function applyModuleHit(card, damage, armorDamage, pressure, energySpent) {
   const targetId = getIntent().part;
   const target = state.parts[targetId];
   const result = damagePart(targetId, damage, armorDamage);
   state.intentPressure += pressure;
-  if (result.bossDamage > 0) {
+  if (result.bossDamage > 0 && energySpent > 0) {
     addSoulEnergy(
-      card.cost * SOUL_GAIN_PER_SPENT_ENERGY,
-      card.name + "消耗" + card.cost + "点战术能量并造成伤害",
+      energySpent * SOUL_GAIN_PER_SPENT_ENERGY,
+      card.name + "消耗" + energySpent + "点战术能量并造成伤害",
     );
   }
   createFloat("-" + result.bossDamage, false);

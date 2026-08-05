@@ -6449,6 +6449,13 @@ button:focus-visible {
   filter: brightness(1.12) saturate(1.08);
 }
 
+.module-card.live-card.stun-free-cast {
+  border-color: color-mix(in srgb, #ffc66d, var(--card-color) 36%);
+  box-shadow:
+    0 0 0 1px rgba(255, 198, 109, .34),
+    0 0 16px rgba(255, 142, 55, .22);
+}
+
 .soul-ultimate-control {
   --ultimate-tier-color: #efb761;
   --ultimate-hold-progress: 0%;
