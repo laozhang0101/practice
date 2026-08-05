@@ -10157,3 +10157,153 @@ button:focus-visible {
     padding-bottom: clamp(3px, .85vh, 6px);
   }
 }
+
+/* Flat soul skill: one circular button and four coplanar quarter-ring stages. */
+.soul-ultimate-control {
+  --soul-ring-thickness: clamp(5px, .9vh, 7px);
+  --soul-core-inset: clamp(8px, 1.5vh, 11px);
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  box-shadow: none;
+  filter: none;
+  transform: none;
+}
+
+.soul-ultimate-control:disabled,
+.soul-ultimate-control.ready,
+.soul-ultimate-control.holding,
+.soul-ultimate-control.casting,
+.soul-ultimate-control.fully-charged {
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  box-shadow: none;
+  filter: none;
+}
+
+.soul-ultimate-control .awakening-copy {
+  display: none;
+}
+
+.soul-ultimate-control .awakening-emblem,
+.soul-ultimate-control.ready .awakening-emblem,
+.soul-ultimate-control.holding .awakening-emblem,
+.soul-ultimate-control.casting .awakening-emblem,
+.soul-ultimate-control.fully-charged .awakening-emblem {
+  position: relative;
+  z-index: 4;
+  grid-column: 1;
+  grid-row: 1;
+  width: calc(100% - var(--soul-core-inset) * 2);
+  height: calc(100% - var(--soul-core-inset) * 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  box-shadow: none;
+  filter: none;
+}
+
+.soul-ultimate-control .awakening-emblem::before,
+.soul-ultimate-control .awakening-emblem::after {
+  display: none;
+}
+
+.soul-ultimate-control .awakening-emblem img {
+  position: relative;
+  inset: auto;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: none;
+  filter: none;
+  transform: none;
+}
+
+.soul-ultimate-control.holding .awakening-emblem img {
+  filter: brightness(1.12) saturate(1.18);
+}
+
+.soul-ultimate-control.cancel-hover .awakening-emblem {
+  animation: none;
+  filter: brightness(.78) saturate(.62);
+}
+
+.soul-ultimate-control .soul-stage-pips {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  transform: none;
+  pointer-events: none;
+}
+
+.soul-ultimate-control .soul-stage-pips b {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  opacity: 1;
+  background: conic-gradient(
+    from -90deg,
+    var(--segment-color) 0 var(--segment-fill-angle),
+    rgba(93, 103, 110, .72) var(--segment-fill-angle) 82deg,
+    transparent 82deg 360deg
+  );
+  box-shadow: none;
+  filter: none;
+  transform: rotate(var(--segment-rotation));
+  transform-origin: 50% 50%;
+  transition: filter 90ms linear, opacity 90ms linear;
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--soul-ring-thickness)),
+    #000 calc(100% - var(--soul-ring-thickness) + 1px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--soul-ring-thickness)),
+    #000 calc(100% - var(--soul-ring-thickness) + 1px)
+  );
+}
+
+.soul-ultimate-control .soul-stage-pips b.unlocked,
+.soul-ultimate-control .soul-stage-pips b.partial {
+  filter: brightness(1.08) saturate(1.04);
+}
+
+.soul-ultimate-control .soul-stage-pips b.consumed {
+  filter: brightness(.52) saturate(.35);
+}
+
+.soul-ultimate-control .soul-stage-pips b.selected {
+  box-shadow: none;
+  filter: brightness(1.28) saturate(1.08);
+  transform: rotate(var(--segment-rotation));
+}
+
+.soul-ultimate-control.fully-charged:not(.holding) .soul-stage-pips b {
+  animation: soul-flat-quarter-ready 760ms ease-in-out infinite alternate;
+}
+
+@keyframes soul-flat-quarter-ready {
+  from { filter: brightness(.96) saturate(1); }
+  to { filter: brightness(1.2) saturate(1.08); }
+}
