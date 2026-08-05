@@ -10307,3 +10307,179 @@ button:focus-visible {
   from { filter: brightness(.96) saturate(1); }
   to { filter: brightness(1.2) saturate(1.08); }
 }
+
+/* Final Boss part treatment: borderless cards and a legible armor-state shield. */
+.boss-hud .part-state,
+.boss-hud .part-state.exposed,
+.boss-hud .part-state.broken,
+.boss-hud .part-state.is-intent,
+.boss-hud .part-state.interrupted {
+  border: 0;
+  box-shadow: none;
+}
+
+.boss-hud .part-state::after {
+  display: none;
+}
+
+.boss-hud .part-state .part-layer-badge {
+  right: clamp(-8px, -1.1vh, -6px);
+  bottom: clamp(-8px, -1.1vh, -6px);
+  width: clamp(21px, 4vh, 29px);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.boss-hud .part-state .part-layer-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Compact battle-only GM tools. */
+.gm-tools {
+  position: absolute;
+  z-index: 35;
+  left: max(8px, env(safe-area-inset-left));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.gm-tools[hidden] {
+  display: none;
+}
+
+.game-shell.preparing .gm-tools {
+  display: none;
+}
+
+.gm-toggle {
+  display: grid;
+  place-items: center;
+  width: clamp(36px, 6.1vh, 44px);
+  height: clamp(26px, 4.4vh, 32px);
+  padding: 0;
+  border: 1px solid rgba(255, 177, 93, .58);
+  border-radius: 4px;
+  color: #ffd49a;
+  background: rgba(7, 12, 16, .92);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, .48);
+  font: 900 clamp(10px, 1.7vh, 12px)/1 "Microsoft YaHei", sans-serif;
+  letter-spacing: .08em;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.gm-tools.open .gm-toggle,
+.gm-toggle:hover,
+.gm-toggle:focus-visible {
+  border-color: #ffb15d;
+  color: #fff4df;
+  background: rgba(64, 34, 16, .96);
+  outline: 0;
+}
+
+.gm-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: clamp(118px, 13vw, 188px);
+  padding: clamp(7px, 1.25vh, 9px);
+  border: 1px solid rgba(255, 177, 93, .44);
+  border-radius: 5px;
+  color: #edf4f7;
+  background: rgba(6, 11, 15, .97);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .62);
+  pointer-events: auto;
+}
+
+.gm-panel[hidden] {
+  display: none;
+}
+
+.gm-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gm-panel header strong {
+  color: #ffc57f;
+  font-size: clamp(10px, 1.7vh, 12px);
+  letter-spacing: .04em;
+}
+
+#gmClose {
+  display: grid;
+  place-items: center;
+  width: clamp(20px, 3.3vh, 24px);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  color: #cbd5da;
+  background: rgba(255, 255, 255, .07);
+  font-size: clamp(14px, 2.5vh, 18px);
+  line-height: 1;
+  cursor: pointer;
+}
+
+#gmStatus {
+  display: block;
+  margin: clamp(5px, .85vh, 7px) 0;
+  color: #9eb0b9;
+  font-size: clamp(7px, 1.25vh, 9px);
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.gm-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.gm-actions button {
+  min-width: 0;
+  min-height: clamp(25px, 4vh, 29px);
+  padding: 3px 4px;
+  border: 1px solid rgba(106, 137, 151, .38);
+  border-radius: 3px;
+  color: #dbe7ec;
+  background: rgba(19, 31, 39, .86);
+  font: 700 clamp(8px, 1.35vh, 10px)/1.1 "Microsoft YaHei", sans-serif;
+  cursor: pointer;
+}
+
+.gm-actions button:hover,
+.gm-actions button:focus-visible,
+#gmClose:hover,
+#gmClose:focus-visible {
+  border-color: rgba(255, 177, 93, .72);
+  color: #fff2dc;
+  background: rgba(82, 44, 20, .92);
+  outline: 0;
+}
+
+@media (max-height: 420px) {
+  .gm-tools {
+    left: 6px;
+    bottom: 6px;
+  }
+
+  .gm-panel {
+    width: 118px;
+    padding: 6px;
+  }
+
+  .gm-actions {
+    gap: 3px;
+  }
+
+  .gm-actions button {
+    min-height: 23px;
+  }
+}

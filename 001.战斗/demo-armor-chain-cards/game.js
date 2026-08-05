@@ -6,7 +6,8 @@ const MAX_BOSS_HP = 420;
 const MAX_ENERGY = 10;
 const MAX_SOUL_ENERGY = 100;
 const SOUL_TIER_COST = 25;
-const SOUL_ENERGY_CHARGE_DURATION = 40000;
+const SOUL_GAIN_PER_SPENT_ENERGY = 4;
+const SOUL_QTE_GAIN = 4;
 const ULTIMATE_MIN_HOLD_MS = 300;
 const ULTIMATE_TIER_HOLD_MS = 400;
 const ULTIMATE_CAST_DURATION = 1120;
@@ -102,7 +103,7 @@ const cards = [
     name: "战甲承压",
     type: "战甲技能",
     role: "稳定",
-    icon: "./assets/soul-armor-skill.jpg",
+    icon: "./assets/armor-overdrive.jpeg",
     cost: 2,
     color: "#e0ae4f",
     summary: "唤醒战甲承压结构，强化形态期间的格挡稳定性。",
@@ -356,6 +357,12 @@ const ui = {
   nextCardCost: document.getElementById("nextCardCost"),
   nextCardName: document.getElementById("nextCardName"),
   compactLog: document.getElementById("compactLog"),
+  gmTools: document.getElementById("gmTools"),
+  gmToggle: document.getElementById("gmToggle"),
+  gmPanel: document.getElementById("gmPanel"),
+  gmClose: document.getElementById("gmClose"),
+  gmStatus: document.getElementById("gmStatus"),
+  gmActions: document.querySelectorAll("[data-gm-action]"),
   combatStyleSummary: document.getElementById("combatStyleSummary"),
   weaponAttackRing: document.getElementById("weaponAttackRing"),
   autoWeaponIcon: document.getElementById("autoWeaponIcon"),
@@ -663,6 +670,7 @@ function getWeaponCardLink(card) {
 
 function resetGame(mode) {
   const shouldStartBattle = mode === "battle";
+  setGmPanelOpen(false, false);
   preparationStep = shouldStartBattle ? "battle" : "monster";
   clearInterval(battleTimer);
   battleTimer = 0;
@@ -676,6 +684,7 @@ function resetGame(mode) {
   hideUltimateCinematic();
   runToken += 1;
   state = createInitialState(preparedStyleId, shouldStartBattle ? "battle" : "preparation");
+  ui.gmTools.hidden = !shouldStartBattle;
   ui.resultOverlay.classList.add("hidden");
   ui.battlePreparation.classList.toggle("hidden", shouldStartBattle);
   ui.battlePreparation.setAttribute("aria-hidden", String(shouldStartBattle));
@@ -704,7 +713,7 @@ function resetGame(mode) {
     });
     return;
   }
-  showMessage("固定节拍交锋开始：挂件卡可直接释放，灵魂能量将自动积累");
+  showMessage("固定节拍交锋开始：挂件造成伤害或QTE成功可恢复灵魂能量");
   battleTimer = window.setInterval(tickBattle, 80);
 }
 
@@ -865,6 +874,67 @@ function renderStatus() {
   );
   renderPlayerStatuses();
   renderSoulUltimate();
+  renderGmStatus();
+}
+
+function renderGmStatus() {
+  if (!state || !ui.gmStatus) {
+    return;
+  }
+  ui.gmStatus.textContent =
+    "灵魂 " + Math.round(state.soulEnergy) + "/" + MAX_SOUL_ENERGY +
+    " · 能量 " + state.energy + "/" + MAX_ENERGY +
+    "\n生命 " + Math.max(0, state.playerHp) + "/" + MAX_PLAYER_HP;
+}
+
+function setGmPanelOpen(isOpen, restoreFocus) {
+  if (!ui.gmPanel || !ui.gmToggle) {
+    return;
+  }
+  const wasOpen = !ui.gmPanel.hidden;
+  const shouldOpen = Boolean(
+    isOpen && state && state.phase === "battle" && !state.ended,
+  );
+  ui.gmPanel.hidden = !shouldOpen;
+  ui.gmToggle.setAttribute("aria-expanded", String(shouldOpen));
+  ui.gmTools.classList.toggle("open", shouldOpen);
+  if (shouldOpen) {
+    renderGmStatus();
+    ui.gmClose.focus({ preventScroll: true });
+  } else if (restoreFocus !== false && wasOpen) {
+    ui.gmToggle.focus({ preventScroll: true });
+  }
+}
+
+function applyGmAction(action) {
+  if (!state || state.phase !== "battle" || state.ended || state.ultimateCasting) {
+    return;
+  }
+  if (state.ultimateHolding) {
+    cancelSoulUltimateHold(true);
+  }
+  if (action === "soul-fill") {
+    state.soulEnergy = MAX_SOUL_ENERGY;
+    showMessage("GM：灵魂能量已补满");
+    showLog("GM 调试 · 灵魂能量补满");
+  } else if (action === "soul-empty") {
+    state.soulEnergy = 0;
+    showMessage("GM：灵魂能量已清空");
+    showLog("GM 调试 · 灵魂能量清空");
+  } else if (action === "energy-fill") {
+    state.energy = MAX_ENERGY;
+    state.nextEnergyAt = performance.now() + ENERGY_INTERVAL;
+    showMessage("GM：战术能量已补满");
+    showLog("GM 调试 · 战术能量补满");
+  } else if (action === "heal") {
+    state.playerHp = MAX_PLAYER_HP;
+    showMessage("GM：生命已恢复");
+    showLog("GM 调试 · 生命恢复至上限");
+  } else {
+    return;
+  }
+  renderStatus();
+  updateCardStates(performance.now());
 }
 
 function getEnergyRecoveryProgress(now) {
@@ -915,7 +985,7 @@ function renderPlayerStatuses() {
     },
   ];
   if (state.armorGuard > 0) {
-    statuses.push({ label: "战甲承压 " + state.armorGuard, icon: "./assets/soul-armor-skill.jpg", count: state.armorGuard, tone: "armor" });
+    statuses.push({ label: "战甲承压 " + state.armorGuard, icon: "./assets/armor-overdrive.jpeg", count: state.armorGuard, tone: "armor" });
   }
   if (state.jetGuard) {
     statuses.push({ label: "喷气闪避待命", icon: "./assets/jet.png", tone: "jet" });
@@ -1449,7 +1519,7 @@ function renderSoulUltimate(now) {
   });
 
   if (state.phase !== "battle") {
-    ui.ultimateButtonLabel.textContent = "进入战斗后自动积累";
+    ui.ultimateButtonLabel.textContent = "造成伤害或QTE成功后积累";
     ui.ultimateControlHint.textContent = "四档终结 · 每满一档点亮一枚";
   } else if (state.ultimateCasting) {
     ui.ultimateButtonLabel.textContent = "终结技释放中";
@@ -1507,24 +1577,6 @@ function addSoulEnergy(amount, source) {
   }
   renderSoulUltimate();
   return gained;
-}
-
-function advanceSoulEnergyAutomatically(frameDelta) {
-  if (
-    state.ended ||
-    state.phase !== "battle" ||
-    state.ultimateHolding ||
-    state.ultimateCasting ||
-    state.videoPlaying ||
-    state.soulEnergy >= MAX_SOUL_ENERGY
-  ) {
-    return;
-  }
-  const beforeFloor = Math.floor(state.soulEnergy);
-  addSoulEnergy((frameDelta / SOUL_ENERGY_CHARGE_DURATION) * MAX_SOUL_ENERGY, "");
-  if (Math.floor(state.soulEnergy) !== beforeFloor) {
-    renderSoulUltimate();
-  }
 }
 
 function updateSoulUltimateHold(now) {
@@ -2299,7 +2351,6 @@ function tickBattle() {
   state.lastFrameAt = now;
   advanceTimedEnergy(now);
   renderEnergyRecoveryProgress(now);
-  advanceSoulEnergyAutomatically(frameDelta);
   if (state.ultimateHolding) {
     updateSoulUltimateHold(now);
     state.nextTurnAt += frameDelta;
@@ -2439,15 +2490,6 @@ function settlePlayerAttack(action, bonus, now) {
   triggerWeaponAttackFx(currentWeaponMode(), Boolean(bonus));
   playWeaponAttackSound(currentWeaponMode());
   showLog(currentWeaponMode().name + "自动使用“" + action.name + "”，造成 " + result.bossDamage + " 点伤害");
-  if (getIntent().part === action.target) {
-    addSoulEnergy(1, "拳套命中Boss蓄力部位");
-  }
-  if (result.armorBroken) {
-    addSoulEnergy(8, action.targetLabel + "护甲被击破");
-  }
-  if (result.partBroken) {
-    addSoulEnergy(10, action.targetLabel + "部位被摧毁");
-  }
   renderStatus();
   renderBossParts();
   renderBossSprite();
@@ -2745,14 +2787,13 @@ function applyCardEffect(card, chainIndex, link) {
 
 function applyModuleHit(card, damage, armorDamage, pressure) {
   const targetId = getIntent().part;
-  const target = state.parts[targetId];
   const result = damagePart(targetId, damage, armorDamage);
   state.intentPressure += pressure;
-  if (result.armorBroken) {
-    addSoulEnergy(8, target.name + "护甲被挂件击破");
-  }
-  if (result.partBroken) {
-    addSoulEnergy(10, target.name + "部位被挂件摧毁");
+  if (result.bossDamage > 0) {
+    addSoulEnergy(
+      card.cost * SOUL_GAIN_PER_SPENT_ENERGY,
+      card.name + "消耗" + card.cost + "点战术能量并造成伤害",
+    );
   }
   createFloat("-" + result.bossDamage, false);
   createUnitBurst(ui.bossUnit, 0.5, 0.42, card.color);
@@ -2858,7 +2899,6 @@ function checkIntentInterrupted(now) {
   state.bossImpactAt = 0;
   state.reactionActive = false;
   state.reactionChoice = null;
-  addSoulEnergy(6, "成功打断Boss攻势");
   showMessage(intent.name + "被模块联携打断，Boss失去进攻节奏");
   showLog("玩家的实时介入改变了Boss行动");
   createFloat("打断", false);
@@ -2982,7 +3022,10 @@ function settleBossAttack(intent) {
   }
 
   if (validResponse) {
-    addSoulEnergy(4, choice === "block" ? "成功格挡Boss攻击" : "成功闪避Boss攻击");
+    addSoulEnergy(
+      SOUL_QTE_GAIN,
+      choice === "block" ? "成功格挡Boss攻击" : "成功闪避Boss攻击",
+    );
   }
 
   if (damage > 0 && state.armorGuard > 0) {
@@ -3332,6 +3375,8 @@ function endBattle(victory, copy) {
   }
   state.ended = true;
   state.phase = "ended";
+  setGmPanelOpen(false, false);
+  ui.gmTools.hidden = true;
   state.actionActor = null;
   state.activeActionId = 0;
   state.reactionActive = false;
@@ -3366,6 +3411,9 @@ function endBattle(victory, copy) {
   ui.resultTitle.textContent = victory ? "巨兽已倒下" : "战斗化身失去行动";
   ui.resultCopy.textContent = copy;
   ui.resultOverlay.classList.remove("hidden");
+  window.requestAnimationFrame(function () {
+    ui.resultRestart.focus({ preventScroll: true });
+  });
   renderStatus();
   updateCardStates(performance.now());
   renderReactionControls();
@@ -3387,6 +3435,17 @@ ui.preparationConfirm.addEventListener("click", startPreparedBattle);
 ui.preparationStyleOptions.forEach(function (button) {
   button.addEventListener("click", function () {
     selectPreparedStyle(button.dataset.styleId);
+  });
+});
+ui.gmToggle.addEventListener("click", function () {
+  setGmPanelOpen(ui.gmPanel.hidden);
+});
+ui.gmClose.addEventListener("click", function () {
+  setGmPanelOpen(false);
+});
+ui.gmActions.forEach(function (button) {
+  button.addEventListener("click", function () {
+    applyGmAction(button.dataset.gmAction);
   });
 });
 ui.soulUltimateButton.addEventListener("pointerdown", function (event) {
@@ -3490,6 +3549,11 @@ ui.moduleVideoSkip.addEventListener("click", function () {
 });
 window.addEventListener("keydown", function (event) {
   if (!state) {
+    return;
+  }
+  if (event.key === "Escape" && !ui.gmPanel.hidden) {
+    event.preventDefault();
+    setGmPanelOpen(false);
     return;
   }
   if (state.phase === "preparation") {

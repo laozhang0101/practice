@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0d10" />
     <title>M98 卡牌版战斗 Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=20260805-flat-soul-ring-30" />
+    <link rel="stylesheet" href="./styles.css?v=20260805-gm-event-soul-32" />
   </head>
   <body>
     <main class="game-shell" id="gameShell">
@@ -369,8 +369,25 @@
       </section>
 
       <aside class="compact-log" id="compactLog" aria-live="polite"></aside>
+
+      <aside class="gm-tools" id="gmTools" aria-label="GM调试工具">
+        <button class="gm-toggle" id="gmToggle" type="button" aria-expanded="false" aria-controls="gmPanel">GM</button>
+        <section class="gm-panel" id="gmPanel" aria-label="GM调试面板" hidden>
+          <header>
+            <strong>GM 调试</strong>
+            <button id="gmClose" type="button" aria-label="关闭GM调试面板">×</button>
+          </header>
+          <output id="gmStatus">灵魂 0/100 · 能量 1/10</output>
+          <div class="gm-actions">
+            <button type="button" data-gm-action="soul-fill">灵魂充满</button>
+            <button type="button" data-gm-action="soul-empty">灵魂清空</button>
+            <button type="button" data-gm-action="energy-fill">能量充满</button>
+            <button type="button" data-gm-action="heal">恢复生命</button>
+          </div>
+        </section>
+      </aside>
     </main>
 
-    <script src="./game.js?v=20260805-flat-soul-ring-30"></script>
+    <script src="./game.js?v=20260805-gm-event-soul-32"></script>
   </body>
 </html>
