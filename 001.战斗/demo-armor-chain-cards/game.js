@@ -551,6 +551,7 @@ function createInitialState(selectedStyleId, phase) {
     bossStunEndsAt: 0,
     bossStunPartId: null,
     bossStunAdvanceIntent: false,
+    bossStunPausedRemaining: null,
     actionIndex: 0,
     selectedWeaponId: selectedStyleId || "fists",
     nextEnergyAt: now + ENERGY_INTERVAL,
@@ -940,11 +941,13 @@ function applyGmAction(action) {
     showMessage("GM：生命已恢复");
     showLog("GM 调试 · 生命恢复至上限");
   } else if (action === "part-break") {
-    let targetId = getIntent().part;
-    if (state.parts[targetId].hp <= 0) {
-      targetId = ["arms", "core", "legs"].find(function (partId) {
-        return state.parts[partId].hp > 0;
-      });
+    let targetId = null;
+    for (let offset = 0; offset < intentBlueprints.length; offset += 1) {
+      const candidate = intentBlueprints[(state.intentIndex + offset) % intentBlueprints.length].part;
+      if (state.parts[candidate].hp > 0) {
+        targetId = candidate;
+        break;
+      }
     }
     if (!targetId) {
       showMessage("GM：所有部位均已破坏");
@@ -952,7 +955,7 @@ function applyGmAction(action) {
     }
     const part = state.parts[targetId];
     damagePart(targetId, Math.max(1, part.hp), part.armor + part.hp * 2);
-    showLog("GM 调试 · 破坏当前蓄力部位");
+    showLog("GM 调试 · 一键破坏" + part.name);
     renderBossParts();
     renderBossSprite();
     checkBattleEnd();
@@ -1715,6 +1718,7 @@ function castSoulUltimate(tier) {
   state.ultimateCasting = true;
   state.ultimateCastStartedAt = now;
   state.ultimateCastPauseApplied = 0;
+  beginBossStunPresentationPause(now);
   ui.commandDeck.classList.add("ultimate-casting");
   ui.battlefield.classList.add("ultimate-casting", "ultimate-tier-" + tier);
   ui.ultimateCinematic.className = "ultimate-cinematic ultimate-tier-" + tier;
@@ -1772,7 +1776,9 @@ function resolveSoulUltimateImpact(ultimate, currentRun) {
   if (!state || state.runId !== currentRun || state.ended || !state.ultimateCasting) {
     return;
   }
-  applySoulUltimatePause(performance.now());
+  const impactTime = performance.now();
+  syncBossStunPresentationPause(impactTime);
+  applySoulUltimatePause(impactTime);
   const targetId = getIntent().part;
   const target = state.parts[targetId];
   const result = applySoulUltimateDamage(ultimate, targetId);
@@ -1821,9 +1827,6 @@ function applySoulUltimatePause(now) {
   if (state.chainDeadline) {
     state.chainDeadline += elapsed;
   }
-  if (state.bossStunned) {
-    state.bossStunEndsAt += elapsed;
-  }
   state.ultimateCastPauseApplied += elapsed;
 }
 
@@ -1833,6 +1836,7 @@ function finishSoulUltimateCast(currentRun) {
   }
   const now = performance.now();
   applySoulUltimatePause(now);
+  endBossStunPresentationPause(now);
   state.ultimateCasting = false;
   state.ultimateCastStartedAt = 0;
   state.ultimateCastPauseApplied = 0;
@@ -2218,6 +2222,51 @@ function renderBossStunProgress(now) {
   ui.autoActionText.textContent = "Boss眩晕 · " + (remaining / 1000).toFixed(1) + "s";
 }
 
+function isSkillPresentationPlaying() {
+  return Boolean(state && (state.videoPlaying || state.ultimateCasting));
+}
+
+function beginBossStunPresentationPause(now) {
+  if (!state) {
+    return;
+  }
+  if (!state.bossStunned) {
+    state.bossStunPausedRemaining = null;
+    return;
+  }
+  const remaining = Math.max(0, state.bossStunEndsAt - now);
+  if (remaining <= 0) {
+    finishBossStun(now);
+    state.bossStunPausedRemaining = null;
+    return;
+  }
+  state.bossStunPausedRemaining = remaining;
+  state.bossStunEndsAt = now + state.bossStunPausedRemaining;
+}
+
+function syncBossStunPresentationPause(now) {
+  if (
+    !state ||
+    !state.bossStunned ||
+    !isSkillPresentationPlaying() ||
+    typeof state.bossStunPausedRemaining !== "number"
+  ) {
+    return false;
+  }
+  state.bossStunEndsAt = now + state.bossStunPausedRemaining;
+  return true;
+}
+
+function endBossStunPresentationPause(now) {
+  if (!state) {
+    return;
+  }
+  if (state.bossStunned && typeof state.bossStunPausedRemaining === "number") {
+    state.bossStunEndsAt = now + state.bossStunPausedRemaining;
+  }
+  state.bossStunPausedRemaining = null;
+}
+
 function beginBossStun(partId, now) {
   if (
     !state ||
@@ -2228,6 +2277,7 @@ function beginBossStun(partId, now) {
     return;
   }
   const currentTime = typeof now === "number" ? now : performance.now();
+  syncBossStunPresentationPause(currentTime);
   const bossWasActing = state.actionActor === "boss";
   if (bossWasActing || getIntent().part === partId) {
     state.bossStunAdvanceIntent = true;
@@ -2245,6 +2295,9 @@ function beginBossStun(partId, now) {
     state.bossStunStartedAt = currentTime;
     state.bossStunEndsAt = refreshedEndAt;
     state.bossStunPartId = partId;
+    if (isSkillPresentationPlaying()) {
+      state.bossStunPausedRemaining = BOSS_STUN_DURATION;
+    }
     state.nextTurnAt += extension;
     state.nextPlayerAt += extension;
     state.lastPlayerActionAt += extension;
@@ -2270,6 +2323,9 @@ function beginBossStun(partId, now) {
   state.bossStunStartedAt = currentTime;
   state.bossStunEndsAt = currentTime + BOSS_STUN_DURATION;
   state.bossStunPartId = partId;
+  if (isSkillPresentationPlaying()) {
+    state.bossStunPausedRemaining = BOSS_STUN_DURATION;
+  }
   state.nextTurnAt += BOSS_STUN_DURATION;
   state.nextPlayerAt += BOSS_STUN_DURATION;
   state.lastPlayerActionAt += BOSS_STUN_DURATION;
@@ -2306,6 +2362,7 @@ function finishBossStun(now) {
   state.bossStunEndsAt = 0;
   state.bossStunPartId = null;
   state.bossStunAdvanceIntent = false;
+  state.bossStunPausedRemaining = null;
   state.nextTurnAt = Math.max(state.nextTurnAt, currentTime + 250);
   if (state.turnActor === "player") {
     state.nextPlayerAt = Math.max(state.nextPlayerAt, state.nextTurnAt);
@@ -2535,7 +2592,8 @@ function tickBattle() {
   advanceTimedEnergy(now);
   renderEnergyRecoveryProgress(now);
   if (state.bossStunned) {
-    if (now >= state.bossStunEndsAt) {
+    const presentationPaused = syncBossStunPresentationPause(now);
+    if (!presentationPaused && now >= state.bossStunEndsAt) {
       finishBossStun(now);
     } else {
       renderBossStunProgress(now);
@@ -2793,6 +2851,7 @@ function startPendingModuleVideo() {
   state.activeVideoEffect = payload;
   state.videoPlaying = true;
   state.videoStartedAt = now;
+  beginBossStunPresentationPause(now);
   state.chainDeadline += Math.max(0, now - payload.queuedAt);
 
   ui.moduleVideoType.textContent = payload.card.type + "介入";
@@ -2884,7 +2943,9 @@ function finishModuleVideo(skipped, expectedPayload) {
   }
 
   payload.resolved = true;
-  const elapsed = Math.max(0, performance.now() - state.videoStartedAt);
+  const finishedAt = performance.now();
+  const elapsed = Math.max(0, finishedAt - state.videoStartedAt);
+  endBossStunPresentationPause(finishedAt);
   state.videoPlaying = false;
   state.activeVideoEffect = null;
   state.videoStartedAt = 0;
@@ -2894,9 +2955,6 @@ function finishModuleVideo(skipped, expectedPayload) {
   state.nextPlayerAt += elapsed;
   if (state.chainDeadline) {
     state.chainDeadline += elapsed;
-  }
-  if (state.bossStunned) {
-    state.bossStunEndsAt += elapsed;
   }
   if (skipped) {
     showLog("已跳过“" + payload.card.name + "”表现，继续结算挂件效果");
@@ -3596,6 +3654,7 @@ function endBattle(victory, copy) {
   state.bossStunEndsAt = 0;
   state.bossStunPartId = null;
   state.bossStunAdvanceIntent = false;
+  state.bossStunPausedRemaining = null;
   ui.battlefield.classList.remove("boss-stunned");
   ui.bossUnit.classList.remove("is-stunned");
   ui.intentBanner.classList.remove("stunned");
