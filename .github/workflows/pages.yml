@@ -45,6 +45,7 @@ jobs:
           set -euo pipefail
           STRATEGY_PATH="$(find . -type f -path '*/demo-2d-strategy/index.html' -printf '%h\n' | head -n 1)"
           CARD_PATH="$(find . -type f -path '*/demo-armor-chain-cards/index.html' -printf '%h\n' | head -n 1)"
+          LITE_PATH="$(find . -type f -path '*/demo-2d-strategy-lite/index.html' -printf '%h\n' | head -n 1)"
 
           if [ -z "$STRATEGY_PATH" ]; then
             echo "demo-2d-strategy/index.html not found"
@@ -54,18 +55,25 @@ jobs:
             echo "demo-armor-chain-cards/index.html not found"
             exit 1
           fi
+          if [ -z "$LITE_PATH" ]; then
+            echo "demo-2d-strategy-lite/index.html not found"
+            exit 1
+          fi
 
           SITE_PATH="$RUNNER_TEMP/pages-site"
-          mkdir -p "$SITE_PATH/card"
+          mkdir -p "$SITE_PATH/card" "$SITE_PATH/lite"
           cp -a "$STRATEGY_PATH/." "$SITE_PATH/"
           cp -a "$CARD_PATH/." "$SITE_PATH/card/"
+          cp -a "$LITE_PATH/." "$SITE_PATH/lite/"
           find "$SITE_PATH" -type f -name '.server-*.log' -delete
           touch "$SITE_PATH/.nojekyll"
 
           test -f "$SITE_PATH/index.html"
           test -f "$SITE_PATH/card/index.html"
+          test -f "$SITE_PATH/lite/index.html"
           echo "Strategy entry: $SITE_PATH/index.html"
           echo "Card entry: $SITE_PATH/card/index.html"
+          echo "Strategy lite entry: $SITE_PATH/lite/index.html"
           echo "path=$SITE_PATH" >> "$GITHUB_OUTPUT"
 
       - uses: actions/configure-pages@v5

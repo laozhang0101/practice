@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#11171d" />
+    <title>M98 策略简化版 Demo</title>
+    <link rel="stylesheet" href="./styles.css?v=20260805-lite-11" />
+  </head>
+  <body>
+    <div class="rotate-notice" aria-hidden="true">
+      <strong>请横屏体验</strong>
+      <span>策略简化版按 16:9 战斗画面设计</span>
+    </div>
+
+    <div class="demo-version">策略简化版 · 2026.08.05</div>
+
+    <main class="prebattle-shell" id="prebattleShell" data-page="boss">
+      <header class="global-header">
+        <strong class="brand-mark">GM</strong>
+        <div class="flow-label" aria-label="当前流程">
+          <span id="flowStep">选择强敌</span>
+          <i></i>
+          <small>战前准备</small>
+        </div>
+      </header>
+
+      <section class="prebattle-page boss-page" id="bossPage" aria-label="选择强敌">
+        <aside class="boss-roster">
+          <header>
+            <small>讨伐名录</small>
+            <strong>选择强敌</strong>
+          </header>
+          <div class="boss-list">
+            <button class="boss-entry selected" type="button" aria-pressed="true">
+              <img src="./assets/boss.png" alt="" />
+              <span><strong>熔岩石头人</strong><small>巨型熔岩构装体</small></span>
+              <b>可挑战</b>
+            </button>
+            <button class="boss-entry locked" type="button" disabled>
+              <span class="locked-glyph">冰</span>
+              <span><strong>霜脊巨兽</strong><small>情报尚未解锁</small></span>
+              <b>未开放</b>
+            </button>
+            <button class="boss-entry locked" type="button" disabled>
+              <span class="locked-glyph">翼</span>
+              <span><strong>风暴翼龙</strong><small>情报尚未解锁</small></span>
+              <b>未开放</b>
+            </button>
+          </div>
+        </aside>
+
+        <section class="boss-showcase">
+          <div class="showcase-rings" aria-hidden="true"><i></i><i></i></div>
+          <div class="boss-title">
+            <small>熔岩坑 · 古代遗迹</small>
+            <h1>熔岩石头人</h1>
+            <p>行动迟缓但压迫感强，会交替使用投石、熔岩喷发与地面震击。</p>
+          </div>
+          <img src="./assets/boss.png" alt="熔岩石头人" />
+          <div class="threat-stamp">高威胁</div>
+        </section>
+
+        <aside class="boss-intel">
+          <header><small>怪物情报</small><strong>战斗前先读懂它</strong></header>
+          <dl class="ability-bars">
+            <div><dt>体力</dt><dd><i style="--value: 82%"></i></dd></div>
+            <div><dt>攻击</dt><dd><i style="--value: 88%"></i></dd></div>
+            <div><dt>速度</dt><dd><i style="--value: 34%"></i></dd></div>
+            <div><dt>防御</dt><dd><i style="--value: 76%"></i></dd></div>
+          </dl>
+          <div class="intel-notes">
+            <article><span class="note-icon">慢</span><div><strong>动作清晰</strong><p>攻击前摇较长，观察提示后再防御。</p></div></article>
+            <article><span class="note-icon danger">重</span><div><strong>单次伤害高</strong><p>连续判断失败会迅速陷入危险。</p></div></article>
+            <article class="unknown"><span class="note-icon">?</span><div><strong>未披露</strong><p>更深层行动尚待实战确认。</p></div></article>
+          </div>
+          <button class="primary-command" id="goLoadoutButton" type="button">战前整备</button>
+        </aside>
+      </section>
+
+      <section class="prebattle-page loadout-page hidden" id="loadoutPage" aria-label="战前选择武器与挂件">
+        <button class="back-command" id="backToBossButton" type="button" aria-label="返回选择强敌">‹</button>
+        <section class="fighter-preview">
+          <div class="preview-copy">
+            <small>战斗化身</small>
+            <h1 id="loadoutStyleName">近身压制</h1>
+            <p id="loadoutStyleSummary">高速连击、行动灵活，用连续出手压缩怪物行动空间。</p>
+          </div>
+          <div class="preview-rings" aria-hidden="true"><i></i><i></i></div>
+          <img id="loadoutPlayerImage" src="./assets/player-fists.png" alt="使用拳套的战斗化身" />
+          <div class="selected-weapon-badge">
+            <img id="selectedWeaponIcon" src="./assets/weapon-fists.png" alt="" />
+            <span><small>本次携带</small><strong id="selectedWeaponName">拳套</strong></span>
+          </div>
+        </section>
+
+        <aside class="weapon-briefing">
+          <header>
+            <small>战斗配置</small>
+            <strong>选择武器与挂件</strong>
+            <p>携带一把武器；挂件按身体部位装配，进入战斗后不可更换。</p>
+          </header>
+          <div class="weapon-options" id="weaponOptions"></div>
+          <section class="skill-preview">
+            <div class="section-title"><span>携带技能</span><small>固定 3 个</small></div>
+            <div class="skill-preview-list" id="skillPreviewList"></div>
+          </section>
+          <section class="accessory-preview">
+            <div class="section-title"><span>挂件装配</span><small id="accessoryCount">已装 0 / 6</small></div>
+            <div class="accessory-slots" id="accessorySlots" aria-label="挂件装配槽"></div>
+            <p class="accessory-selection-title" id="accessorySlotTitle">选择肩膀挂件</p>
+            <div class="accessory-options" id="accessoryOptions"></div>
+            <article class="accessory-detail" id="accessoryDetail" aria-live="polite"></article>
+          </section>
+          <button class="primary-command" id="enterBattleButton" type="button">进入挑战</button>
+        </aside>
+      </section>
+    </main>
+
+    <main class="battle-shell strategy-battle-shell hidden" id="battleShell">
+      <section class="stage-area">
+        <header class="topbar">
+          <div>
+            <h1>M98 2D 回合战斗验证</h1>
+            <p>保留战前单武器与挂件装配，战斗表现沿用策略版。</p>
+          </div>
+          <div class="battle-state">
+            <span id="phaseText">玩家回合</span>
+            <button id="restartBattleButton" type="button">重开</button>
+          </div>
+        </header>
+
+        <div class="battle-frame" id="battlefield">
+          <canvas id="battleCanvas" width="1366" height="768" aria-label="2D 战斗验证画面"></canvas>
+          <div class="turn-banner" id="turnBanner">玩家行动</div>
+          <aside class="battle-event-tip hidden" id="battleEventTip" aria-live="polite">
+            <small id="battleEventTipKicker">战斗提示</small>
+            <strong id="battleEventTipTitle"></strong>
+            <p id="battleEventTipCopy"></p>
+          </aside>
+          <div class="floating-layer" id="floatingLayer" aria-live="polite"></div>
+
+          <div class="battle-skill-overlay" id="battleSkillOverlay" aria-label="战斗技能栏">
+            <div class="battle-skill-list" id="battleSkills"></div>
+          </div>
+
+          <section class="cinematic-overlay hidden" id="cinematicOverlay" aria-live="polite">
+            <video id="cinematicVideo" muted playsinline preload="auto"></video>
+            <img class="cinematic-frame hidden" id="cinematicFrame" alt="" />
+            <div class="cinematic-caption" aria-hidden="true">
+              <small id="cinematicKicker">技能表现</small>
+              <strong id="cinematicTitle"></strong>
+            </div>
+            <div class="qte-overlay hidden" id="qteOverlay">
+              <strong class="qte-title" id="qteTitle">格挡时机</strong>
+              <span class="qte-copy" id="qteCopy">W 格挡</span>
+              <div class="qte-bar"><i id="qteGauge"></i></div>
+              <div class="defense-controls" id="defenseControls" aria-label="防御操作">
+                <button type="button" data-defense="left"><kbd>A</kbd><span>左闪</span></button>
+                <button type="button" data-defense="block"><kbd>W</kbd><span>格挡</span></button>
+                <button type="button" data-defense="right"><kbd>D</kbd><span>右闪</span></button>
+              </div>
+            </div>
+            <div class="accessory-choice hidden" id="accessoryChoice" aria-label="选择挂件协同"></div>
+          </section>
+
+          <div class="battle-hidden-proxies" aria-hidden="true">
+            <span id="battleWeaponName"></span>
+            <i id="playerHpBar"></i><b id="playerHpText"></b>
+            <i id="bossHpBar"></i><b id="bossHpText"></b>
+            <span id="enemyCue"></span><strong id="enemyAttackName"></strong><span id="enemyHint"></span>
+            <i id="warningMeter"></i><section id="enemyWarning"></section>
+            <span id="playerUnit"></span><span id="bossUnit"></span>
+            <img id="battlePlayerImage" alt="" />
+            <img id="battleWeaponIcon" alt="" />
+          </div>
+        </div>
+
+        <div class="timeline">
+          <div>
+            <span>当前回合</span>
+            <div class="turn-pill" id="roundText">第 1 回合</div>
+          </div>
+          <div>
+            <span>本场武器</span>
+            <div class="turn-pill weapon" id="battleWeaponStyle">拳套 · 近身压制</div>
+          </div>
+          <div>
+            <span>行动力</span>
+            <div class="turn-pill action"><strong id="actionPointText">4 / 7</strong><div class="energy-cells" id="energyCells"></div></div>
+            <span class="ammo-status hidden" id="ammoStatus"><small>弹药</small><strong id="ammoText">10 / 10</strong></span>
+          </div>
+        </div>
+        <div class="battle-accessories hidden" id="battleAccessories" aria-hidden="true"></div>
+      </section>
+
+      <aside class="control-area battle-sidebar">
+        <section class="panel log-panel">
+          <h2>战斗记录</h2>
+          <ol id="battleLog" aria-live="polite"></ol>
+          <div class="sidebar-actions">
+            <button id="returnLoadoutButton" type="button">返回整备</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="result-overlay hidden" id="resultOverlay" aria-live="assertive">
+        <div>
+          <small>挑战结果</small>
+          <h2 id="resultTitle">战斗胜利</h2>
+          <p id="resultCopy">你用选定的武器击败了熔岩石头人。</p>
+          <button id="resultRestartButton" type="button">再次挑战</button>
+          <button id="resultLoadoutButton" type="button">返回整备</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="./game.js?v=20260805-lite-11"></script>
+  </body>
+</html>
