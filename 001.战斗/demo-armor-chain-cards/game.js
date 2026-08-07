@@ -1,6 +1,6 @@
 "use strict";
 
-const DEMO_VERSION = "卡牌版 v0.4.1-impact-sync · 2026.08.07";
+const DEMO_VERSION = "卡牌版 v0.4.2-compact-mode-toggle · 2026.08.07";
 const MAX_PLAYER_HP = 220;
 const MAX_BOSS_HP = 420;
 const MAX_ENERGY = 10;
