@@ -7158,6 +7158,32 @@ button:focus-visible {
   display: none;
 }
 
+.module-cinematic.frame-sequence-presentation .module-frame-stage {
+  gap: 8px;
+}
+
+.module-cinematic.frame-sequence-presentation .module-frame-core {
+  width: min(72vw, 760px);
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
+.module-cinematic.frame-sequence-presentation .module-frame-core::before,
+.module-cinematic.frame-sequence-presentation .module-frame-core::after,
+.module-cinematic.frame-sequence-presentation .module-frame-core i {
+  display: none;
+}
+
+.module-cinematic.frame-sequence-presentation .module-frame-core img {
+  width: 100%;
+  height: 100%;
+  border-width: 2px;
+  border-radius: 10px;
+  object-fit: cover;
+  animation: none;
+  box-shadow: 0 0 32px color-mix(in srgb, var(--module-color), transparent 38%);
+}
+
 .module-frame-stage {
   position: absolute;
   z-index: 2;
@@ -8343,6 +8369,18 @@ button:focus-visible {
   color: #fff1dc;
   background: linear-gradient(135deg, rgba(125, 45, 22, .96), rgba(37, 16, 13, .94));
   box-shadow: 0 0 9px rgba(237, 94, 48, .46);
+}
+
+.module-card.live-card.target-multi .weapon-fit {
+  border-color: rgba(255, 190, 94, .9);
+  color: #fff4c9;
+  background: linear-gradient(135deg, rgba(142, 67, 20, .98), rgba(48, 21, 12, .95));
+  box-shadow: 0 0 10px rgba(255, 143, 52, .56);
+}
+
+.module-card.live-card.weapon-skill-card > img {
+  object-fit: cover;
+  filter: saturate(1.08) contrast(1.05);
 }
 
 .module-card.live-card.target-general .weapon-fit {

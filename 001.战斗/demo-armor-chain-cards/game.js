@@ -1,6 +1,6 @@
 "use strict";
 
-const DEMO_VERSION = "卡牌版 v0.4.2-compact-mode-toggle · 2026.08.07";
+const DEMO_VERSION = "卡牌版 v0.5.0-fist-skill-cards · 2026.08.07";
 const MAX_PLAYER_HP = 220;
 const MAX_BOSS_HP = 420;
 const MAX_ENERGY = 10;
@@ -30,6 +30,8 @@ const INTERVENTION_TIME_SCALE = 0.3;
 const INTERVENTION_RELEASE_DELAY = 900;
 const MODULE_FRAME_DURATION = 900;
 const MODULE_VIDEO_TIMEOUT = 12000;
+const FIST_FRAME_INTERVAL = 250;
+const FIST_CHAIN_WINDOW = 30000;
 const MIN_TURN_GAP = 600;
 const BOSS_STUN_DURATION = 5000;
 const CARD_TO_BOSS_DELAY = 680;
@@ -37,8 +39,20 @@ const AUTO_MODE_RESUME_DELAY = 420;
 const AUTO_CHAIN_CONTINUE_WINDOW = 8200;
 const STUN_AUTO_CARD_GAP = 280;
 
-const deckRecipe = ["armor", "reactor", "jet", "cannon", "drone", "gourd", "reactor", "cannon"];
-const openingHandRecipe = ["reactor", "jet", "cannon", "gourd"];
+const deckRecipe = [
+  "armor",
+  "reactor",
+  "jet",
+  "cannon",
+  "drone",
+  "gourd",
+  "fist_arm_rush",
+  "fist_leg_drive",
+  "fist_flurry",
+  "reactor",
+  "cannon",
+];
+const openingHandRecipe = ["reactor", "fist_arm_rush", "fist_leg_drive", "fist_flurry"];
 
 const weaponModes = [
   {
@@ -53,7 +67,7 @@ const weaponModes = [
     impactDelay: 620,
     recoverDelay: 1400,
     cadence: "稳定连击",
-    synergyCards: ["reactor", "jet", "drone"],
+    synergyCards: ["reactor", "jet", "drone", "fist_arm_rush", "fist_leg_drive", "fist_flurry"],
     neutralCards: ["gourd"],
     sound: { wave: "square", start: 230, end: 360, duration: 0.11 },
     actions: [
@@ -109,6 +123,76 @@ const weaponModes = [
 const availableStyleIds = new Set(["fists"]);
 
 const cards = [
+  {
+    id: "fist_arm_rush",
+    weaponId: "fists",
+    name: "核心连打",
+    type: "拳套技能",
+    role: "追击",
+    icon: "./assets/fist-skill-preview.jpg",
+    cost: 4,
+    color: "#ef873f",
+    summary: "贴身连拳直击胸口；裸露时伤害提高，并有50%概率追加一记追拳。",
+    usage: "胸口单体 · 裸露追击",
+    effectTags: ["胸口单体", "50%追击"],
+    targetParts: ["core"],
+    damage: 24,
+    armorDamage: 8,
+    exposedBonus: 1.65,
+    pressure: 22,
+    followUpChance: 0.5,
+    followUpDamage: 22,
+    video: "./assets/fist-skill.mp4",
+  },
+  {
+    id: "fist_leg_drive",
+    weaponId: "fists",
+    name: "贴地踢击",
+    type: "拳套技能",
+    role: "破绽",
+    icon: "./assets/skill-frames/fist-close-flurry/frame_005.webp",
+    cost: 5,
+    color: "#f09a48",
+    summary: "低身突进踢击脚部；对裸露脚部造成高额伤害，并有50%概率追击。",
+    usage: "脚部单体 · 裸露追击",
+    effectTags: ["脚部单体", "50%追击"],
+    targetParts: ["legs"],
+    damage: 44,
+    armorDamage: 8,
+    exposedBonus: 1.6,
+    pressure: 28,
+    followUpChance: 0.5,
+    followUpDamage: 22,
+    video: "./assets/videos/fist-leg-drive.mp4",
+  },
+  {
+    id: "fist_flurry",
+    weaponId: "fists",
+    name: "近身乱舞",
+    type: "拳套技能",
+    role: "全压制",
+    icon: "./assets/skill-frames/fist-close-flurry/frame_007.webp",
+    cost: 6,
+    color: "#ffb15a",
+    summary: "从多个角度连续攻击胸口、手部与脚部；总伤害按一次技能结算。",
+    usage: "全部位 · 连续压制",
+    effectTags: ["三部位", "总伤害归一"],
+    targetParts: ["core", "arms", "legs"],
+    damage: 56,
+    armorDamage: 6,
+    exposedBonus: 1.35,
+    pressure: 34,
+    frames: [
+      "./assets/skill-frames/fist-close-flurry/frame_001.webp",
+      "./assets/skill-frames/fist-close-flurry/frame_002.webp",
+      "./assets/skill-frames/fist-close-flurry/frame_003.webp",
+      "./assets/skill-frames/fist-close-flurry/frame_004.webp",
+      "./assets/skill-frames/fist-close-flurry/frame_005.webp",
+      "./assets/skill-frames/fist-close-flurry/frame_006.webp",
+      "./assets/skill-frames/fist-close-flurry/frame_007.webp",
+      "./assets/skill-frames/fist-close-flurry/frame_008.webp",
+    ],
+  },
   {
     id: "armor",
     name: "战甲承压",
@@ -242,6 +326,9 @@ const linkRules = {
   "reactor>cannon": { name: "高能炮击", bonus: 0.22 },
   "jet>cannon": { name: "空中火力", bonus: 0.2 },
   "cannon>drone": { name: "交叉追击", bonus: 0.18 },
+  "reactor>fist_arm_rush": { name: "超载起式", bonus: 0.12 },
+  "fist_arm_rush>fist_leg_drive": { name: "拳势追击", bonus: 0.16 },
+  "fist_leg_drive>fist_flurry": { name: "三段压制", bonus: 0.2 },
 };
 
 const chainTiers = [
@@ -427,6 +514,7 @@ let logTimer = 0;
 let resolvedChainTimer = 0;
 let modulePresentationTimer = 0;
 let modulePresentationWatchdog = 0;
+let moduleFrameSequenceTimer = 0;
 let modulePresentationSerial = 0;
 let audioContext = null;
 let runToken = 0;
@@ -680,6 +768,9 @@ function currentWeaponMode() {
 
 function getWeaponCardAffinity(card, weapon) {
   const activeWeapon = weapon || currentWeaponMode();
+  if (card.weaponId && card.weaponId === activeWeapon.id) {
+    return "linked";
+  }
   if (activeWeapon.synergyCards.includes(card.id)) {
     return "linked";
   }
@@ -1372,7 +1463,7 @@ function renderCards() {
     const card = getCard(instance.cardId);
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "module-card live-card";
+    button.className = "module-card live-card" + (card.weaponId ? " weapon-skill-card" : "");
     button.style.setProperty("--card-color", card.color);
     button.dataset.cardId = card.id;
     button.dataset.cardInstance = instance.uid;
@@ -1683,7 +1774,14 @@ function updateCardStates(now) {
         : 1;
     const energyAccess = freeDuringBossStun ? "free" : lacksEnergy ? "locked" : "ready";
     const previousEnergyAccess = instance.energyAccessState;
-    const targetPartId = card.targetsIntentPart ? getIntent().part : "general";
+    const fixedTargetParts = Array.isArray(card.targetParts) ? card.targetParts : [];
+    const targetPartId = fixedTargetParts.length > 1
+      ? "multi"
+      : fixedTargetParts.length === 1
+        ? fixedTargetParts[0]
+        : card.targetsIntentPart
+          ? getIntent().part
+          : "general";
     const fitLabel = button.querySelector(".weapon-fit");
     const costLabel = button.querySelector(".card-cost b");
     button.style.setProperty(
@@ -1725,12 +1823,14 @@ function updateCardStates(now) {
     button.classList.toggle("weapon-linked", affinity === "linked");
     button.classList.toggle("weapon-neutral", affinity === "neutral");
     button.classList.toggle("weapon-unlinked", affinity === "unlinked");
-    button.classList.remove("target-arms", "target-core", "target-legs", "target-general");
+    button.classList.remove("target-arms", "target-core", "target-legs", "target-multi", "target-general");
     button.classList.add("target-" + targetPartId);
     if (fitLabel) {
-      fitLabel.textContent = targetPartId === "general"
-        ? "通用"
-        : partBlueprints[targetPartId].name;
+      fitLabel.textContent = targetPartId === "multi"
+        ? "全"
+        : targetPartId === "general"
+          ? "通用"
+          : partBlueprints[targetPartId].name;
     }
     if (costLabel) {
       costLabel.textContent = freeDuringBossStun ? "0" : card.cost;
@@ -1771,7 +1871,7 @@ function updateCardStates(now) {
         : freeDuringBossStun
           ? "Boss倒地 · 免费释放 · " + card.summary
         : lacksEnergy
-          ? "战甲能量不足 · " + card.summary
+          ? "战术能量不足 · " + card.summary
           : "点击立即激活 · " + card.summary;
   });
 }
@@ -3472,7 +3572,10 @@ function activateCard(cardInstanceId, sourceButton, origin) {
 
   state.energy -= energySpent;
   state.chain.push({ card: card, link: link.name, bonus: link.bonus, comboBonus: comboBonus });
-  state.chainWindow = BASE_CHAIN_WINDOW + (hasCardInChain("armor") ? 650 : 0);
+  const fistSequenceActive = card.weaponId === "fists" || (previous && previous.weaponId === "fists");
+  state.chainWindow = fistSequenceActive
+    ? FIST_CHAIN_WINDOW
+    : BASE_CHAIN_WINDOW + (hasCardInChain("armor") ? 650 : 0);
   state.chainDeadline = now + state.chainWindow;
   const presentationPayload = {
     card: card,
@@ -3506,7 +3609,7 @@ function activateCard(cardInstanceId, sourceButton, origin) {
     (freeDuringBossStun ? "免费释放" : "已释放") +
     " · 表现完成后结算效果";
   showLog(
-    card.name + "挂件协议已提交" +
+    card.name + "卡牌指令已提交" +
       (freeDuringBossStun ? "，Boss倒地期间不消耗战术能量" : "，等待释放表现"),
   );
 
@@ -3548,12 +3651,15 @@ function startPendingModuleVideo() {
   beginBossStunPresentationPause(now);
   state.chainDeadline += Math.max(0, now - payload.queuedAt);
 
-  ui.moduleVideoType.textContent = payload.card.type + "介入";
+  ui.moduleVideoType.textContent = payload.card.type;
   ui.moduleVideoTitle.textContent = payload.card.name;
   renderModuleVideoCombo(payload);
+  const hasFrameSequence = Array.isArray(payload.card.frames) && payload.card.frames.length > 0;
   ui.moduleCinematic.className =
     "cinematic module-cinematic " +
-    (payload.card.video ? "video-presentation" : "frame-presentation frame-" + payload.card.id);
+    (payload.card.video
+      ? "video-presentation"
+      : "frame-presentation " + (hasFrameSequence ? "frame-sequence-presentation " : "") + "frame-" + payload.card.id);
   ui.moduleCinematic.style.setProperty("--module-color", payload.card.color);
   ui.moduleCinematic.setAttribute("aria-hidden", "false");
   updateCardStates(now);
@@ -3562,12 +3668,19 @@ function startPendingModuleVideo() {
     ui.moduleVideo.classList.add("hidden");
     ui.moduleFrameStage.classList.remove("hidden");
     ui.moduleFrameStage.setAttribute("aria-hidden", "false");
-    ui.moduleFrameIcon.src = payload.card.icon;
+    ui.moduleFrameIcon.src = hasFrameSequence ? payload.card.frames[0] : payload.card.icon;
     ui.moduleFrameIcon.alt = "";
     ui.moduleFrameName.textContent = payload.card.name;
+    if (hasFrameSequence) {
+      let frameIndex = 0;
+      moduleFrameSequenceTimer = window.setInterval(function () {
+        frameIndex = (frameIndex + 1) % payload.card.frames.length;
+        ui.moduleFrameIcon.src = payload.card.frames[frameIndex];
+      }, FIST_FRAME_INTERVAL);
+    }
     modulePresentationTimer = window.setTimeout(function () {
       finishModuleVideo(false, payload);
-    }, MODULE_FRAME_DURATION);
+    }, hasFrameSequence ? payload.card.frames.length * FIST_FRAME_INTERVAL : MODULE_FRAME_DURATION);
     return;
   }
 
@@ -3615,9 +3728,9 @@ function renderModuleVideoCombo(payload) {
   if (payload.previous) {
     ui.moduleVideoComboName.textContent = payload.previous.name + " → " + payload.card.name;
     ui.moduleVideoComboEffect.textContent =
-      payload.link.name + " · 前置部件完成后触发当前挂件";
+      payload.link.name + " · 前一张卡完成后触发当前技能";
   } else {
-    ui.moduleVideoComboName.textContent = "独立启动";
+    ui.moduleVideoComboName.textContent = "独立释放";
     ui.moduleVideoComboEffect.textContent = "释放表现完成后，结算自身效果";
   }
 }
@@ -3651,7 +3764,7 @@ function finishModuleVideo(skipped, expectedPayload) {
     state.chainDeadline += elapsed;
   }
   if (skipped) {
-    showLog("已跳过“" + payload.card.name + "”表现，继续结算挂件效果");
+    showLog("已跳过“" + payload.card.name + "”表现，继续结算卡牌效果");
   }
 
   const energySpent = typeof payload.energySpent === "number"
@@ -3677,8 +3790,10 @@ function hideModuleVideo() {
   }
   clearTimeout(modulePresentationTimer);
   clearTimeout(modulePresentationWatchdog);
+  clearInterval(moduleFrameSequenceTimer);
   modulePresentationTimer = 0;
   modulePresentationWatchdog = 0;
+  moduleFrameSequenceTimer = 0;
   ui.moduleVideo.onended = null;
   ui.moduleVideo.onerror = null;
   ui.moduleVideo.pause();
@@ -3713,7 +3828,9 @@ function applyCardEffect(card, chainIndex, link, energySpent) {
   pulseCombatClass("player-skill-action", 720);
   triggerModuleFx(card, chainIndex);
 
-  if (card.id === "armor") {
+  if (card.weaponId === "fists") {
+    applyFistSkillCard(card, multiplier, resolvedEnergySpent);
+  } else if (card.id === "armor") {
     state.armorGuard += 1;
     showMessage("战甲过载接入，下一次受击将被大幅削减");
   } else if (card.id === "reactor") {
@@ -3744,6 +3861,112 @@ function applyCardEffect(card, chainIndex, link, energySpent) {
   updateCardStates(performance.now());
   checkIntentInterrupted(performance.now());
   checkBattleEnd();
+}
+
+function applyFistSkillCard(card, multiplier, energySpent) {
+  const targetIds = (card.targetParts || []).filter(function (partId) {
+    return Boolean(state.parts[partId]);
+  });
+  if (!targetIds.length) {
+    return;
+  }
+
+  const intentPartId = getIntent().part;
+  const orderedTargetIds = targetIds.slice().sort(function (left, right) {
+    if (left === intentPartId) return -1;
+    if (right === intentPartId) return 1;
+    return 0;
+  });
+  const multiTarget = orderedTargetIds.length > 1;
+  const bossHpBefore = state.bossHp;
+  const queuedBonus = state.nextAutoBonus;
+  state.nextAutoBonus = 0;
+  let aggregateBossDamage = 0;
+  let anyPartBroken = false;
+  const brokenPartIds = [];
+
+  orderedTargetIds.forEach(function (targetId, index) {
+    const target = state.parts[targetId];
+    const exposedMultiplier = target.armor <= 0 ? card.exposedBonus || 1 : 1;
+    const bonusDamage = index === 0 ? queuedBonus : 0;
+    const damage = Math.round(card.damage * multiplier * exposedMultiplier) + bonusDamage;
+    const armorDamage = Math.round(card.armorDamage * multiplier) +
+      (index === 0 ? Math.round(queuedBonus * 1.2) : 0);
+    const result = damagePart(targetId, damage, armorDamage, { suppressStun: multiTarget });
+    aggregateBossDamage += result.bossDamage;
+    anyPartBroken = anyPartBroken || result.partBroken;
+    if (result.partBroken) {
+      brokenPartIds.push(targetId);
+    }
+    if (!multiTarget) {
+      createFloat("-" + result.bossDamage, false);
+    }
+    const burstPoints = {
+      core: [0.5, 0.4],
+      arms: [0.36, 0.48],
+      legs: [0.54, 0.76],
+    };
+    const point = burstPoints[targetId] || [0.5, 0.44];
+    window.setTimeout(function () {
+      createUnitBurst(ui.bossUnit, point[0], point[1], card.color);
+    }, index * 90);
+    if (multiTarget) {
+      state.bossHp = bossHpBefore;
+    }
+  });
+
+  if (multiTarget) {
+    aggregateBossDamage = Math.max(1, Math.round(aggregateBossDamage / orderedTargetIds.length));
+    state.bossHp = Math.max(0, bossHpBefore - aggregateBossDamage);
+    createFloat("全域 -" + aggregateBossDamage, false);
+    if (brokenPartIds.length && state.bossHp > 0) {
+      beginBossStun(brokenPartIds[0], performance.now());
+    }
+  }
+
+  let followUpDamage = 0;
+  if (
+    !multiTarget &&
+    state.bossHp > 0 &&
+    card.followUpChance &&
+    Math.random() < card.followUpChance
+  ) {
+    const targetId = orderedTargetIds[0];
+    const target = state.parts[targetId];
+    const followUpBase = Math.round((card.followUpDamage || 0) * multiplier);
+    const followUp = damagePart(targetId, followUpBase, 0);
+    followUpDamage = followUp.bossDamage;
+    aggregateBossDamage += followUpDamage;
+    anyPartBroken = anyPartBroken || followUp.partBroken;
+    window.setTimeout(function () {
+      createFloat("追击 -" + followUpDamage, false);
+      createUnitBurst(ui.bossUnit, targetId === "legs" ? 0.53 : 0.5, targetId === "legs" ? 0.75 : 0.4, "#ffe0a3");
+    }, 140);
+  }
+
+  if (targetIds.includes(intentPartId)) {
+    state.intentPressure += Math.round((card.pressure || 0) * multiplier);
+  }
+  if (aggregateBossDamage > 0 && energySpent > 0) {
+    addSoulEnergy(
+      energySpent * SOUL_GAIN_PER_SPENT_ENERGY,
+      card.name + "消耗" + energySpent + "点战术能量并造成伤害",
+    );
+  }
+
+  pulseCombatClass("boss-hit", multiTarget ? 520 : 380);
+  pulseCombatClass("shake", multiTarget ? 520 : 360);
+  showMessage(
+    card.name + "命中" +
+      (multiTarget ? "全部位" : state.parts[orderedTargetIds[0]].name) +
+      "，造成 " + aggregateBossDamage + " 点伤害" +
+      (followUpDamage > 0 ? " · 触发追击" : "") +
+      (anyPartBroken && state.bossHp > 0 ? " · 部位破坏，Boss眩晕5秒" : ""),
+  );
+  showLog(
+    "拳套技能“" + card.name + "”已执行" +
+      (queuedBonus > 0 ? "，喷气增幅 +" + queuedBonus : ""),
+  );
 }
 
 function applyModuleHit(card, damage, armorDamage, pressure, energySpent) {
@@ -3779,7 +4002,8 @@ function applyModuleHit(card, damage, armorDamage, pressure, energySpent) {
   }
 }
 
-function damagePart(partId, damage, armorDamage) {
+function damagePart(partId, damage, armorDamage, options) {
+  const resolvedOptions = options || {};
   const part = state.parts[partId];
   const armorBefore = part.armor;
   const hpBefore = part.hp;
@@ -3806,7 +4030,7 @@ function damagePart(partId, damage, armorDamage) {
     armorBroken: armorBefore > 0 && part.armor <= 0,
     partBroken: hpBefore > 0 && part.hp <= 0,
   };
-  if (result.partBroken) {
+  if (result.partBroken && !resolvedOptions.suppressStun) {
     beginBossStun(partId, performance.now());
   }
   return result;
@@ -4107,7 +4331,9 @@ function handleDefenseInput(choice) {
 function createCardProjectile(card, sourceButton) {
   const sourceRect = sourceButton.getBoundingClientRect();
   let target = ui.playerUnit;
-  if (card.id === "reactor" || card.id === "jet" || card.id === "cannon") {
+  if (card.weaponId) {
+    target = ui.bossUnit;
+  } else if (card.id === "reactor" || card.id === "jet" || card.id === "cannon") {
     target = ui.playerUnit.querySelector('[data-socket="' + card.id + '"]') || ui.playerUnit;
   } else if (card.id === "drone") {
     target = ui.droneUnit;
@@ -4142,6 +4368,19 @@ function triggerModuleFx(card, chainIndex) {
 
   if (card.id === "armor") {
     createUnitBurst(ui.playerUnit, 0.42, 0.48, card.color);
+  } else if (card.weaponId === "fists") {
+    triggerWeaponAttackFx(currentWeaponMode(), chainIndex >= 1);
+    playWeaponAttackSound(currentWeaponMode());
+    if (card.id === "fist_leg_drive") {
+      createUnitBeam(ui.playerUnit, 0.58, 0.68, ui.bossUnit, 0.52, 0.76, card.color);
+      createUnitBurst(ui.bossUnit, 0.52, 0.76, card.color);
+    } else if (card.id === "fist_flurry") {
+      createUnitBeam(ui.playerUnit, 0.58, 0.34, ui.bossUnit, 0.48, 0.42, card.color);
+      window.setTimeout(function () {
+        createUnitBurst(ui.bossUnit, 0.36, 0.48, card.color);
+        createUnitBurst(ui.bossUnit, 0.54, 0.76, card.color);
+      }, 120);
+    }
   } else if (card.id === "reactor") {
     pulseSocket("reactor");
   } else if (card.id === "jet") {
