@@ -1,6 +1,6 @@
 "use strict";
 
-const DEMO_VERSION = "卡牌版 v0.4.0-auto-duel · 2026.08.07";
+const DEMO_VERSION = "卡牌版 v0.4.1-impact-sync · 2026.08.07";
 const MAX_PLAYER_HP = 220;
 const MAX_BOSS_HP = 420;
 const MAX_ENERGY = 10;
@@ -14,7 +14,13 @@ const ULTIMATE_CAST_DURATION = 1120;
 const BOSS_TURN_INTERVAL = 3400;
 const FIRST_TURN_DELAY = 1500;
 const BOSS_IMPACT_DELAY = 2400;
-const ATTACK_RECOVER_DELAY = 2950;
+const BOSS_LUNGE_DURATION = 1320;
+const BOSS_LUNGE_CONTACT_PROGRESS = 0.42;
+const BOSS_LUNGE_CONTACT_OFFSET = Math.round(
+  BOSS_LUNGE_DURATION * BOSS_LUNGE_CONTACT_PROGRESS,
+);
+const BOSS_LUNGE_START_DELAY = Math.max(0, BOSS_IMPACT_DELAY - BOSS_LUNGE_CONTACT_OFFSET);
+const ATTACK_RECOVER_DELAY = BOSS_LUNGE_START_DELAY + BOSS_LUNGE_DURATION + 100;
 const ENERGY_INTERVAL = 4000;
 const BASE_CHAIN_WINDOW = 2700;
 const MAX_HAND_SIZE = 4;
@@ -3908,7 +3914,6 @@ function resolveBossAttack(now) {
   state.reactionActive = !state.intentInterrupted;
   state.reactionChoice = null;
   ui.autoActionText.textContent = "Boss回合 · " + intent.name;
-  pulseCombatClass("boss-turn", ATTACK_RECOVER_DELAY);
   updateCombatStance();
   renderStatus();
   renderReactionControls();
@@ -3932,6 +3937,20 @@ function resolveBossAttack(now) {
     }, 360);
   } else {
     showMessage(intent.responseHint);
+    window.setTimeout(function () {
+      if (
+        !state ||
+        state.runId !== currentRun ||
+        state.ended ||
+        state.activeActionId !== actionId ||
+        state.actionActor !== "boss" ||
+        state.intentInterrupted ||
+        state.bossStunned
+      ) {
+        return;
+      }
+      pulseCombatClass("boss-turn", BOSS_LUNGE_DURATION);
+    }, BOSS_LUNGE_START_DELAY);
     window.setTimeout(function () {
       if (
         !state ||

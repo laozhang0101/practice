@@ -1610,8 +1610,12 @@ button:focus-visible {
 
 @keyframes damageRise {
   0% {
-    opacity: 0;
-    transform: translate(-50%, 12px) scale(0.72);
+    opacity: .92;
+    transform: translate(-50%, 6px) scale(0.86);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(-50%, 1px) scale(1.06);
   }
   28% {
     opacity: 1;
@@ -1622,6 +1626,8 @@ button:focus-visible {
     transform: translate(-50%, -42px) scale(0.92);
   }
 }
+
+/* v0.4.1: Boss damage and floating numbers resolve on the lunge contact frame. */
 
 @keyframes energyBurst {
   0% {
