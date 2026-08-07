@@ -1,6 +1,6 @@
 "use strict";
 
-const DEMO_VERSION = "卡牌版 v0.5.0-fist-skill-cards · 2026.08.07";
+const DEMO_VERSION = "卡牌版 v0.5.1-stun-card-cooldown · 2026.08.07";
 const MAX_PLAYER_HP = 220;
 const MAX_BOSS_HP = 420;
 const MAX_ENERGY = 10;
@@ -37,7 +37,7 @@ const BOSS_STUN_DURATION = 5000;
 const CARD_TO_BOSS_DELAY = 680;
 const AUTO_MODE_RESUME_DELAY = 420;
 const AUTO_CHAIN_CONTINUE_WINDOW = 8200;
-const STUN_AUTO_CARD_GAP = 280;
+const STUN_AUTO_CARD_GAP = 500;
 
 const deckRecipe = [
   "armor",
@@ -668,6 +668,8 @@ function createInitialState(selectedStyleId, phase) {
     reactionChoice: null,
     cardPlayMode: "auto",
     cardTurnResolving: false,
+    cardPlayCooldownStartedAt: 0,
+    cardPlayCooldownEndsAt: 0,
     cardDragActive: false,
     autoResumeAt: now + FIRST_TURN_DELAY,
     drawPile: deckState.drawPile,
@@ -1301,6 +1303,9 @@ function isPlayerCardWindowOpen(now) {
   if (state && state.bossStunned && !stunFree) {
     return false;
   }
+  if (state && state.cardPlayMode === "auto" && isCardPlayCooldownActive(currentTime)) {
+    return false;
+  }
   return Boolean(
     state &&
     state.phase === "battle" &&
@@ -1747,12 +1752,49 @@ function hasBossStunFreeCards(now) {
   );
 }
 
+function isCardPlayCooldownActive(now) {
+  const currentTime = typeof now === "number" ? now : performance.now();
+  return Boolean(state && state.cardPlayCooldownEndsAt > currentTime);
+}
+
+function getCardPlayCooldownRatio(now) {
+  const currentTime = typeof now === "number" ? now : performance.now();
+  if (!isCardPlayCooldownActive(currentTime)) {
+    return 0;
+  }
+  const duration = Math.max(1, state.cardPlayCooldownEndsAt - state.cardPlayCooldownStartedAt);
+  return Math.max(
+    0,
+    Math.min(1, (state.cardPlayCooldownEndsAt - currentTime) / duration),
+  );
+}
+
+function startCardPlayCooldown(now, duration) {
+  const currentTime = typeof now === "number" ? now : performance.now();
+  const cooldownDuration = Math.max(0, Number(duration) || 0);
+  state.cardPlayCooldownStartedAt = currentTime;
+  state.cardPlayCooldownEndsAt = currentTime + cooldownDuration;
+}
+
+function clearCardPlayCooldown() {
+  if (!state) {
+    return;
+  }
+  state.cardPlayCooldownStartedAt = 0;
+  state.cardPlayCooldownEndsAt = 0;
+}
+
 function updateCardStates(now) {
+  const currentTime = typeof now === "number" ? now : performance.now();
   const resolutionLocked = isCardResolutionLocked();
   const bossActionLocked = isBossActionLocked();
   const battleActive = state.phase === "battle" && !state.ended;
-  const freeDuringBossStun = hasBossStunFreeCards(now);
-  const playerWindowOpen = isPlayerCardWindowOpen(now);
+  const freeDuringBossStun = hasBossStunFreeCards(currentTime);
+  const playCooldownRatio = state.cardPlayMode === "auto"
+    ? getCardPlayCooldownRatio(currentTime)
+    : 0;
+  const playCooldownActive = playCooldownRatio > 0;
+  const playerWindowOpen = isPlayerCardWindowOpen(currentTime);
   renderCardPlayMode();
   state.hand.forEach(function (instance, index) {
     const card = getCard(instance.cardId);
@@ -1765,7 +1807,7 @@ function updateCardStates(now) {
     const lacksEnergy = !freeDuringBossStun && card.cost > state.energy;
     const visualEnergy = Math.min(
       MAX_ENERGY,
-      state.energy + getEnergyRecoveryProgress(now),
+      state.energy + getEnergyRecoveryProgress(currentTime),
     );
     const energyRatio = freeDuringBossStun
       ? 1
@@ -1784,9 +1826,10 @@ function updateCardStates(now) {
           : "general";
     const fitLabel = button.querySelector(".weapon-fit");
     const costLabel = button.querySelector(".card-cost b");
+    const cardShadowRatio = Math.max(1 - energyRatio, playCooldownRatio);
     button.style.setProperty(
       "--energy-shadow-height",
-      ((1 - energyRatio) * 100).toFixed(2) + "%",
+      (cardShadowRatio * 100).toFixed(2) + "%",
     );
     if (lacksEnergy) {
       button.classList.remove("energy-ready-flash");
@@ -1801,7 +1844,9 @@ function updateCardStates(now) {
       instance.energyReadyFlashPending &&
       energyAccess !== "locked" &&
       battleActive &&
-      !resolutionLocked
+      !resolutionLocked &&
+      !playCooldownActive &&
+      playerWindowOpen
     ) {
       button.classList.remove("energy-ready-flash");
       void button.offsetWidth;
@@ -1814,6 +1859,7 @@ function updateCardStates(now) {
     button.draggable = false;
     button.removeAttribute("aria-disabled");
     button.classList.toggle("energy-locked", lacksEnergy);
+    button.classList.toggle("play-cooldown", playCooldownActive);
     button.classList.toggle("stun-free-cast", freeDuringBossStun);
     button.classList.toggle("card-ready", canPlayNow);
     button.classList.toggle("auto-priority", state.cardPlayMode === "auto" && index === 0);
@@ -1841,6 +1887,8 @@ function updateCardStates(now) {
         ? "Boss攻击中，仅可进行QTE"
       : state.cardTurnResolving
         ? "技能结算中"
+      : playCooldownActive
+        ? "出牌冷却中"
       : state.ultimateHolding
         ? "终结技蓄力中"
         : state.ultimateCasting
@@ -1866,6 +1914,8 @@ function updateCardStates(now) {
         ? "Boss攻击中：只能进行QTE，暂不可出牌或排序"
       : resolutionLocked
         ? "当前动作结算中 · " + card.summary
+      : playCooldownActive
+        ? "出牌间隔冷却中 · " + card.summary
       : state.cardPlayMode === "auto"
         ? (index === 0 ? "自动队列下一张 · " : "自动队列第" + (index + 1) + "张 · ") + "拖动可调整顺序"
         : freeDuringBossStun
@@ -2918,6 +2968,8 @@ function beginBossStun(partId, now) {
     state.reactionChoice = null;
   }
   if (state.bossStunned) {
+    startCardPlayCooldown(currentTime, STUN_AUTO_CARD_GAP);
+    state.autoResumeAt = state.cardPlayCooldownEndsAt;
     const refreshedEndAt = currentTime + BOSS_STUN_DURATION;
     const extension = Math.max(0, refreshedEndAt - state.bossStunEndsAt);
     state.bossStunStartedAt = currentTime;
@@ -2952,7 +3004,8 @@ function beginBossStun(partId, now) {
   state.bossStunResumeActor = "boss";
   state.turnActor = "player";
   state.lastAutoActor = "boss";
-  state.autoResumeAt = currentTime + STUN_AUTO_CARD_GAP;
+  startCardPlayCooldown(currentTime, STUN_AUTO_CARD_GAP);
+  state.autoResumeAt = state.cardPlayCooldownEndsAt;
   state.bossStunStartedAt = currentTime;
   state.bossStunEndsAt = currentTime + BOSS_STUN_DURATION;
   state.bossStunPartId = partId;
@@ -2997,6 +3050,7 @@ function finishBossStun(now) {
   state.bossStunPartId = null;
   state.bossStunAdvanceIntent = false;
   state.bossStunPausedRemaining = null;
+  clearCardPlayCooldown();
   if (state.cardDragActive) {
     finishCardDrag(true);
   }
@@ -3321,6 +3375,8 @@ function finishPlayerCardTurn(payload, now) {
   state.lastPlayerActionAt = now;
   state.autoResumeAt = now + AUTO_MODE_RESUME_DELAY;
   if (state.bossStunned) {
+    startCardPlayCooldown(now, STUN_AUTO_CARD_GAP);
+    state.autoResumeAt = state.cardPlayCooldownEndsAt;
     state.turnActor = "player";
     state.lastAutoActor = "boss";
     state.nextTurnAt = now + STUN_AUTO_CARD_GAP;
@@ -4633,6 +4689,7 @@ function endBattle(victory, copy) {
   state.bossStunAdvanceIntent = false;
   state.bossStunPausedRemaining = null;
   state.bossStunResumeActor = "boss";
+  clearCardPlayCooldown();
   ui.battlefield.classList.remove("boss-stunned");
   ui.bossUnit.classList.remove("is-stunned");
   ui.intentBanner.classList.remove("stunned");

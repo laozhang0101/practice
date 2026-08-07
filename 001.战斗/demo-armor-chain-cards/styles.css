@@ -8048,8 +8048,16 @@ button:focus-visible {
   will-change: height;
 }
 
-.module-card.live-card.energy-locked .card-energy-shadow {
+.module-card.live-card.energy-locked .card-energy-shadow,
+.module-card.live-card.play-cooldown .card-energy-shadow {
   opacity: 1;
+}
+
+.module-card.live-card.play-cooldown .card-energy-shadow {
+  border-bottom-color: rgba(255, 190, 86, .72);
+  box-shadow:
+    0 7px 13px rgba(0, 0, 0, .48),
+    0 2px 8px rgba(255, 139, 48, .2);
 }
 
 .card-ready-flare {
