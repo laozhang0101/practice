@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0d10" />
     <title>M98 卡牌版战斗 Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=20260805-stun-free-cards-36" />
+    <link rel="stylesheet" href="./styles.css?v=20260807-gm-hide-ui-37" />
   </head>
   <body>
     <main class="game-shell" id="gameShell">
@@ -371,7 +371,7 @@
       <aside class="compact-log" id="compactLog" aria-live="polite"></aside>
 
       <aside class="gm-tools" id="gmTools" aria-label="GM调试工具">
-        <button class="gm-toggle" id="gmToggle" type="button" aria-expanded="false" aria-controls="gmPanel">GM</button>
+        <button class="gm-toggle" id="gmToggle" type="button" aria-label="打开GM调试面板" aria-expanded="false" aria-controls="gmPanel">GM</button>
         <section class="gm-panel" id="gmPanel" aria-label="GM调试面板" hidden>
           <header>
             <strong>GM 调试</strong>
@@ -384,11 +384,12 @@
             <button type="button" data-gm-action="energy-fill">能量充满</button>
             <button type="button" data-gm-action="heal">恢复生命</button>
             <button type="button" data-gm-action="part-break" aria-label="一键破坏怪物一个部位">一键破部位</button>
+            <button id="gmUiToggle" type="button" data-gm-action="ui-toggle" aria-pressed="false">隐藏UI</button>
           </div>
         </section>
       </aside>
     </main>
 
-    <script src="./game.js?v=20260805-stun-free-cards-36"></script>
+    <script src="./game.js?v=20260807-gm-hide-ui-37"></script>
   </body>
 </html>

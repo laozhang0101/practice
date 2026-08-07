@@ -363,6 +363,7 @@ const ui = {
   gmPanel: document.getElementById("gmPanel"),
   gmClose: document.getElementById("gmClose"),
   gmStatus: document.getElementById("gmStatus"),
+  gmUiToggle: document.getElementById("gmUiToggle"),
   gmActions: document.querySelectorAll("[data-gm-action]"),
   combatStyleSummary: document.getElementById("combatStyleSummary"),
   weaponAttackRing: document.getElementById("weaponAttackRing"),
@@ -574,6 +575,7 @@ function createInitialState(selectedStyleId, phase) {
     videoPlaying: false,
     videoStartedAt: 0,
     activeVideoEffect: null,
+    battleUiHidden: false,
     ended: false,
     phase: phase || "preparation",
   };
@@ -692,6 +694,7 @@ function resetGame(mode) {
   hideUltimateCinematic();
   runToken += 1;
   state = createInitialState(preparedStyleId, shouldStartBattle ? "battle" : "preparation");
+  setBattleUiHidden(false, false);
   ui.gmTools.hidden = !shouldStartBattle;
   ui.resultOverlay.classList.add("hidden");
   ui.battlePreparation.classList.toggle("hidden", shouldStartBattle);
@@ -903,7 +906,7 @@ function setGmPanelOpen(isOpen, restoreFocus) {
   }
   const wasOpen = !ui.gmPanel.hidden;
   const shouldOpen = Boolean(
-    isOpen && state && state.phase === "battle" && !state.ended,
+    isOpen && state && state.phase === "battle" && !state.ended && !state.battleUiHidden,
   );
   ui.gmPanel.hidden = !shouldOpen;
   ui.gmToggle.setAttribute("aria-expanded", String(shouldOpen));
@@ -916,12 +919,50 @@ function setGmPanelOpen(isOpen, restoreFocus) {
   }
 }
 
+function setBattleUiHidden(isHidden, announce) {
+  if (!ui.gameShell || !ui.gmToggle) {
+    return;
+  }
+  const shouldHide = Boolean(
+    isHidden && state && state.phase === "battle" && !state.ended,
+  );
+  if (state) {
+    state.battleUiHidden = shouldHide;
+  }
+  ui.gameShell.classList.toggle("battle-ui-hidden", shouldHide);
+  ui.gmToggle.textContent = shouldHide ? "UI" : "GM";
+  ui.gmToggle.setAttribute(
+    "aria-label",
+    shouldHide ? "显示战斗UI" : "打开GM调试面板",
+  );
+  ui.gmToggle.title = shouldHide ? "显示战斗UI" : "GM调试";
+  if (ui.gmUiToggle) {
+    ui.gmUiToggle.textContent = shouldHide ? "显示UI" : "隐藏UI";
+    ui.gmUiToggle.setAttribute("aria-pressed", String(shouldHide));
+  }
+  if (shouldHide) {
+    setGmPanelOpen(false, false);
+    ui.gmToggle.focus({ preventScroll: true });
+  } else if (announce) {
+    showMessage("GM：战斗UI已显示");
+    showLog("GM 调试 · 战斗UI恢复显示");
+  }
+}
+
 function applyGmAction(action) {
-  if (!state || state.phase !== "battle" || state.ended || state.ultimateCasting) {
+  if (!state || state.phase !== "battle" || state.ended) {
     return;
   }
   if (state.ultimateHolding) {
     cancelSoulUltimateHold(true);
+  }
+  if (action === "ui-toggle") {
+    const shouldHide = !state.battleUiHidden;
+    setBattleUiHidden(shouldHide, !shouldHide);
+    return;
+  }
+  if (state.ultimateCasting) {
+    return;
   }
   if (action === "soul-fill") {
     state.soulEnergy = MAX_SOUL_ENERGY;
@@ -3687,6 +3728,7 @@ function endBattle(victory, copy) {
   if (!state || state.ended) {
     return;
   }
+  setBattleUiHidden(false, false);
   state.ended = true;
   state.phase = "ended";
   setGmPanelOpen(false, false);
@@ -3762,6 +3804,10 @@ ui.preparationStyleOptions.forEach(function (button) {
   });
 });
 ui.gmToggle.addEventListener("click", function () {
+  if (state && state.battleUiHidden) {
+    setBattleUiHidden(false, true);
+    return;
+  }
   setGmPanelOpen(ui.gmPanel.hidden);
 });
 ui.gmClose.addEventListener("click", function () {
@@ -3873,6 +3919,11 @@ ui.moduleVideoSkip.addEventListener("click", function () {
 });
 window.addEventListener("keydown", function (event) {
   if (!state) {
+    return;
+  }
+  if (event.key === "Escape" && state.battleUiHidden) {
+    event.preventDefault();
+    setBattleUiHidden(false, true);
     return;
   }
   if (event.key === "Escape" && !ui.gmPanel.hidden) {

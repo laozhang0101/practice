@@ -10471,8 +10471,50 @@ button:focus-visible {
   outline: 0;
 }
 
-.gm-actions button[data-gm-action="part-break"] {
+.gm-actions button[data-gm-action="part-break"],
+.gm-actions button[data-gm-action="ui-toggle"] {
   grid-column: 1 / -1;
+}
+
+/* GM clean-view mode: keep combat staging and effects, remove informational UI. */
+.game-shell.battle-ui-hidden .demo-version,
+.game-shell.battle-ui-hidden .top-hud,
+.game-shell.battle-ui-hidden .auto-mode-panel,
+.game-shell.battle-ui-hidden .intent-banner,
+.game-shell.battle-ui-hidden .reaction-controls,
+.game-shell.battle-ui-hidden .battle-message,
+.game-shell.battle-ui-hidden .floating-layer,
+.game-shell.battle-ui-hidden .command-deck,
+.game-shell.battle-ui-hidden .compact-log,
+.game-shell.battle-ui-hidden .module-video-heading,
+.game-shell.battle-ui-hidden .module-video-combo,
+.game-shell.battle-ui-hidden .module-video-skip,
+.game-shell.battle-ui-hidden .module-frame-stage > span,
+.game-shell.battle-ui-hidden .module-frame-stage > strong,
+.game-shell.battle-ui-hidden .ultimate-cinematic > span,
+.game-shell.battle-ui-hidden .ultimate-cinematic > strong,
+.game-shell.battle-ui-hidden .ultimate-cinematic > small {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.game-shell.battle-ui-hidden .gm-toggle {
+  width: 32px;
+  height: 24px;
+  border-color: rgba(207, 225, 234, .3);
+  color: rgba(225, 237, 242, .72);
+  background: rgba(5, 9, 12, .54);
+  box-shadow: none;
+  opacity: .42;
+}
+
+.game-shell.battle-ui-hidden .gm-toggle:hover,
+.game-shell.battle-ui-hidden .gm-toggle:focus-visible {
+  border-color: rgba(255, 177, 93, .72);
+  color: #fff4df;
+  background: rgba(41, 23, 13, .9);
+  opacity: 1;
 }
 
 @media (max-height: 420px) {
