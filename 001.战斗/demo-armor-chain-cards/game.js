@@ -1,6 +1,6 @@
 "use strict";
 
-const DEMO_VERSION = "卡牌版 v0.5.1-stun-card-cooldown · 2026.08.07";
+const DEMO_VERSION = "卡牌版 v0.6.0-persistent-role-skills · 2026.08.07";
 const MAX_PLAYER_HP = 220;
 const MAX_BOSS_HP = 420;
 const MAX_ENERGY = 10;
@@ -46,13 +46,11 @@ const deckRecipe = [
   "cannon",
   "drone",
   "gourd",
-  "fist_arm_rush",
-  "fist_leg_drive",
-  "fist_flurry",
   "reactor",
   "cannon",
 ];
-const openingHandRecipe = ["reactor", "fist_arm_rush", "fist_leg_drive", "fist_flurry"];
+const openingHandRecipe = ["reactor", "drone", "cannon", "gourd"];
+const weaponSkillRecipe = ["fist_arm_rush", "fist_leg_drive", "fist_flurry"];
 
 const weaponModes = [
   {
@@ -449,6 +447,7 @@ const ui = {
   cardEnergyMax: document.getElementById("cardEnergyMax"),
   energyRate: document.getElementById("energyRate"),
   cardEnergyPips: document.getElementById("cardEnergyPips"),
+  weaponSkillHand: document.getElementById("weaponSkillHand"),
   cardHand: document.getElementById("cardHand"),
   cardModeSwitch: document.getElementById("cardModeSwitch"),
   cardModeButtons: document.querySelectorAll("[data-card-play-mode]"),
@@ -605,6 +604,16 @@ function createDeckState() {
   };
 }
 
+function createWeaponSkillState() {
+  return weaponSkillRecipe.map(function (cardId, index) {
+    return {
+      uid: runToken + "-skill-" + index + "-" + cardId,
+      cardId: cardId,
+      zone: "skill",
+    };
+  });
+}
+
 function createInitialState(selectedStyleId, phase) {
   const now = performance.now();
   const deckState = createDeckState();
@@ -667,11 +676,13 @@ function createInitialState(selectedStyleId, phase) {
     reactionActive: false,
     reactionChoice: null,
     cardPlayMode: "auto",
+    autoCardLane: "hand",
     cardTurnResolving: false,
     cardPlayCooldownStartedAt: 0,
     cardPlayCooldownEndsAt: 0,
     cardDragActive: false,
     autoResumeAt: now + FIRST_TURN_DELAY,
+    weaponSkills: createWeaponSkillState(),
     drawPile: deckState.drawPile,
     hand: deckState.hand,
     discardPile: deckState.discardPile,
@@ -702,6 +713,59 @@ function getCard(cardId) {
   return cards.find(function (card) {
     return card.id === cardId;
   });
+}
+
+function locatePlayableCard(uid) {
+  if (!state) {
+    return null;
+  }
+  const skillIndex = state.weaponSkills.findIndex(function (instance) {
+    return instance.uid === uid;
+  });
+  if (skillIndex >= 0) {
+    return {
+      zone: "skill",
+      list: state.weaponSkills,
+      index: skillIndex,
+      instance: state.weaponSkills[skillIndex],
+    };
+  }
+  const handIndex = state.hand.findIndex(function (instance) {
+    return instance.uid === uid;
+  });
+  if (handIndex >= 0) {
+    return {
+      zone: "hand",
+      list: state.hand,
+      index: handIndex,
+      instance: state.hand[handIndex],
+    };
+  }
+  return null;
+}
+
+function getPlayableCardButton(uid, zone) {
+  const selector = zone === "skill"
+    ? '[data-skill-instance="' + uid + '"]'
+    : '[data-card-instance="' + uid + '"]';
+  const container = zone === "skill" ? ui.weaponSkillHand : ui.cardHand;
+  return container ? container.querySelector(selector) : null;
+}
+
+function getAutoCardCandidate() {
+  if (!state) {
+    return null;
+  }
+  const preferredZone = state.autoCardLane === "skill" ? "skill" : "hand";
+  const fallbackZone = preferredZone === "skill" ? "hand" : "skill";
+  const preferredList = preferredZone === "skill" ? state.weaponSkills : state.hand;
+  const fallbackList = fallbackZone === "skill" ? state.weaponSkills : state.hand;
+  const zone = preferredList.length ? preferredZone : fallbackZone;
+  const list = preferredList.length ? preferredList : fallbackList;
+  const instance = list[0] || null;
+  return instance
+    ? { zone: zone, instance: instance, card: getCard(instance.cardId) }
+    : null;
 }
 
 function reserveNextDraw(announceShuffle) {
@@ -1451,6 +1515,51 @@ function moveHandCardByOffset(uid, offset) {
   return moveHandCard(uid, targetUid, offset > 0);
 }
 
+function renderWeaponSkillCards() {
+  ui.weaponSkillHand.innerHTML = "";
+  state.weaponSkills.forEach(function (instance, index) {
+    const card = getCard(instance.cardId);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "module-card live-card weapon-skill-card persistent-skill-card";
+    button.style.setProperty("--card-color", card.color);
+    button.dataset.cardId = card.id;
+    button.dataset.skillInstance = instance.uid;
+    button.setAttribute("aria-posinset", String(index + 1));
+    button.setAttribute("aria-setsize", String(state.weaponSkills.length));
+    button.title = card.summary;
+    button.innerHTML =
+      '<img src="' +
+      card.icon +
+      '" alt="" /><div class="card-copy"><strong>' +
+      card.name +
+      '</strong><span class="card-tags"><b>' +
+      card.role +
+      '</b><i>' +
+      card.type +
+      '</i></span></div><span class="weapon-fit"></span><span class="card-cost"><b>' +
+      card.cost +
+      '</b></span><i class="card-energy-shadow" aria-hidden="true"></i>' +
+      '<i class="card-ready-flare" aria-hidden="true"></i>';
+    button.addEventListener("click", function () {
+      if (performance.now() < suppressCardClickUntil) {
+        return;
+      }
+      if (state.cardPlayMode === "auto") {
+        showMessage("自动模式会按角色技能顺序循环释放；切换主动后可直接选择");
+        return;
+      }
+      activateCard(instance.uid, button, "manual");
+    });
+    button.addEventListener("animationend", function (event) {
+      if (event.animationName === "card-energy-ready-glow") {
+        button.classList.remove("energy-ready-flash");
+      }
+    });
+    ui.weaponSkillHand.appendChild(button);
+  });
+}
+
 function renderCards() {
   if (state) {
     state.cardDragActive = false;
@@ -1463,6 +1572,7 @@ function renderCards() {
   nativeCardDragActive = false;
   mouseCardDrag = null;
   clearCardDragVisuals();
+  renderWeaponSkillCards();
   ui.cardHand.innerHTML = "";
   state.hand.forEach(function (instance, index) {
     const card = getCard(instance.cardId);
@@ -1795,12 +1905,21 @@ function updateCardStates(now) {
     : 0;
   const playCooldownActive = playCooldownRatio > 0;
   const playerWindowOpen = isPlayerCardWindowOpen(currentTime);
+  const autoCandidate = getAutoCardCandidate();
+  const cardEntries = state.weaponSkills.map(function (instance, index) {
+    return { instance: instance, index: index, zone: "skill" };
+  }).concat(state.hand.map(function (instance, index) {
+    return { instance: instance, index: index, zone: "hand" };
+  }));
   renderCardPlayMode();
-  state.hand.forEach(function (instance, index) {
+  cardEntries.forEach(function (entry) {
+    const instance = entry.instance;
+    const index = entry.index;
+    const zone = entry.zone;
     const card = getCard(instance.cardId);
     const weapon = currentWeaponMode();
     const affinity = getWeaponCardAffinity(card, weapon);
-    const button = ui.cardHand.querySelector('[data-card-instance="' + instance.uid + '"]');
+    const button = getPlayableCardButton(instance.uid, zone);
     if (!button) {
       return;
     }
@@ -1862,7 +1981,10 @@ function updateCardStates(now) {
     button.classList.toggle("play-cooldown", playCooldownActive);
     button.classList.toggle("stun-free-cast", freeDuringBossStun);
     button.classList.toggle("card-ready", canPlayNow);
-    button.classList.toggle("auto-priority", state.cardPlayMode === "auto" && index === 0);
+    button.classList.toggle(
+      "auto-priority",
+      state.cardPlayMode === "auto" && Boolean(autoCandidate) && autoCandidate.instance.uid === instance.uid,
+    );
     button.classList.toggle("auto-controlled", state.cardPlayMode === "auto");
     button.classList.toggle("interaction-locked", resolutionLocked);
     button.classList.remove("awakening-selectable", "awakening-selected");
@@ -1872,11 +1994,21 @@ function updateCardStates(now) {
     button.classList.remove("target-arms", "target-core", "target-legs", "target-multi", "target-general");
     button.classList.add("target-" + targetPartId);
     if (fitLabel) {
-      fitLabel.textContent = targetPartId === "multi"
-        ? "全"
-        : targetPartId === "general"
-          ? "通用"
-          : partBlueprints[targetPartId].name;
+      fitLabel.textContent = zone === "skill"
+        ? targetPartId === "multi"
+          ? "全"
+          : targetPartId === "general"
+            ? "通"
+            : targetPartId === "core"
+              ? "胸"
+              : targetPartId === "legs"
+                ? "脚"
+                : "手"
+        : targetPartId === "multi"
+          ? "全"
+          : targetPartId === "general"
+            ? "通用"
+            : partBlueprints[targetPartId].name;
     }
     if (costLabel) {
       costLabel.textContent = freeDuringBossStun ? "0" : card.cost;
@@ -1900,7 +2032,11 @@ function updateCardStates(now) {
           : !playerWindowOpen
             ? "等待玩家出牌阶段"
           : state.cardPlayMode === "auto"
-            ? index === 0 ? "自动队列下一张" : "自动队列第" + (index + 1) + "张"
+            ? autoCandidate && autoCandidate.instance.uid === instance.uid
+              ? "自动队列下一张"
+              : zone === "skill"
+                ? "常驻角色技能第" + (index + 1) + "张"
+                : "挂件队列第" + (index + 1) + "张"
             : "可主动释放";
     button.setAttribute(
       "aria-label",
@@ -1917,7 +2053,11 @@ function updateCardStates(now) {
       : playCooldownActive
         ? "出牌间隔冷却中 · " + card.summary
       : state.cardPlayMode === "auto"
-        ? (index === 0 ? "自动队列下一张 · " : "自动队列第" + (index + 1) + "张 · ") + "拖动可调整顺序"
+        ? autoCandidate && autoCandidate.instance.uid === instance.uid
+          ? "自动队列下一张 · " + card.summary
+          : zone === "skill"
+            ? "常驻角色技能 · 自动循环 · " + card.summary
+            : "挂件队列第" + (index + 1) + "张 · 拖动可调整顺序"
         : freeDuringBossStun
           ? "Boss倒地 · 免费释放 · " + card.summary
         : lacksEnergy
@@ -3311,8 +3451,7 @@ function updateCardFlowStatus(now) {
   ) {
     return;
   }
-  const firstInstance = state.hand[0];
-  const firstCard = firstInstance ? getCard(firstInstance.cardId) : null;
+  const candidate = getAutoCardCandidate();
   if (now < state.nextTurnAt) {
     ui.autoActionText.textContent = "对峙游走 · " + Math.max(0, (state.nextTurnAt - now) / 1000).toFixed(1) + "s";
     return;
@@ -3321,15 +3460,15 @@ function updateCardFlowStatus(now) {
     ui.autoActionText.textContent = "主动模式 · 请选择卡牌";
     return;
   }
-  if (!firstCard) {
+  if (!candidate) {
     ui.autoActionText.textContent = "自动队列 · 等待补牌";
     return;
   }
-  if (!hasBossStunFreeCards(now) && firstCard.cost > state.energy) {
-    ui.autoActionText.textContent = "自动等待 · " + firstCard.name + " " + state.energy + "/" + firstCard.cost;
+  if (!hasBossStunFreeCards(now) && candidate.card.cost > state.energy) {
+    ui.autoActionText.textContent = "自动等待 · " + candidate.card.name + " " + state.energy + "/" + candidate.card.cost;
     return;
   }
-  ui.autoActionText.textContent = "自动队列 · " + firstCard.name;
+  ui.autoActionText.textContent = (candidate.zone === "skill" ? "角色技能 · " : "挂件队列 · ") + candidate.card.name;
 }
 
 function tryAutoPlayCard(now) {
@@ -3342,17 +3481,16 @@ function tryAutoPlayCard(now) {
   ) {
     return false;
   }
-  const instance = state.hand[0];
-  const card = instance ? getCard(instance.cardId) : null;
-  if (!instance || !card) {
+  const candidate = getAutoCardCandidate();
+  if (!candidate) {
     return false;
   }
-  if (!hasBossStunFreeCards(now) && card.cost > state.energy) {
+  if (!hasBossStunFreeCards(now) && candidate.card.cost > state.energy) {
     updateCardFlowStatus(now);
     return false;
   }
-  const button = ui.cardHand.querySelector('[data-card-instance="' + instance.uid + '"]');
-  return activateCard(instance.uid, button, "auto");
+  const button = getPlayableCardButton(candidate.instance.uid, candidate.zone);
+  return activateCard(candidate.instance.uid, button, "auto");
 }
 
 function finishPlayerCardTurn(payload, now) {
@@ -3594,16 +3732,17 @@ function activateCard(cardInstanceId, sourceButton, origin) {
   ) {
     return false;
   }
-  const handIndex = state.hand.findIndex(function (instance) {
-    return instance.uid === cardInstanceId;
-  });
-  if (handIndex < 0) {
+  const location = locatePlayableCard(cardInstanceId);
+  if (!location) {
     return false;
   }
-  if (playOrigin === "auto" && handIndex !== 0) {
-    return false;
+  if (playOrigin === "auto") {
+    const autoCandidate = getAutoCardCandidate();
+    if (!autoCandidate || autoCandidate.instance.uid !== cardInstanceId) {
+      return false;
+    }
   }
-  const instance = state.hand[handIndex];
+  const instance = location.instance;
   const card = getCard(instance.cardId);
   if (state.chain.length && now >= state.chainDeadline) {
     resolveChain();
@@ -3646,18 +3785,26 @@ function activateCard(cardInstanceId, sourceButton, origin) {
     freeDuringBossStun: freeDuringBossStun,
     flowOwned: true,
     playOrigin: playOrigin,
+    cardZone: location.zone,
     resolved: false,
   };
   state.videoPending = presentationPayload;
-  const resolvedSourceButton = sourceButton || ui.cardHand.querySelector(
-    '[data-card-instance="' + cardInstanceId + '"]',
-  );
+  const resolvedSourceButton = sourceButton || getPlayableCardButton(cardInstanceId, location.zone);
   if (resolvedSourceButton) {
     createCardProjectile(card, resolvedSourceButton);
   }
-  state.hand.splice(handIndex, 1);
-  state.discardPile.push(instance);
-  drawNextCard();
+  state.autoCardLane = location.zone === "skill" ? "hand" : "skill";
+  if (location.zone === "skill") {
+    if (playOrigin === "auto") {
+      location.list.splice(location.index, 1);
+      location.list.push(instance);
+      renderCards();
+    }
+  } else {
+    state.hand.splice(location.index, 1);
+    state.discardPile.push(instance);
+    drawNextCard();
+  }
   renderStatus();
   renderChain();
   playTone(state.chain.length - 1, state.chain.length >= 3, false);

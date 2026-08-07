@@ -10801,3 +10801,120 @@ button:focus-visible {
     animation: none;
   }
 }
+
+/* v0.6.0: the three fist actions are persistent role skills, not disposable draws. */
+.weapon-skill-hand {
+  position: absolute;
+  z-index: 15;
+  left: clamp(92px, 15.5vh, 116px);
+  right: var(--energy-value-gutter);
+  bottom: calc(100% + 4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: clamp(2px, .55vh, 4px);
+  pointer-events: none;
+}
+
+.weapon-skill-hand > * {
+  pointer-events: auto;
+}
+
+.weapon-skill-hand .module-card.live-card:nth-child(n) {
+  width: calc(var(--combat-card-width) * .68);
+  min-width: calc(var(--combat-card-width) * .68);
+  height: calc(var(--combat-card-height) * .68);
+  padding: clamp(3px, .55vh, 5px);
+  grid-template-rows: minmax(0, 62fr) minmax(18px, 38fr);
+  transform: none;
+  transform-origin: 50% 100%;
+  border-color: color-mix(in srgb, var(--card-color), transparent 18%);
+  box-shadow:
+    0 7px 13px rgba(0, 0, 0, .62),
+    0 0 9px color-mix(in srgb, var(--card-color), transparent 68%);
+}
+
+.weapon-skill-hand .module-card.live-card:hover:not(:disabled) {
+  z-index: 9;
+  transform: translateY(-5px) scale(1.025);
+}
+
+.weapon-skill-hand .module-card.live-card .card-copy {
+  position: relative;
+  z-index: 7;
+  align-content: center;
+  gap: 0;
+}
+
+.weapon-skill-hand .module-card.live-card strong {
+  padding: 0 2px;
+  font-size: clamp(6px, 1.15vh, 9px);
+  line-height: 1.1;
+  text-align: center;
+}
+
+.weapon-skill-hand .module-card.live-card .card-tags {
+  display: none;
+}
+
+.weapon-skill-hand .module-card.live-card .weapon-fit {
+  z-index: 8;
+  left: 3px;
+  top: 3px;
+  display: grid;
+  place-items: center;
+  min-width: clamp(13px, 2.35vh, 17px);
+  max-width: none;
+  height: clamp(13px, 2.35vh, 17px);
+  padding: 0 3px;
+  border-radius: 999px;
+  font-size: clamp(6px, 1.05vh, 8px);
+  line-height: 1;
+  transform: none;
+}
+
+.weapon-skill-hand .module-card.live-card .card-cost {
+  top: 3px;
+  right: 3px;
+  transform: scale(.78);
+  transform-origin: top right;
+}
+
+.command-deck.boss-action-lock .weapon-skill-hand {
+  filter: saturate(.62) brightness(.72);
+}
+
+@media (max-width: 980px), (max-height: 600px) {
+  .weapon-skill-hand {
+    left: 96px;
+    bottom: calc(100% + 3px);
+    gap: 2px;
+  }
+
+  .weapon-skill-hand .module-card.live-card:nth-child(n) {
+    width: calc(var(--combat-card-width) * .6);
+    min-width: calc(var(--combat-card-width) * .6);
+    height: calc(var(--combat-card-height) * .6);
+  }
+}
+
+@media (max-width: 760px), (max-height: 420px) {
+  .weapon-skill-hand {
+    left: 92px;
+  }
+
+  .weapon-skill-hand .module-card.live-card:nth-child(n) {
+    width: calc(var(--combat-card-width) * .54);
+    min-width: calc(var(--combat-card-width) * .54);
+    height: calc(var(--combat-card-height) * .54);
+    grid-template-rows: 1fr;
+  }
+
+  .weapon-skill-hand .module-card.live-card .card-copy {
+    display: none;
+  }
+
+  .weapon-skill-hand .module-card.live-card .card-cost {
+    transform: scale(.6);
+  }
+}
