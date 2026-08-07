@@ -10588,3 +10588,162 @@ button:focus-visible {
     animation: none;
   }
 }
+
+/* v0.4.0: card-driven auto duel, reorderable FIFO, and neutral footwork. */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.card-mode-switch {
+  position: absolute;
+  z-index: 18;
+  left: 0;
+  top: clamp(-37px, -5.4vh, -20px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(clamp(38px, 7.8vh, 56px), 1fr));
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid rgba(106, 135, 150, .44);
+  border-radius: 999px;
+  background: rgba(3, 8, 12, .86);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, .48);
+  backdrop-filter: blur(7px);
+}
+
+.card-mode-switch button {
+  min-width: 0;
+  min-height: clamp(32px, 4.6vh, 38px);
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 999px;
+  color: #78909b;
+  background: transparent;
+  font: 900 clamp(8px, 1.55vh, 11px)/1 "Microsoft YaHei", sans-serif;
+  letter-spacing: .08em;
+  cursor: pointer;
+}
+
+.card-mode-switch button.selected {
+  color: #f4fbff;
+  background: linear-gradient(135deg, rgba(24, 143, 188, .96), rgba(25, 82, 112, .96));
+  box-shadow: inset 0 0 0 1px rgba(147, 229, 255, .5), 0 0 10px rgba(72, 199, 241, .28);
+}
+
+.card-mode-switch button[data-card-play-mode="manual"].selected {
+  color: #fff5e5;
+  background: linear-gradient(135deg, rgba(191, 101, 38, .98), rgba(100, 49, 22, .96));
+  box-shadow: inset 0 0 0 1px rgba(255, 203, 136, .54), 0 0 10px rgba(255, 142, 63, .26);
+}
+
+.card-mode-switch button:focus-visible {
+  outline: 2px solid #dff7ff;
+  outline-offset: 2px;
+}
+
+.card-mode-switch.locked {
+  opacity: .62;
+  filter: saturate(.55);
+}
+
+.card-mode-switch button:disabled {
+  cursor: not-allowed;
+}
+
+.auto-card-mode .module-card.live-card.auto-priority:not(:disabled) {
+  z-index: 5;
+  box-shadow:
+    0 0 0 1px rgba(115, 219, 255, .78),
+    0 0 16px rgba(60, 188, 237, .42),
+    0 10px 17px rgba(0, 0, 0, .62);
+}
+
+.auto-card-mode .module-card.live-card.auto-priority:not(:disabled)::after {
+  border-color: rgba(148, 231, 255, .66);
+}
+
+.card-hand.drag-active .module-card.live-card {
+  transition: none;
+}
+
+.card-hand .module-card.live-card {
+  touch-action: none;
+}
+
+.card-hand .module-card.live-card.card-dragging {
+  z-index: 30;
+  opacity: .34;
+  filter: grayscale(.45) brightness(.78);
+  transform: translateY(3px) scale(.96) !important;
+}
+
+.card-hand .module-card.live-card.drag-before {
+  outline: 2px solid #78ddff;
+  outline-offset: 2px;
+  transform: translateX(7px) !important;
+}
+
+.card-hand .module-card.live-card.drag-after {
+  outline: 2px solid #78ddff;
+  outline-offset: 2px;
+  transform: translateX(-7px) !important;
+}
+
+.command-deck.boss-action-lock .card-hand {
+  filter: saturate(.62) brightness(.72);
+}
+
+.command-deck.boss-action-lock .card-hand::after {
+  opacity: .78;
+}
+
+.battlefield.combat-neutral .player-unit {
+  animation: player-neutral-footwork 3.1s ease-in-out infinite;
+}
+
+.battlefield.combat-neutral .boss-unit {
+  animation: boss-neutral-footwork 3.7s ease-in-out -.8s infinite;
+}
+
+.battlefield.player-skill-action .player-unit {
+  animation: player-card-step 720ms cubic-bezier(.2, .76, .22, 1) both;
+}
+
+@keyframes player-neutral-footwork {
+  0%, 100% { transform: translateX(-50%) translate(0, 0) scale(1); }
+  28% { transform: translateX(-50%) translate(9px, -3px) scale(1.006); }
+  62% { transform: translateX(-50%) translate(-5px, 1px) scale(.998); }
+}
+
+@keyframes boss-neutral-footwork {
+  0%, 100% { transform: translateX(-50%) translate(0, 0) scale(1); }
+  34% { transform: translateX(-50%) translate(-8px, 2px) scale(1.008); }
+  70% { transform: translateX(-50%) translate(5px, 0) scale(.998); }
+}
+
+@keyframes player-card-step {
+  0%, 100% { transform: translateX(-50%) translate(0, 0); }
+  30% { transform: translateX(-50%) translate(18px, -7px); }
+  58% { transform: translateX(-50%) translate(72px, -13px); }
+  76% { transform: translateX(-50%) translate(36px, -8px); }
+}
+
+@media (max-width: 980px), (max-height: 600px) {
+  .card-mode-switch {
+    top: -22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .battlefield.combat-neutral .player-unit,
+  .battlefield.combat-neutral .boss-unit,
+  .battlefield.player-skill-action .player-unit {
+    animation: none;
+  }
+}

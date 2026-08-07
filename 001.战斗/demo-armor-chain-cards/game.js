@@ -1,6 +1,6 @@
 "use strict";
 
-const DEMO_VERSION = "卡牌版-2026.08.04-严格交替回合与精简能量";
+const DEMO_VERSION = "卡牌版 v0.4.0-auto-duel · 2026.08.07";
 const MAX_PLAYER_HP = 220;
 const MAX_BOSS_HP = 420;
 const MAX_ENERGY = 10;
@@ -13,8 +13,8 @@ const ULTIMATE_TIER_HOLD_MS = 400;
 const ULTIMATE_CAST_DURATION = 1120;
 const BOSS_TURN_INTERVAL = 3400;
 const FIRST_TURN_DELAY = 1500;
-const BOSS_IMPACT_DELAY = 1200;
-const ATTACK_RECOVER_DELAY = 1650;
+const BOSS_IMPACT_DELAY = 2400;
+const ATTACK_RECOVER_DELAY = 2950;
 const ENERGY_INTERVAL = 4000;
 const BASE_CHAIN_WINDOW = 2700;
 const MAX_HAND_SIZE = 4;
@@ -26,6 +26,10 @@ const MODULE_FRAME_DURATION = 900;
 const MODULE_VIDEO_TIMEOUT = 12000;
 const MIN_TURN_GAP = 600;
 const BOSS_STUN_DURATION = 5000;
+const CARD_TO_BOSS_DELAY = 680;
+const AUTO_MODE_RESUME_DELAY = 420;
+const AUTO_CHAIN_CONTINUE_WINDOW = 8200;
+const STUN_AUTO_CARD_GAP = 280;
 
 const deckRecipe = ["armor", "reactor", "jet", "cannon", "drone", "gourd", "reactor", "cannon"];
 const openingHandRecipe = ["reactor", "jet", "cannon", "gourd"];
@@ -353,6 +357,9 @@ const ui = {
   energyRate: document.getElementById("energyRate"),
   cardEnergyPips: document.getElementById("cardEnergyPips"),
   cardHand: document.getElementById("cardHand"),
+  cardModeSwitch: document.getElementById("cardModeSwitch"),
+  cardModeButtons: document.querySelectorAll("[data-card-play-mode]"),
+  cardOrderStatus: document.getElementById("cardOrderStatus"),
   nextCardPreview: document.getElementById("nextCardPreview"),
   nextCardImage: document.getElementById("nextCardImage"),
   nextCardCost: document.getElementById("nextCardCost"),
@@ -419,6 +426,11 @@ let audioContext = null;
 let runToken = 0;
 let preparedStyleId = "fists";
 let preparationStep = "monster";
+let draggedCardUid = null;
+let suppressCardClickUntil = 0;
+let pointerCardDrag = null;
+let nativeCardDragActive = false;
+let mouseCardDrag = null;
 
 function createParts() {
   const output = {};
@@ -553,12 +565,17 @@ function createInitialState(selectedStyleId, phase) {
     bossStunPartId: null,
     bossStunAdvanceIntent: false,
     bossStunPausedRemaining: null,
+    bossStunResumeActor: "boss",
     actionIndex: 0,
     selectedWeaponId: selectedStyleId || "fists",
     nextEnergyAt: now + ENERGY_INTERVAL,
     nextAutoBonus: 0,
     reactionActive: false,
     reactionChoice: null,
+    cardPlayMode: "auto",
+    cardTurnResolving: false,
+    cardDragActive: false,
+    autoResumeAt: now + FIRST_TURN_DELAY,
     drawPile: deckState.drawPile,
     hand: deckState.hand,
     discardPile: deckState.discardPile,
@@ -680,6 +697,11 @@ function getWeaponCardLink(card) {
 
 function resetGame(mode) {
   const shouldStartBattle = mode === "battle";
+  draggedCardUid = null;
+  suppressCardClickUntil = 0;
+  pointerCardDrag = null;
+  nativeCardDragActive = false;
+  mouseCardDrag = null;
   setGmPanelOpen(false, false);
   preparationStep = shouldStartBattle ? "battle" : "monster";
   clearInterval(battleTimer);
@@ -707,12 +729,14 @@ function resetGame(mode) {
     "ultimate-holding",
     "ultimate-casting",
   );
+  ui.gameShell.classList.remove("auto-card-mode", "manual-card-mode");
   ui.battlefield.className = "battlefield";
   ui.effectLayer.innerHTML = "";
   ui.floatingLayer.innerHTML = "";
   ui.battleMessage.classList.remove("visible");
   ui.compactLog.classList.remove("visible");
   renderAll();
+  updateCombatStance();
   renderPreparationSelection();
   renderPreparationFlow();
   if (!shouldStartBattle) {
@@ -724,7 +748,8 @@ function resetGame(mode) {
     });
     return;
   }
-  showMessage("固定节拍交锋开始：消耗能量的挂件造成伤害，或QTE成功，可恢复灵魂能量");
+  showMessage("自动模式启动：从左到右出牌，技能结算后Boss反击");
+  showLog("拖动卡牌可调整自动执行顺序；Boss攻击时只能进行QTE");
   battleTimer = window.setInterval(tickBattle, 80);
 }
 
@@ -868,7 +893,8 @@ function renderStatus() {
         ? "灵魂终结 · 奥义释放"
         : state.ultimateHolding
           ? "灵魂终结 · 蓄力选档"
-      : "自动回合 · " + (displayedActor === "player" ? "玩家行动" : "Boss行动");
+      : (state.cardPlayMode === "auto" ? "自动出牌" : "主动出牌") +
+        " · " + (displayedActor === "player" ? "玩家行动" : "Boss行动");
   ui.energyCells.innerHTML = "";
   for (let index = 0; index < MAX_ENERGY; index += 1) {
     const cell = document.createElement("i");
@@ -887,6 +913,7 @@ function renderStatus() {
   );
   renderPlayerStatuses();
   renderSoulUltimate();
+  renderCardPlayMode();
   renderGmStatus();
 }
 
@@ -1144,9 +1171,198 @@ function renderNextCardPreview() {
   );
 }
 
+function isBossActionLocked() {
+  return Boolean(state && (state.actionActor === "boss" || state.reactionActive));
+}
+
+function isCardResolutionLocked() {
+  return Boolean(
+    state && (
+      state.cardTurnResolving ||
+      state.videoPlaying ||
+      state.videoPending ||
+      state.ultimateHolding ||
+      state.ultimateCasting ||
+      isBossActionLocked()
+    )
+  );
+}
+
+function isCardReorderLocked() {
+  return Boolean(
+    !state ||
+    state.phase !== "battle" ||
+    state.ended ||
+    state.turnActor !== "player" ||
+    isCardResolutionLocked()
+  );
+}
+
+function isPlayerCardWindowOpen(now) {
+  const currentTime = typeof now === "number" ? now : performance.now();
+  const stunFree = hasBossStunFreeCards(currentTime);
+  if (state && state.bossStunned && !stunFree) {
+    return false;
+  }
+  return Boolean(
+    state &&
+    state.phase === "battle" &&
+    !state.ended &&
+    state.turnActor === "player" &&
+    !isCardResolutionLocked() &&
+    !state.cardDragActive &&
+    (stunFree || currentTime >= state.nextTurnAt)
+  );
+}
+
+function renderCardPlayMode() {
+  if (!state || !ui.cardModeSwitch) {
+    return;
+  }
+  const isAuto = state.cardPlayMode === "auto";
+  const modeLocked =
+    state.phase !== "battle" ||
+    state.ended ||
+    isCardResolutionLocked();
+  ui.gameShell.classList.toggle("auto-card-mode", isAuto);
+  ui.gameShell.classList.toggle("manual-card-mode", !isAuto);
+  ui.cardModeSwitch.classList.toggle("locked", modeLocked);
+  ui.cardModeSwitch.dataset.mode = state.cardPlayMode;
+  ui.cardModeButtons.forEach(function (button) {
+    const selected = button.dataset.cardPlayMode === state.cardPlayMode;
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+    button.disabled = modeLocked;
+    button.title = modeLocked ? "当前动作结算中，结束后可切换出牌模式" : "切换出牌模式";
+  });
+}
+
+function setCardPlayMode(mode, announce) {
+  if (
+    !state ||
+    state.phase !== "battle" ||
+    state.ended ||
+    (mode !== "auto" && mode !== "manual") ||
+    state.cardPlayMode === mode
+  ) {
+    return;
+  }
+  state.cardPlayMode = mode;
+  state.autoResumeAt = performance.now() + AUTO_MODE_RESUME_DELAY;
+  if (mode === "auto" && state.turnActor === "player" && !state.bossStunned) {
+    state.nextTurnAt = Math.max(state.nextTurnAt, state.autoResumeAt);
+    state.nextPlayerAt = Math.max(state.nextPlayerAt, state.nextTurnAt);
+  }
+  renderCardPlayMode();
+  updateCardStates(performance.now());
+  if (announce !== false) {
+    const label = mode === "auto" ? "自动" : "主动";
+    showMessage(label + "出牌模式已启用");
+    showLog(
+      mode === "auto"
+        ? "自动模式：严格执行最左侧卡牌，拖动可调整优先级"
+        : "主动模式：玩家自主选择卡牌，Boss攻击期间仍会锁牌",
+    );
+  }
+}
+
+function clearCardDragVisuals() {
+  ui.cardHand.classList.remove("drag-active");
+  ui.cardHand.querySelectorAll(".card-dragging, .drag-before, .drag-after").forEach(function (button) {
+    button.classList.remove("card-dragging", "drag-before", "drag-after");
+  });
+}
+
+function finishCardDrag(cancelled) {
+  if (!state) {
+    return;
+  }
+  state.cardDragActive = false;
+  state.autoResumeAt = performance.now() + AUTO_MODE_RESUME_DELAY;
+  draggedCardUid = null;
+  pointerCardDrag = null;
+  nativeCardDragActive = false;
+  mouseCardDrag = null;
+  suppressCardClickUntil = performance.now() + (cancelled ? 180 : 320);
+  clearCardDragVisuals();
+  updateCardStates(performance.now());
+}
+
+function announceCardOrder(uid) {
+  if (!ui.cardOrderStatus) {
+    return;
+  }
+  const index = state.hand.findIndex(function (instance) { return instance.uid === uid; });
+  const instance = index >= 0 ? state.hand[index] : null;
+  const card = instance ? getCard(instance.cardId) : null;
+  if (card) {
+    ui.cardOrderStatus.textContent = card.name + "已移动到第" + (index + 1) + "位";
+  }
+}
+
+function moveHandCard(uid, targetUid, placeAfter) {
+  if (isCardReorderLocked()) {
+    return false;
+  }
+  const fromIndex = state.hand.findIndex(function (instance) { return instance.uid === uid; });
+  if (fromIndex < 0) {
+    return false;
+  }
+  const moved = state.hand.splice(fromIndex, 1)[0];
+  let targetIndex = targetUid
+    ? state.hand.findIndex(function (instance) { return instance.uid === targetUid; })
+    : state.hand.length;
+  if (targetIndex < 0) {
+    targetIndex = state.hand.length;
+  } else if (placeAfter) {
+    targetIndex += 1;
+  }
+  state.hand.splice(targetIndex, 0, moved);
+  state.cardDragActive = false;
+  draggedCardUid = null;
+  pointerCardDrag = null;
+  nativeCardDragActive = false;
+  mouseCardDrag = null;
+  state.autoResumeAt = performance.now() + AUTO_MODE_RESUME_DELAY;
+  suppressCardClickUntil = performance.now() + 320;
+  renderCards();
+  announceCardOrder(uid);
+  window.requestAnimationFrame(function () {
+    const movedButton = ui.cardHand.querySelector('[data-card-instance="' + uid + '"]');
+    if (movedButton) {
+      movedButton.focus({ preventScroll: true });
+    }
+  });
+  return true;
+}
+
+function moveHandCardByOffset(uid, offset) {
+  if (isCardReorderLocked()) {
+    return false;
+  }
+  const fromIndex = state.hand.findIndex(function (instance) { return instance.uid === uid; });
+  const targetIndex = Math.max(0, Math.min(state.hand.length - 1, fromIndex + offset));
+  if (fromIndex < 0 || targetIndex === fromIndex) {
+    return false;
+  }
+  const targetUid = state.hand[targetIndex].uid;
+  return moveHandCard(uid, targetUid, offset > 0);
+}
+
 function renderCards() {
+  if (state) {
+    state.cardDragActive = false;
+  }
+  if (suppressCardClickUntil === Number.POSITIVE_INFINITY) {
+    suppressCardClickUntil = performance.now() + 180;
+  }
+  draggedCardUid = null;
+  pointerCardDrag = null;
+  nativeCardDragActive = false;
+  mouseCardDrag = null;
+  clearCardDragVisuals();
   ui.cardHand.innerHTML = "";
-  state.hand.forEach(function (instance) {
+  state.hand.forEach(function (instance, index) {
     const card = getCard(instance.cardId);
     const button = document.createElement("button");
     button.type = "button";
@@ -1154,6 +1370,10 @@ function renderCards() {
     button.style.setProperty("--card-color", card.color);
     button.dataset.cardId = card.id;
     button.dataset.cardInstance = instance.uid;
+    button.draggable = false;
+    button.setAttribute("aria-posinset", String(index + 1));
+    button.setAttribute("aria-setsize", String(state.hand.length));
+    button.setAttribute("aria-keyshortcuts", "Alt+ArrowLeft Alt+ArrowRight");
     button.title = card.summary;
     button.innerHTML =
       '<img src="' +
@@ -1169,7 +1389,222 @@ function renderCards() {
       '</b></span><i class="card-energy-shadow" aria-hidden="true"></i>' +
       '<i class="card-ready-flare" aria-hidden="true"></i>';
     button.addEventListener("click", function () {
-      activateCard(instance.uid, button);
+      if (performance.now() < suppressCardClickUntil) {
+        return;
+      }
+      if (state.cardPlayMode === "auto") {
+        showMessage("自动模式按左起顺序出牌，拖动卡牌可调整优先级");
+        return;
+      }
+      activateCard(instance.uid, button, "manual");
+    });
+    button.addEventListener("mousedown", function (event) {
+      if (
+        event.button !== 0 ||
+        mouseCardDrag ||
+        pointerCardDrag ||
+        nativeCardDragActive ||
+        isCardReorderLocked()
+      ) {
+        return;
+      }
+      state.cardDragActive = true;
+      state.autoResumeAt = performance.now() + AUTO_MODE_RESUME_DELAY;
+      mouseCardDrag = {
+        uid: instance.uid,
+        startX: event.clientX,
+        startY: event.clientY,
+        active: false,
+      };
+    });
+    button.addEventListener("pointerdown", function (event) {
+      if (
+        event.button !== 0 ||
+        event.pointerType === "mouse" ||
+        pointerCardDrag ||
+        nativeCardDragActive ||
+        isCardReorderLocked()
+      ) {
+        return;
+      }
+      state.cardDragActive = true;
+      state.autoResumeAt = performance.now() + AUTO_MODE_RESUME_DELAY;
+      pointerCardDrag = {
+        uid: instance.uid,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        active: false,
+      };
+      try {
+        button.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // Pointer capture is optional; desktop pointer events still provide the drag path.
+      }
+    });
+    button.addEventListener("pointermove", function (event) {
+      if (
+        !pointerCardDrag ||
+        pointerCardDrag.uid !== instance.uid ||
+        pointerCardDrag.pointerId !== event.pointerId ||
+        isCardReorderLocked()
+      ) {
+        return;
+      }
+      const distance = Math.hypot(
+        event.clientX - pointerCardDrag.startX,
+        event.clientY - pointerCardDrag.startY,
+      );
+      const dragThreshold = event.pointerType === "touch" ? 16 : 8;
+      if (!pointerCardDrag.active && distance < dragThreshold) {
+        return;
+      }
+      pointerCardDrag.active = true;
+      draggedCardUid = pointerCardDrag.uid;
+      suppressCardClickUntil = Number.POSITIVE_INFINITY;
+      button.classList.add("card-dragging");
+      ui.cardHand.classList.add("drag-active");
+      ui.cardHand.querySelectorAll(".drag-before, .drag-after").forEach(function (candidate) {
+        candidate.classList.remove("drag-before", "drag-after");
+      });
+      const hit = document.elementFromPoint(event.clientX, event.clientY);
+      const target = hit ? hit.closest(".module-card[data-card-instance]") : null;
+      if (target && target.dataset.cardInstance !== pointerCardDrag.uid) {
+        const rect = target.getBoundingClientRect();
+        const placeAfter = event.clientX > rect.left + rect.width / 2;
+        target.classList.toggle("drag-before", !placeAfter);
+        target.classList.toggle("drag-after", placeAfter);
+      }
+      event.preventDefault();
+    });
+    button.addEventListener("pointerup", function (event) {
+      if (
+        !pointerCardDrag ||
+        pointerCardDrag.uid !== instance.uid ||
+        pointerCardDrag.pointerId !== event.pointerId
+      ) {
+        return;
+      }
+      const wasActive = pointerCardDrag.active;
+      const sourceUid = pointerCardDrag.uid;
+      const hit = document.elementFromPoint(event.clientX, event.clientY);
+      const target = hit ? hit.closest(".module-card[data-card-instance]") : null;
+      pointerCardDrag = null;
+      try {
+        if (button.hasPointerCapture(event.pointerId)) {
+          button.releasePointerCapture(event.pointerId);
+        }
+      } catch (error) {
+        // The pointer may already have been released by the browser.
+      }
+      if (!wasActive) {
+        state.cardDragActive = false;
+        draggedCardUid = null;
+        return;
+      }
+      event.preventDefault();
+      if (target && target.dataset.cardInstance !== sourceUid) {
+        const rect = target.getBoundingClientRect();
+        moveHandCard(sourceUid, target.dataset.cardInstance, event.clientX > rect.left + rect.width / 2);
+      } else if (hit && hit.closest(".card-hand")) {
+        const handRect = ui.cardHand.getBoundingClientRect();
+        const moveToEnd = event.clientX >= handRect.left + handRect.width / 2;
+        const edgeInstance = moveToEnd ? state.hand[state.hand.length - 1] : state.hand[0];
+        if (edgeInstance && edgeInstance.uid !== sourceUid) {
+          moveHandCard(sourceUid, edgeInstance.uid, moveToEnd);
+        } else {
+          finishCardDrag(true);
+        }
+      } else {
+        finishCardDrag(true);
+      }
+    });
+    button.addEventListener("pointercancel", function (event) {
+      if (pointerCardDrag && pointerCardDrag.pointerId === event.pointerId) {
+        const wasActive = pointerCardDrag.active;
+        pointerCardDrag = null;
+        if (nativeCardDragActive) {
+          return;
+        } else if (wasActive) {
+          finishCardDrag(true);
+        } else {
+          state.cardDragActive = false;
+        }
+      }
+    });
+    button.addEventListener("lostpointercapture", function () {
+      if (pointerCardDrag && pointerCardDrag.uid === instance.uid) {
+        const wasActive = pointerCardDrag.active;
+        pointerCardDrag = null;
+        if (nativeCardDragActive) {
+          return;
+        } else if (wasActive) {
+          finishCardDrag(true);
+        } else {
+          state.cardDragActive = false;
+        }
+      }
+    });
+    button.addEventListener("dragstart", function (event) {
+      if (isCardReorderLocked()) {
+        event.preventDefault();
+        return;
+      }
+      nativeCardDragActive = true;
+      pointerCardDrag = null;
+      draggedCardUid = instance.uid;
+      state.cardDragActive = true;
+      state.autoResumeAt = performance.now() + AUTO_MODE_RESUME_DELAY;
+      suppressCardClickUntil = Number.POSITIVE_INFINITY;
+      button.classList.add("card-dragging");
+      ui.cardHand.classList.add("drag-active");
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", instance.uid);
+      }
+    });
+    button.addEventListener("dragover", function (event) {
+      if (!nativeCardDragActive || !draggedCardUid || isCardReorderLocked()) {
+        return;
+      }
+      event.preventDefault();
+      ui.cardHand.querySelectorAll(".drag-before, .drag-after").forEach(function (candidate) {
+        candidate.classList.remove("drag-before", "drag-after");
+      });
+      if (draggedCardUid !== instance.uid) {
+        const rect = button.getBoundingClientRect();
+        const placeAfter = event.clientX > rect.left + rect.width / 2;
+        button.classList.toggle("drag-before", !placeAfter);
+        button.classList.toggle("drag-after", placeAfter);
+      }
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "move";
+      }
+    });
+    button.addEventListener("drop", function (event) {
+      if (!nativeCardDragActive || !draggedCardUid || isCardReorderLocked()) {
+        return;
+      }
+      event.preventDefault();
+      const sourceUid = draggedCardUid;
+      if (sourceUid === instance.uid) {
+        finishCardDrag(true);
+        return;
+      }
+      const rect = button.getBoundingClientRect();
+      moveHandCard(sourceUid, instance.uid, event.clientX > rect.left + rect.width / 2);
+    });
+    button.addEventListener("dragend", function () {
+      if (nativeCardDragActive || state.cardDragActive) {
+        finishCardDrag(true);
+      }
+    });
+    button.addEventListener("keydown", function (event) {
+      if (!event.altKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) {
+        return;
+      }
+      event.preventDefault();
+      moveHandCardByOffset(instance.uid, event.key === "ArrowLeft" ? -1 : 1);
     });
     button.addEventListener("animationend", function (event) {
       if (event.animationName === "card-energy-ready-glow") {
@@ -1216,14 +1651,13 @@ function hasBossStunFreeCards(now) {
 }
 
 function updateCardStates(now) {
-  const resolutionLocked =
-    state.videoPlaying ||
-    Boolean(state.videoPending) ||
-    state.ultimateHolding ||
-    state.ultimateCasting;
+  const resolutionLocked = isCardResolutionLocked();
+  const bossActionLocked = isBossActionLocked();
   const battleActive = state.phase === "battle" && !state.ended;
   const freeDuringBossStun = hasBossStunFreeCards(now);
-  state.hand.forEach(function (instance) {
+  const playerWindowOpen = isPlayerCardWindowOpen(now);
+  renderCardPlayMode();
+  state.hand.forEach(function (instance, index) {
     const card = getCard(instance.cardId);
     const weapon = currentWeaponMode();
     const affinity = getWeaponCardAffinity(card, weapon);
@@ -1271,13 +1705,16 @@ function updateCardStates(now) {
       instance.energyReadyFlashPending = false;
     }
     instance.energyAccessState = energyAccess;
-    button.disabled =
-      !battleActive ||
-      resolutionLocked ||
-      lacksEnergy;
+    const canPlayNow = playerWindowOpen && !lacksEnergy;
+    button.disabled = !battleActive || resolutionLocked || state.turnActor !== "player";
+    button.draggable = false;
+    button.removeAttribute("aria-disabled");
     button.classList.toggle("energy-locked", lacksEnergy);
     button.classList.toggle("stun-free-cast", freeDuringBossStun);
-    button.classList.toggle("card-ready", battleActive && !button.disabled);
+    button.classList.toggle("card-ready", canPlayNow);
+    button.classList.toggle("auto-priority", state.cardPlayMode === "auto" && index === 0);
+    button.classList.toggle("auto-controlled", state.cardPlayMode === "auto");
+    button.classList.toggle("interaction-locked", resolutionLocked);
     button.classList.remove("awakening-selectable", "awakening-selected");
     button.classList.toggle("weapon-linked", affinity === "linked");
     button.classList.toggle("weapon-neutral", affinity === "neutral");
@@ -1294,6 +1731,10 @@ function updateCardStates(now) {
     }
     const stateDescription = !battleActive
       ? "等待开战"
+      : bossActionLocked
+        ? "Boss攻击中，仅可进行QTE"
+      : state.cardTurnResolving
+        ? "技能结算中"
       : state.ultimateHolding
         ? "终结技蓄力中"
         : state.ultimateCasting
@@ -1302,7 +1743,11 @@ function updateCardStates(now) {
             ? "Boss倒地，免费释放"
           : lacksEnergy
             ? "能量不足"
-            : "可释放";
+          : !playerWindowOpen
+            ? "等待玩家出牌阶段"
+          : state.cardPlayMode === "auto"
+            ? index === 0 ? "自动队列下一张" : "自动队列第" + (index + 1) + "张"
+            : "可主动释放";
     button.setAttribute(
       "aria-label",
       card.name + "，" +
@@ -1311,8 +1756,12 @@ function updateCardStates(now) {
     );
     button.title = !battleActive
       ? "进入战斗后可使用 · " + card.summary
+      : bossActionLocked
+        ? "Boss攻击中：只能进行QTE，暂不可出牌或排序"
       : resolutionLocked
-        ? "终结技结算中 · " + card.summary
+        ? "当前动作结算中 · " + card.summary
+      : state.cardPlayMode === "auto"
+        ? (index === 0 ? "自动队列下一张 · " : "自动队列第" + (index + 1) + "张 · ") + "拖动可调整顺序"
         : freeDuringBossStun
           ? "Boss倒地 · 免费释放 · " + card.summary
         : lacksEnergy
@@ -1389,6 +1838,7 @@ function renderChain() {
     !state.ended &&
     !state.ultimateHolding &&
     !state.ultimateCasting &&
+    !state.cardTurnResolving &&
     !state.lastResolvedChain.length
   ) {
     ui.liveHint.textContent = "挂件卡随时释放 · 长按终结技逐档蓄力";
@@ -1537,6 +1987,7 @@ function canStartSoulUltimate() {
     !state.ended &&
     !state.ultimateHolding &&
     !state.ultimateCasting &&
+    !state.cardTurnResolving &&
     !state.actionActor &&
     !state.reactionActive &&
     !state.videoPending &&
@@ -2392,6 +2843,10 @@ function beginBossStun(partId, now) {
   }
 
   state.bossStunned = true;
+  state.bossStunResumeActor = "boss";
+  state.turnActor = "player";
+  state.lastAutoActor = "boss";
+  state.autoResumeAt = currentTime + STUN_AUTO_CARD_GAP;
   state.bossStunStartedAt = currentTime;
   state.bossStunEndsAt = currentTime + BOSS_STUN_DURATION;
   state.bossStunPartId = partId;
@@ -2436,10 +2891,14 @@ function finishBossStun(now) {
   state.bossStunPartId = null;
   state.bossStunAdvanceIntent = false;
   state.bossStunPausedRemaining = null;
-  state.nextTurnAt = Math.max(state.nextTurnAt, currentTime + 250);
-  if (state.turnActor === "player") {
-    state.nextPlayerAt = Math.max(state.nextPlayerAt, state.nextTurnAt);
+  if (state.cardDragActive) {
+    finishCardDrag(true);
   }
+  state.turnActor = state.bossStunResumeActor || "boss";
+  state.bossStunResumeActor = "boss";
+  state.lastAutoActor = state.turnActor === "boss" ? "player" : "boss";
+  state.nextTurnAt = currentTime + 250;
+  state.nextPlayerAt = state.nextTurnAt;
   ui.battlefield.classList.remove("boss-stunned");
   ui.liveHint.textContent = "Boss恢复行动 · 严格交替回合继续";
   ui.autoActionText.textContent = "Boss起身 · 战斗节拍恢复";
@@ -2656,6 +3115,126 @@ function endIntervention(reason, now) {
   renderStatus();
 }
 
+function updateCombatStance() {
+  if (!state || !ui.battlefield) {
+    return;
+  }
+  const neutral = Boolean(
+    state.phase === "battle" &&
+    !state.ended &&
+    !state.bossStunned &&
+    !state.actionActor &&
+    !state.cardTurnResolving &&
+    !state.reactionActive &&
+    !state.videoPending &&
+    !state.videoPlaying &&
+    !state.ultimateHolding &&
+    !state.ultimateCasting
+  );
+  ui.battlefield.classList.toggle("combat-neutral", neutral);
+  ui.commandDeck.classList.toggle("boss-action-lock", isBossActionLocked());
+}
+
+function updateCardFlowStatus(now) {
+  if (
+    !state ||
+    state.phase !== "battle" ||
+    state.ended ||
+    state.bossStunned ||
+    state.actionActor ||
+    state.cardTurnResolving ||
+    state.videoPending ||
+    state.videoPlaying ||
+    state.ultimateHolding ||
+    state.ultimateCasting ||
+    state.turnActor !== "player"
+  ) {
+    return;
+  }
+  const firstInstance = state.hand[0];
+  const firstCard = firstInstance ? getCard(firstInstance.cardId) : null;
+  if (now < state.nextTurnAt) {
+    ui.autoActionText.textContent = "对峙游走 · " + Math.max(0, (state.nextTurnAt - now) / 1000).toFixed(1) + "s";
+    return;
+  }
+  if (state.cardPlayMode === "manual") {
+    ui.autoActionText.textContent = "主动模式 · 请选择卡牌";
+    return;
+  }
+  if (!firstCard) {
+    ui.autoActionText.textContent = "自动队列 · 等待补牌";
+    return;
+  }
+  if (!hasBossStunFreeCards(now) && firstCard.cost > state.energy) {
+    ui.autoActionText.textContent = "自动等待 · " + firstCard.name + " " + state.energy + "/" + firstCard.cost;
+    return;
+  }
+  ui.autoActionText.textContent = "自动队列 · " + firstCard.name;
+}
+
+function tryAutoPlayCard(now) {
+  if (
+    !state ||
+    state.cardPlayMode !== "auto" ||
+    state.cardDragActive ||
+    now < state.autoResumeAt ||
+    !isPlayerCardWindowOpen(now)
+  ) {
+    return false;
+  }
+  const instance = state.hand[0];
+  const card = instance ? getCard(instance.cardId) : null;
+  if (!instance || !card) {
+    return false;
+  }
+  if (!hasBossStunFreeCards(now) && card.cost > state.energy) {
+    updateCardFlowStatus(now);
+    return false;
+  }
+  const button = ui.cardHand.querySelector('[data-card-instance="' + instance.uid + '"]');
+  return activateCard(instance.uid, button, "auto");
+}
+
+function finishPlayerCardTurn(payload, now) {
+  if (!state || !payload || payload.runId !== state.runId) {
+    return;
+  }
+  state.cardTurnResolving = false;
+  if (state.ended) {
+    return;
+  }
+  if (state.chain.length >= 5) {
+    resolveChain();
+    if (state.ended) {
+      return;
+    }
+  }
+  if (state.chain.length) {
+    state.chainDeadline = Math.max(state.chainDeadline, now + AUTO_CHAIN_CONTINUE_WINDOW);
+  }
+  state.lastPlayerActionAt = now;
+  state.autoResumeAt = now + AUTO_MODE_RESUME_DELAY;
+  if (state.bossStunned) {
+    state.turnActor = "player";
+    state.lastAutoActor = "boss";
+    state.nextTurnAt = now + STUN_AUTO_CARD_GAP;
+    state.nextPlayerAt = state.nextTurnAt;
+    state.playerCycleDuration = STUN_AUTO_CARD_GAP;
+    ui.autoActionText.textContent = "Boss倒地 · 免费队列继续";
+  } else {
+    state.lastAutoActor = "player";
+    state.turnActor = "boss";
+    state.nextTurnAt = now + CARD_TO_BOSS_DELAY;
+    state.nextPlayerAt = state.nextTurnAt + currentWeaponMode().attackInterval;
+    state.playerCycleDuration = Math.max(1, state.nextPlayerAt - state.lastPlayerActionAt);
+    ui.autoActionText.textContent = payload.card.name + "完成 · Boss即将反击";
+  }
+  updateCombatStance();
+  renderStatus();
+  renderReactionControls();
+  updateCardStates(now);
+}
+
 function tickBattle() {
   if (!state || state.phase !== "battle" || state.ended) {
     return;
@@ -2663,6 +3242,7 @@ function tickBattle() {
   const now = performance.now();
   const frameDelta = Math.max(0, now - state.lastFrameAt);
   state.lastFrameAt = now;
+  updateCombatStance();
   advanceTimedEnergy(now);
   renderEnergyRecoveryProgress(now);
   if (state.bossStunned) {
@@ -2694,6 +3274,10 @@ function tickBattle() {
     return;
   }
   if (state.bossStunned) {
+    if (state.cardPlayMode === "auto") {
+      tryAutoPlayCard(now);
+    }
+    updateCardFlowStatus(now);
     updateCardStates(now);
     return;
   }
@@ -2703,13 +3287,19 @@ function tickBattle() {
   }
   if (now >= state.nextTurnAt && isAutoTurnIdle()) {
     if (state.turnActor === "player") {
-      executeAutoAttack(now);
+      if (state.cardPlayMode === "auto") {
+        tryAutoPlayCard(now);
+      }
     } else {
       resolveBossAttack(now);
     }
   }
+  updateCardFlowStatus(now);
   updateAutoActionMeter(now);
   updateIntentTimer(now);
+  if (state.actionActor === "boss" && state.chain.length) {
+    state.chainDeadline += frameDelta;
+  }
   updateChainTimer(now);
   updateCardStates(now);
 }
@@ -2733,6 +3323,8 @@ function isAutoTurnIdle() {
     state &&
     !state.ended &&
     !state.actionActor &&
+    !state.cardTurnResolving &&
+    (state.turnActor === "boss" || !state.cardDragActive) &&
     !state.reactionActive &&
     !state.videoPending &&
     !state.videoPlaying &&
@@ -2826,31 +3418,35 @@ function settlePlayerAttack(action, bonus, now) {
   checkBattleEnd();
 }
 
-function activateCard(cardInstanceId, sourceButton) {
+function activateCard(cardInstanceId, sourceButton, origin) {
+  const now = performance.now();
+  const playOrigin = origin === "auto" ? "auto" : "manual";
   if (
     !state ||
     state.phase !== "battle" ||
     state.ended ||
-    state.videoPlaying ||
-    state.videoPending ||
-    state.ultimateHolding ||
-    state.ultimateCasting
+    isCardResolutionLocked() ||
+    !isPlayerCardWindowOpen(now) ||
+    (playOrigin === "auto" && state.cardPlayMode !== "auto") ||
+    (playOrigin === "manual" && state.cardPlayMode !== "manual")
   ) {
-    return;
+    return false;
   }
   const handIndex = state.hand.findIndex(function (instance) {
     return instance.uid === cardInstanceId;
   });
   if (handIndex < 0) {
-    return;
+    return false;
+  }
+  if (playOrigin === "auto" && handIndex !== 0) {
+    return false;
   }
   const instance = state.hand[handIndex];
   const card = getCard(instance.cardId);
-  const now = performance.now();
   if (state.chain.length && now >= state.chainDeadline) {
     resolveChain();
     if (state.ended) {
-      return;
+      return false;
     }
   }
   const freeDuringBossStun = hasBossStunFreeCards(now);
@@ -2858,8 +3454,9 @@ function activateCard(cardInstanceId, sourceButton) {
   if (state.energy < energySpent) {
     showMessage("战术能量不足，无法激活“" + card.name + "”");
     updateCardStates(now);
-    return;
+    return false;
   }
+  state.cardTurnResolving = true;
   endIntervention("card", now);
 
   const previous = state.chain.length ? state.chain[state.chain.length - 1].card : null;
@@ -2882,10 +3479,17 @@ function activateCard(cardInstanceId, sourceButton) {
     presentationId: ++modulePresentationSerial,
     energySpent: energySpent,
     freeDuringBossStun: freeDuringBossStun,
+    flowOwned: true,
+    playOrigin: playOrigin,
     resolved: false,
   };
   state.videoPending = presentationPayload;
-  createCardProjectile(card, sourceButton);
+  const resolvedSourceButton = sourceButton || ui.cardHand.querySelector(
+    '[data-card-instance="' + cardInstanceId + '"]',
+  );
+  if (resolvedSourceButton) {
+    createCardProjectile(card, resolvedSourceButton);
+  }
   state.hand.splice(handIndex, 1);
   state.discardPile.push(instance);
   drawNextCard();
@@ -2903,6 +3507,7 @@ function activateCard(cardInstanceId, sourceButton) {
   if (!state.actionActor && !state.reactionActive) {
     startPendingModuleVideo();
   }
+  return true;
 }
 
 function scheduleMaxChainResolve(currentRun, delay) {
@@ -3051,6 +3656,10 @@ function finishModuleVideo(skipped, expectedPayload) {
     return;
   }
   updateCardStates(performance.now());
+  if (payload.flowOwned) {
+    finishPlayerCardTurn(payload, performance.now());
+    return;
+  }
   if (state.chain.length >= 5) {
     scheduleMaxChainResolve(payload.runId, 360);
   }
@@ -3095,6 +3704,7 @@ function applyCardEffect(card, chainIndex, link, energySpent) {
     multiplier += 0.25;
     state.moduleBoost -= 1;
   }
+  pulseCombatClass("player-skill-action", 720);
   triggerModuleFx(card, chainIndex);
 
   if (card.id === "armor") {
@@ -3108,7 +3718,7 @@ function applyCardEffect(card, chainIndex, link, energySpent) {
   } else if (card.id === "jet") {
     state.jetGuard = true;
     state.nextAutoBonus += Math.round(13 * multiplier);
-    showMessage("喷气背包强化下一次自动攻击，并准备规避反击");
+    showMessage("喷气背包强化下一张伤害挂件，并准备规避反击");
   } else if (card.id === "cannon") {
     applyModuleHit(card, Math.round(24 * multiplier), Math.round(48 * multiplier), Math.round(44 * multiplier), resolvedEnergySpent);
   } else if (card.id === "drone") {
@@ -3131,6 +3741,13 @@ function applyCardEffect(card, chainIndex, link, energySpent) {
 }
 
 function applyModuleHit(card, damage, armorDamage, pressure, energySpent) {
+  const queuedBonus = state.nextAutoBonus;
+  if (queuedBonus > 0) {
+    damage += queuedBonus;
+    armorDamage += Math.round(queuedBonus * 1.2);
+    pressure += Math.round(queuedBonus * 0.4);
+    state.nextAutoBonus = 0;
+  }
   const targetId = getIntent().part;
   const target = state.parts[targetId];
   const result = damagePart(targetId, damage, armorDamage);
@@ -3151,6 +3768,9 @@ function applyModuleHit(card, damage, armorDamage, pressure, energySpent) {
       (result.partBroken && state.bossHp > 0 ? " · 部位破坏，Boss眩晕5秒" : ""),
   );
   showLog(card.name + "已真实介入自动战斗");
+  if (queuedBonus > 0) {
+    showLog("喷气背包增幅已接入本次伤害：+" + queuedBonus);
+  }
 }
 
 function damagePart(partId, damage, armorDamage) {
@@ -3266,6 +3886,7 @@ function resolveBossAttack(now) {
   if (
     state.ended ||
     state.bossStunned ||
+    state.cardTurnResolving ||
     state.turnActor !== "boss" ||
     state.actionActor ||
     state.reactionActive ||
@@ -3288,8 +3909,10 @@ function resolveBossAttack(now) {
   state.reactionChoice = null;
   ui.autoActionText.textContent = "Boss回合 · " + intent.name;
   pulseCombatClass("boss-turn", ATTACK_RECOVER_DELAY);
+  updateCombatStance();
   renderStatus();
   renderReactionControls();
+  updateCardStates(now);
 
   if (state.intentInterrupted) {
     window.setTimeout(function () {
@@ -3335,8 +3958,10 @@ function resolveBossAttack(now) {
       state.activeActionId = 0;
       state.reactionActive = false;
       state.bossImpactAt = 0;
+      updateCombatStance();
       renderStatus();
       renderReactionControls();
+      updateCardStates(performance.now());
     }
   }, ATTACK_RECOVER_DELAY);
 }
@@ -3735,6 +4360,12 @@ function endBattle(victory, copy) {
   ui.gmTools.hidden = true;
   state.actionActor = null;
   state.activeActionId = 0;
+  state.cardTurnResolving = false;
+  state.cardDragActive = false;
+  draggedCardUid = null;
+  suppressCardClickUntil = 0;
+  pointerCardDrag = null;
+  nativeCardDragActive = false;
   state.reactionActive = false;
   state.bossImpactAt = 0;
   state.bossStunned = false;
@@ -3743,6 +4374,7 @@ function endBattle(victory, copy) {
   state.bossStunPartId = null;
   state.bossStunAdvanceIntent = false;
   state.bossStunPausedRemaining = null;
+  state.bossStunResumeActor = "boss";
   ui.battlefield.classList.remove("boss-stunned");
   ui.bossUnit.classList.remove("is-stunned");
   ui.intentBanner.classList.remove("stunned");
@@ -3772,6 +4404,7 @@ function endBattle(victory, copy) {
   );
   clearInterval(battleTimer);
   battleTimer = 0;
+  updateCombatStance();
   ui.commandDeck.classList.add("locked");
   ui.resultEyebrow.textContent = victory ? "挑战完成" : "战斗失败";
   ui.resultTitle.textContent = victory ? "巨兽已倒下" : "战斗化身失去行动";
@@ -3817,6 +4450,119 @@ ui.gmActions.forEach(function (button) {
   button.addEventListener("click", function () {
     applyGmAction(button.dataset.gmAction);
   });
+});
+ui.cardModeSwitch.addEventListener("click", function (event) {
+  const button = event.target.closest("[data-card-play-mode]");
+  if (!button || button.disabled) {
+    return;
+  }
+  setCardPlayMode(button.dataset.cardPlayMode);
+});
+ui.cardHand.addEventListener("dragover", function (event) {
+  if (!draggedCardUid || isCardReorderLocked() || event.target.closest(".module-card")) {
+    return;
+  }
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "move";
+  }
+});
+ui.cardHand.addEventListener("drop", function (event) {
+  if (!draggedCardUid || isCardReorderLocked() || event.target.closest(".module-card")) {
+    return;
+  }
+  event.preventDefault();
+  moveHandCard(draggedCardUid, null, true);
+});
+document.addEventListener("mousemove", function (event) {
+  if (!mouseCardDrag) {
+    return;
+  }
+  if (isCardReorderLocked()) {
+    finishCardDrag(true);
+    return;
+  }
+  const distance = Math.hypot(
+    event.clientX - mouseCardDrag.startX,
+    event.clientY - mouseCardDrag.startY,
+  );
+  if (!mouseCardDrag.active && distance < 8) {
+    return;
+  }
+  mouseCardDrag.active = true;
+  draggedCardUid = mouseCardDrag.uid;
+  suppressCardClickUntil = Number.POSITIVE_INFINITY;
+  const source = ui.cardHand.querySelector(
+    '[data-card-instance="' + mouseCardDrag.uid + '"]',
+  );
+  if (source) {
+    source.classList.add("card-dragging");
+  }
+  ui.cardHand.classList.add("drag-active");
+  ui.cardHand.querySelectorAll(".drag-before, .drag-after").forEach(function (candidate) {
+    candidate.classList.remove("drag-before", "drag-after");
+  });
+  const hit = document.elementFromPoint(event.clientX, event.clientY);
+  const target = hit ? hit.closest(".module-card[data-card-instance]") : null;
+  if (target && target.dataset.cardInstance !== mouseCardDrag.uid) {
+    const rect = target.getBoundingClientRect();
+    const placeAfter = event.clientX > rect.left + rect.width / 2;
+    target.classList.toggle("drag-before", !placeAfter);
+    target.classList.toggle("drag-after", placeAfter);
+  }
+  event.preventDefault();
+});
+document.addEventListener("mouseup", function (event) {
+  if (!mouseCardDrag || event.button !== 0) {
+    return;
+  }
+  const drag = mouseCardDrag;
+  mouseCardDrag = null;
+  if (!drag.active) {
+    state.cardDragActive = false;
+    return;
+  }
+  event.preventDefault();
+  const hit = document.elementFromPoint(event.clientX, event.clientY);
+  const target = hit ? hit.closest(".module-card[data-card-instance]") : null;
+  if (target && target.dataset.cardInstance !== drag.uid) {
+    const rect = target.getBoundingClientRect();
+    moveHandCard(drag.uid, target.dataset.cardInstance, event.clientX > rect.left + rect.width / 2);
+    return;
+  }
+  if (hit && hit.closest(".card-hand")) {
+    const handRect = ui.cardHand.getBoundingClientRect();
+    const moveToEnd = event.clientX >= handRect.left + handRect.width / 2;
+    const edgeInstance = moveToEnd ? state.hand[state.hand.length - 1] : state.hand[0];
+    if (edgeInstance && edgeInstance.uid !== drag.uid) {
+      moveHandCard(drag.uid, edgeInstance.uid, moveToEnd);
+      return;
+    }
+  }
+  finishCardDrag(true);
+});
+document.addEventListener("pointerup", function (event) {
+  if (
+    pointerCardDrag &&
+    pointerCardDrag.pointerId === event.pointerId &&
+    !nativeCardDragActive
+  ) {
+    finishCardDrag(true);
+  }
+});
+document.addEventListener("pointercancel", function (event) {
+  if (
+    pointerCardDrag &&
+    pointerCardDrag.pointerId === event.pointerId &&
+    !nativeCardDragActive
+  ) {
+    finishCardDrag(true);
+  }
+});
+window.addEventListener("blur", function () {
+  if (state && state.cardDragActive && !nativeCardDragActive) {
+    finishCardDrag(true);
+  }
 });
 ui.soulUltimateButton.addEventListener("pointerdown", function (event) {
   if (event.button !== 0) {

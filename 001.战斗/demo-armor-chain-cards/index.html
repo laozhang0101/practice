@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0d10" />
     <title>M98 卡牌版战斗 Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=20260807-gm-hide-ui-37" />
+    <link rel="stylesheet" href="./styles.css?v=20260807-auto-duel-v040-40" />
   </head>
   <body>
     <main class="game-shell" id="gameShell">
-      <div class="demo-version" aria-label="演示版本">卡牌版 · 2026.08.04 · 严格交替回合 / 精简能量</div>
+      <div class="demo-version" aria-label="演示版本">卡牌版 · v0.4.0-auto-duel · 2026.08.07</div>
 
       <section class="battle-preparation monster-step" id="battlePreparation" aria-label="战前准备流程" aria-hidden="false">
         <div class="preparation-ambient" aria-hidden="true"></div>
@@ -347,7 +347,12 @@
             <span class="soul-cancel-target" id="soulCancelTarget" aria-hidden="true"><i></i></span>
           </button>
           <div class="card-rail">
+            <div class="card-mode-switch" id="cardModeSwitch" role="group" aria-label="出牌模式">
+              <button type="button" data-card-play-mode="auto" aria-pressed="true">自动</button>
+              <button type="button" data-card-play-mode="manual" aria-pressed="false">主动</button>
+            </div>
             <section class="card-hand" id="cardHand" aria-label="战甲与挂件卡牌"></section>
+            <span class="sr-only" id="cardOrderStatus" aria-live="polite"></span>
             <aside class="next-card-preview" id="nextCardPreview" aria-live="polite" aria-label="下一张补充卡牌">
               <i class="next-card-chevron" aria-hidden="true"></i>
               <span class="next-card-frame">
@@ -390,6 +395,6 @@
       </aside>
     </main>
 
-    <script src="./game.js?v=20260807-gm-hide-ui-37"></script>
+    <script src="./game.js?v=20260807-auto-duel-v040-40"></script>
   </body>
 </html>
