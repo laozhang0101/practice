@@ -273,29 +273,40 @@ button:disabled {
 .player-mana-track {
   display: grid;
   grid-template-columns: repeat(var(--mana-cell-count, 7), minmax(0, 1fr));
-  align-items: center;
-  gap: 5px;
-  height: 11px;
+  align-items: stretch;
+  gap: 2px;
+  height: 14px;
+  padding: 2px 3px;
+  border-top: 1px solid rgba(129, 183, 207, 0.5);
+  border-bottom: 1px solid rgba(50, 90, 109, 0.72);
+  background: linear-gradient(180deg, rgba(3, 12, 18, 0.92), rgba(10, 27, 37, 0.82));
+  box-shadow:
+    inset 0 1px 0 rgba(196, 231, 243, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.82),
+    0 1px 0 rgba(0, 0, 0, 0.68);
 }
 
 .player-mana-track i {
   display: block;
-  justify-self: center;
-  width: clamp(11px, 1.05vw, 15px);
-  height: 7px;
-  border: 1px solid rgba(100, 151, 180, 0.46);
-  border-radius: 1px;
-  background: rgba(5, 22, 34, 0.86);
-  transform: skewX(-16deg);
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(72, 105, 122, 0.72);
+  border-radius: 0;
+  background: linear-gradient(180deg, #182832 0%, #101c24 52%, #09131a 100%);
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(137, 176, 193, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.82);
   transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .player-mana-track i.filled {
-  border-color: rgba(190, 237, 255, 0.82);
-  background: radial-gradient(circle at 45% 35%, #dcf8ff 0 12%, #5cd2ff 34%, #088fd2 78%);
+  border-color: rgba(157, 235, 255, 0.92);
+  background: linear-gradient(180deg, #a6efff 0%, #45d8f5 32%, #0d9bc3 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.42),
-    0 0 9px rgba(42, 185, 243, 0.56);
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -1px 0 rgba(0, 74, 105, 0.62),
+    0 0 7px rgba(38, 205, 245, 0.36);
 }
 
 .player-combat-hud {
