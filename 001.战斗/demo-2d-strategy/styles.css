@@ -137,6 +137,715 @@ button:disabled {
   transform: translateX(-50%);
 }
 
+/* Reference combat composition: status at lower-left, actions stacked at right. */
+.combat-action-dock {
+  position: absolute;
+  right: clamp(14px, 1.6vw, 24px);
+  top: auto;
+  bottom: clamp(28px, 4.5vh, 40px);
+  z-index: 50;
+  display: block;
+  width: clamp(230px, 22vw, 340px);
+  height: 75%;
+  transform: none;
+  pointer-events: none;
+}
+
+.combat-action-dock .weapon-overlay {
+  position: absolute;
+  inset: auto 0 0 auto;
+  display: flex;
+  flex-direction: row-reverse;
+  pointer-events: auto;
+}
+
+.combat-action-dock .weapon-dock {
+  transform: translateX(10px);
+}
+
+.combat-action-dock .weapon-overlay.expanded .weapon-dock {
+  transform: translateX(0);
+}
+
+.combat-action-dock .battle-skill-overlay {
+  position: absolute;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100%;
+  transform: translateX(14px) !important;
+  transform-origin: right bottom;
+}
+
+.combat-action-dock .battle-skill-overlay.active {
+  transform: translateX(0) !important;
+}
+
+.combat-action-dock .battle-skill-list {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.combat-action-dock .battle-skill-card {
+  position: absolute;
+  margin: 0;
+}
+
+.combat-action-dock .battle-skill-card:nth-child(1) {
+  right: 0;
+  bottom: 31%;
+}
+
+.combat-action-dock .battle-skill-card:nth-child(2) {
+  right: 31%;
+  bottom: 21%;
+}
+
+.combat-action-dock .battle-skill-card:nth-child(3) {
+  right: 43%;
+  bottom: 0;
+}
+
+.combat-action-dock .battle-skill-page-toggle {
+  position: absolute;
+  right: 18%;
+  bottom: -28px;
+  margin: 0;
+}
+
+.combat-action-dock .weapon-toggle {
+  width: clamp(72px, 6.1vw, 82px);
+  height: clamp(72px, 6.1vw, 82px);
+}
+
+.combat-action-dock .skill-card.battle-skill-card {
+  width: clamp(68px, 5.8vw, 78px);
+  height: clamp(68px, 5.8vw, 78px);
+}
+
+.player-status-dock {
+  position: absolute;
+  left: clamp(16px, 2vw, 28px);
+  bottom: clamp(14px, 2.4vh, 24px);
+  z-index: 52;
+  display: block;
+  pointer-events: none;
+}
+
+.player-status-dock .soul-armor-button {
+  position: relative;
+  inset: auto !important;
+  width: clamp(78px, 6.8vw, 92px);
+  height: clamp(78px, 6.8vw, 92px);
+  margin: 0;
+  pointer-events: auto;
+}
+
+.player-resource-stack {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(16px, 2.4vh, 24px);
+  z-index: 52;
+  display: grid;
+  gap: 5px;
+  width: clamp(250px, 24vw, 320px);
+  padding: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.player-mana-hud {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  display: block;
+  width: 100%;
+  transform: none;
+  filter: drop-shadow(0 7px 13px rgba(0, 0, 0, 0.62));
+  pointer-events: none;
+}
+
+.player-mana-body {
+  display: grid;
+  width: 100%;
+}
+
+.player-mana-track {
+  display: grid;
+  grid-template-columns: repeat(var(--mana-cell-count, 7), minmax(0, 1fr));
+  align-items: center;
+  gap: 5px;
+  height: 11px;
+}
+
+.player-mana-track i {
+  display: block;
+  justify-self: center;
+  width: clamp(11px, 1.05vw, 15px);
+  height: 7px;
+  border: 1px solid rgba(100, 151, 180, 0.46);
+  border-radius: 1px;
+  background: rgba(5, 22, 34, 0.86);
+  transform: skewX(-16deg);
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.player-mana-track i.filled {
+  border-color: rgba(190, 237, 255, 0.82);
+  background: radial-gradient(circle at 45% 35%, #dcf8ff 0 12%, #5cd2ff 34%, #088fd2 78%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 0 9px rgba(42, 185, 243, 0.56);
+}
+
+.player-combat-hud {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 0;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.62));
+}
+
+.player-combat-vitals {
+  display: grid;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.player-resource-row {
+  grid-template-columns: 16px minmax(0, 1fr) 62px;
+  align-items: center;
+  gap: 7px;
+  min-height: 16px;
+  color: #edf4f8;
+  text-shadow: 0 1px 3px #000;
+}
+
+.player-resource-row > strong {
+  color: #edf4f8;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.player-resource-mark {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: #f0f4f6;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0 7px currentColor;
+}
+
+.player-resource-mark.mana {
+  color: #39c3ff;
+  font-size: 16px;
+}
+
+.player-hp-readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-right: 12px;
+  color: #f1f6fa;
+  line-height: 1;
+  text-shadow: 0 1px 3px #000;
+}
+
+.player-hp-readout small {
+  color: #cbd9e1;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.player-hp-readout strong {
+  font-size: clamp(12px, 1vw, 14px);
+}
+
+.player-hp-track {
+  display: block;
+  height: 8px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(224, 241, 249, 0.3);
+  border-radius: 1px;
+  background: rgba(2, 7, 11, 0.78);
+}
+
+.player-hp-track i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #dbe6eb 0%, #f5f8f9 62%, #ffffff 100%);
+  box-shadow: 0 0 8px rgba(224, 242, 248, 0.38);
+  transition: width 0.22s ease-out;
+}
+
+/* Right-side combat skill dock */
+.battle-skill-overlay {
+  left: auto;
+  right: clamp(14px, 1.6vw, 24px);
+  top: 50%;
+  bottom: auto;
+  width: auto;
+  transform: translate(14px, -50%);
+  transform-origin: right center;
+  display: grid;
+  justify-items: end;
+  gap: 9px;
+}
+
+.battle-skill-overlay.active {
+  transform: translate(0, -50%);
+}
+
+.battle-skill-list {
+  display: flex;
+  flex-direction: column;
+  align-items: end;
+  gap: 12px;
+}
+
+.battle-skill-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr;
+  gap: 0;
+  width: clamp(76px, 6.7vw, 92px);
+  height: clamp(82px, 7.4vw, 102px);
+  min-height: 0;
+  padding: 4px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--skill-color), white 18%);
+  border-radius: 50%;
+  background: rgba(7, 10, 15, 0.96);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 8px 20px rgba(0, 0, 0, 0.46);
+  color: #fff;
+  text-align: center;
+  touch-action: none;
+  user-select: none;
+}
+
+.battle-skill-card.has-action-cost {
+  padding: 4px;
+}
+
+.battle-skill-icon {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #111722;
+}
+
+.battle-skill-icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, transparent 58%, rgba(0, 0, 0, 0.48));
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.battle-skill-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.battle-skill-name {
+  position: absolute;
+  left: 50%;
+  right: auto;
+  top: calc(100% + 5px);
+  display: block;
+  min-width: max-content;
+  padding: 3px 8px;
+  border-top: 2px solid var(--skill-color);
+  border-radius: 0 0 3px 3px;
+  background: rgba(4, 7, 11, 0.82);
+  color: #f5f7fa;
+  font-size: clamp(10px, 0.85vw, 12px);
+  line-height: 1.1;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+  text-shadow: 0 1px 3px #000;
+}
+
+.battle-skill-cost {
+  position: absolute;
+  left: -3px;
+  right: auto;
+  top: -3px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border: 1px solid rgba(167, 218, 255, 0.9);
+  border-radius: 50%;
+  background: #135b95;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+}
+
+.battle-skill-card:hover:not(:disabled),
+.battle-skill-card:focus-visible {
+  border-color: color-mix(in srgb, var(--skill-color), white 48%);
+  transform: translateX(-4px) scale(1.04);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--skill-color), transparent 66%),
+    0 0 18px color-mix(in srgb, var(--skill-color), transparent 65%);
+}
+
+.battle-skill-page-toggle {
+  display: grid;
+  grid-template-columns: 24px 30px 24px;
+  place-items: center;
+  width: 78px;
+  height: 30px;
+  margin-right: 15px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(5, 10, 16, 0.82);
+  color: #eef7ff;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.42);
+}
+
+.battle-skill-page-toggle.hidden {
+  display: none;
+}
+
+.battle-skill-page-toggle button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #dcecf8;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.battle-skill-page-toggle button:hover,
+.battle-skill-page-toggle button:focus-visible {
+  background: rgba(88, 183, 255, 0.22);
+  color: #fff;
+}
+
+.battle-skill-page-toggle small {
+  color: #f4f7fa;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.battle-skill-list.page-swap {
+  animation: skill-page-swap 0.18s ease-out;
+}
+
+@keyframes skill-page-swap {
+  from { opacity: 0.25; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.battle-skill-card.holding {
+  animation: skill-hold-pulse 0.52s linear forwards;
+}
+
+.battle-skill-card:disabled {
+  opacity: 0.42;
+  filter: grayscale(0.82);
+}
+
+@keyframes skill-hold-pulse {
+  from { box-shadow: inset 0 0 0 1px transparent, 0 8px 20px rgba(0, 0, 0, 0.46); }
+  to { box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--skill-color), white 22%), 0 0 22px color-mix(in srgb, var(--skill-color), transparent 48%); }
+}
+
+.skill-description-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  display: block;
+  padding: 0;
+  background: linear-gradient(90deg, transparent 44%, rgba(0, 0, 0, 0.08));
+}
+
+.skill-description-overlay.hidden {
+  display: none;
+}
+
+.skill-description-panel {
+  position: absolute;
+  top: clamp(58px, 13%, 92px);
+  right: clamp(18px, 3.5%, 44px);
+  display: grid;
+  gap: 9px;
+  width: min(450px, 52%);
+  padding: 13px 15px;
+  border: 1px solid rgba(219, 192, 124, 0.68);
+  border-radius: 8px;
+  background: linear-gradient(105deg, rgba(8, 10, 12, 0.97), rgba(14, 15, 15, 0.91));
+  color: #fff;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.68),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.045);
+}
+
+.skill-description-panel header {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.skill-description-content {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.skill-description-content > small {
+  color: #aeb5bf;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.skill-description-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.skill-description-title-line > strong {
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.skill-description-icon {
+  display: block;
+  width: 76px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--skill-color), white 42%);
+  border-radius: 50%;
+  background: #111;
+  box-shadow:
+    0 0 0 3px rgba(0, 0, 0, 0.72),
+    0 0 16px color-mix(in srgb, var(--skill-color), transparent 58%);
+}
+
+.skill-description-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.skill-description-effect,
+.skill-description-note {
+  margin: 0;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.skill-description-note {
+  color: #aeb4bc;
+  font-size: 10px;
+}
+
+.skill-description-title-line .skill-description-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.skill-description-tags i {
+  padding: 2px 5px;
+  border: 1px solid rgba(167, 177, 187, 0.42);
+  border-radius: 2px;
+  color: #cbd3dc;
+  font-size: 9px;
+  font-weight: 800;
+  font-style: normal;
+  line-height: 1.15;
+}
+
+.skill-description-tags .tag-damage {
+  border-color: rgba(228, 182, 91, 0.58);
+  color: #f0c66c;
+}
+
+.skill-description-tags .tag-break {
+  border-color: rgba(232, 112, 74, 0.58);
+  color: #ff8b63;
+}
+
+.skill-description-tags .tag-bleed {
+  border-color: rgba(218, 78, 72, 0.62);
+  color: #ff7770;
+}
+
+.skill-description-tags .tag-counter {
+  border-color: rgba(92, 181, 225, 0.62);
+  color: #87d2f6;
+}
+
+.skill-description-tags .tag-combo {
+  border-color: rgba(110, 204, 132, 0.62);
+  color: #8fe0a2;
+}
+
+.skill-rich-number {
+  color: #f4b15c;
+  font-weight: 900;
+}
+
+.skill-rich-state {
+  color: #ff755f;
+  font-weight: 900;
+}
+
+.skill-rich-keyword {
+  color: #f1d080;
+  font-weight: 900;
+}
+
+.skill-description-meta {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.skill-description-meta span {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.skill-description-meta small {
+  color: #7f8994;
+  font-size: 9px;
+}
+
+.skill-description-meta b {
+  color: #dfe5eb;
+  font-size: 10px;
+}
+
+.soul-target-icon {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--skill-color), transparent 56%), rgba(7, 10, 15, 0.96));
+}
+
+.soul-target-icon .part-icon-cluster {
+  display: grid;
+  place-items: center;
+}
+
+.soul-target-icon .part-icon-wrap {
+  grid-template-rows: 34px auto;
+}
+
+.soul-target-icon .part-icon {
+  width: 34px;
+  height: 34px;
+}
+
+@media (max-height: 620px) and (orientation: landscape), (max-width: 980px) and (min-aspect-ratio: 13 / 9) {
+  .battle-skill-overlay {
+    right: 8px;
+    top: 50%;
+    bottom: auto;
+    width: auto;
+    transform: translate(10px, -50%);
+  }
+
+  .battle-skill-overlay.active {
+    transform: translate(0, -50%);
+  }
+
+  .battle-skill-list {
+    gap: 6px;
+  }
+
+  .battle-skill-card {
+    width: 62px;
+    height: 70px;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr) 19px;
+    padding: 3px;
+  }
+
+  .battle-skill-card.has-action-cost {
+    padding: 3px;
+  }
+
+  .battle-skill-name {
+    font-size: 9px;
+  }
+
+  .battle-skill-cost {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+
+  .skill-description-panel {
+    top: 40px;
+    right: 12px;
+    width: min(410px, 55%);
+    gap: 7px;
+    padding: 10px 12px;
+  }
+
+  .skill-description-panel header {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .skill-description-icon {
+    width: 58px;
+  }
+
+  .skill-description-title-line > strong {
+    font-size: 16px;
+  }
+
+  .skill-description-note {
+    display: none;
+  }
+}
+
 .upper-armor-inlay-panel[hidden] {
   display: none !important;
 }
@@ -8611,6 +9320,92 @@ button:disabled {
   }
 }
 
+/* Final placement overrides: keep the skill buttons fixed to the battle frame's right edge. */
+.battle-skill-overlay {
+  left: auto !important;
+  right: clamp(14px, 1.6vw, 24px) !important;
+  top: 50% !important;
+  bottom: auto !important;
+  width: auto !important;
+  transform: translate(14px, -50%) !important;
+  transform-origin: right center;
+}
+
+.battle-skill-overlay.active {
+  transform: translate(0, -50%) !important;
+}
+
+.battle-frame .soul-armor-button {
+  right: clamp(116px, 10.5vw, 150px);
+}
+
+.battle-skill-list {
+  display: flex;
+  flex-direction: column;
+  align-items: end;
+  gap: 10px;
+}
+
+.skill-card.battle-skill-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  gap: 0;
+  width: clamp(70px, 5.9vw, 82px);
+  height: clamp(70px, 5.9vw, 82px);
+  min-height: 0;
+  padding: 5px;
+  overflow: visible;
+  border-radius: 50%;
+}
+
+.skill-card.battle-skill-card.has-action-cost {
+  padding: 5px;
+}
+
+@media (max-height: 620px) and (orientation: landscape), (max-width: 980px) and (min-aspect-ratio: 13 / 9) {
+  .battle-skill-overlay {
+    right: 8px !important;
+    top: 50% !important;
+    bottom: auto !important;
+    width: auto !important;
+    transform: translate(10px, -50%) !important;
+  }
+
+  .battle-skill-overlay.active {
+    transform: translate(0, -50%) !important;
+  }
+
+  .battle-frame .soul-armor-button {
+    right: 82px;
+  }
+
+  .battle-skill-list {
+    gap: 6px;
+  }
+
+  .skill-card.battle-skill-card {
+    width: 58px;
+    height: 58px;
+    min-height: 0;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    padding: 4px;
+    border-radius: 50%;
+  }
+
+  .skill-card.battle-skill-card.has-action-cost {
+    padding: 4px;
+  }
+
+  .battle-skill-page-toggle {
+    grid-template-columns: 22px 26px 22px;
+    width: 70px;
+    height: 28px;
+    margin-right: 0;
+  }
+}
+
 /* Tactical loadout presets */
 .loadout-preset-shell {
   position: relative;
@@ -10637,8 +11432,8 @@ h2 {
 
 .weakpoint-tip {
   position: absolute;
-  left: auto;
-  right: 18px;
+  left: 18px;
+  right: auto;
   top: 9%;
   z-index: 60;
   display: grid;
@@ -11579,6 +12374,10 @@ body.gm-battle-ui-hidden .demo-version {
 .app-shell.gm-ui-hidden .weapon-overlay,
 .app-shell.gm-ui-hidden .battle-skill-overlay,
 .app-shell.gm-ui-hidden .soul-armor-button,
+.app-shell.gm-ui-hidden .combat-action-dock,
+.app-shell.gm-ui-hidden .player-status-dock,
+.app-shell.gm-ui-hidden .player-resource-stack,
+.app-shell.gm-ui-hidden .player-mana-hud,
 .app-shell.gm-ui-hidden .weakpoint-tip,
 .app-shell.gm-ui-hidden .qte-overlay,
 .app-shell.gm-ui-hidden .accessory-choice {

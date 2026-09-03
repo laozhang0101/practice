@@ -1,6 +1,6 @@
 ﻿const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
-const DEMO_VERSION = "2026.08.03-full-attack-qte";
+const DEMO_VERSION = "2026.09.03-centered-resource-rows";
 const DEFAULT_MELEE_CINEMATIC_DURATION = 0.82;
 const NORMAL_ATTACK_DAMAGE = 22;
 const GOURD_HEAL_CHANCE = 0.5;
@@ -49,6 +49,10 @@ const ui = {
   phaseLabel: document.getElementById("phaseLabel"),
   soulGauge: document.getElementById("soulGauge"),
   playerHp: document.getElementById("playerHp"),
+  playerHudHp: document.getElementById("playerHudHp"),
+  playerHudHpFill: document.getElementById("playerHudHpFill"),
+  playerMana: document.getElementById("playerMana"),
+  playerManaCells: document.getElementById("playerManaCells"),
   selectedWeapon: document.getElementById("selectedWeapon"),
   turnState: document.getElementById("turnState"),
   currentTarget: document.getElementById("currentTarget"),
@@ -58,6 +62,12 @@ const ui = {
   weaponButtons: document.getElementById("weaponButtons"),
   battleSkillOverlay: document.getElementById("battleSkillOverlay"),
   battleSkillButtons: document.getElementById("battleSkillButtons"),
+  battleSkillPageToggle: document.getElementById("battleSkillPageToggle"),
+  battleSkillPagePrev: document.getElementById("battleSkillPagePrev"),
+  battleSkillPageNext: document.getElementById("battleSkillPageNext"),
+  battleSkillPageIndex: document.getElementById("battleSkillPageIndex"),
+  skillDescriptionOverlay: document.getElementById("skillDescriptionOverlay"),
+  skillDescriptionPanel: document.getElementById("skillDescriptionPanel"),
   skillButtons: document.getElementById("skillButtons"),
   soulSkillButtons: document.getElementById("soulSkillButtons"),
   soulArmorButton: document.getElementById("soulArmorButton"),
@@ -337,6 +347,7 @@ const skills = [
     actionCost: 3,
     soulGain: 13,
     color: "#f0b84f",
+    icon: "./assets/skill-icons/gs-arm-sunder.webp",
     frameSequence: "gs-arm-sunder",
     desc: "重型破甲，优先剥离手部硬甲。",
   },
@@ -356,6 +367,7 @@ const skills = [
     actionCost: 3,
     soulGain: 13,
     color: "#f0b84f",
+    icon: "./assets/skill-icons/gs-leg-cleave.webp",
     frameSequence: "gs-leg-cleave",
     desc: "重型破甲，打开脚部硬甲。",
   },
@@ -375,6 +387,7 @@ const skills = [
     actionCost: 0,
     soulGain: 8,
     color: "#f0b84f",
+    icon: "./assets/skill-icons/gs-guard-stance.webp",
     stance: "greatsword_counter",
     counterChance: 0.7,
     counterDamage: 32,
@@ -398,6 +411,7 @@ const skills = [
     actionCost: 3,
     soulGain: 14,
     color: "#d95d4f",
+    icon: "./assets/skill-icons/gs-blood-reap.webp",
     tags: ["流血"],
     bloodReap: true,
     frameSequence: "gs-blood-reap",
@@ -492,6 +506,7 @@ const skills = [
     actionCost: 0,
     soulGain: 15,
     color: "#76d17b",
+    icon: "./assets/skill-icons/fist-core-rush.webp",
     comboChance: 0.5,
     comboDamage: NORMAL_ATTACK_DAMAGE,
     desc: "近战爆发，直击胸口核心弱点。",
@@ -539,6 +554,7 @@ const skills = [
     actionCost: 1,
     soulGain: 14,
     color: "#76d17b",
+    icon: "./assets/skill-icons/fist-leg-drive.webp",
     comboChance: 0.5,
     comboDamage: NORMAL_ATTACK_DAMAGE,
     desc: "打裸露脚部收益高，硬甲状态收益低。",
@@ -559,6 +575,7 @@ const skills = [
     actionCost: 3,
     soulGain: 18,
     color: "#76d17b",
+    icon: "./assets/skill-icons/fist-flurry.webp",
     frameSequence: "fist-close-flurry",
     desc: "近战 AOE，同时打击胸部、手部和脚部。",
   },
@@ -578,6 +595,7 @@ const skills = [
     ammoCost: 2,
     soulGain: 9,
     color: "#58b7ff",
+    icon: "./assets/skill-icons/bow-core-burst.webp",
     frameSequence: "bow-core-burst",
     desc: "消耗弹药，单点爆破裸露核心。",
   },
@@ -597,6 +615,7 @@ const skills = [
     ammoCost: 1,
     soulGain: 10,
     color: "#58b7ff",
+    icon: "./assets/skill-icons/bow-arm-pierce.webp",
     frameSequence: "bow-arm-pierce",
     desc: "远程破甲，精准打开手部硬甲。",
   },
@@ -616,6 +635,7 @@ const skills = [
     ammoCost: 2,
     soulGain: 13,
     color: "#58b7ff",
+    icon: "./assets/skill-icons/bow-volley.webp",
     frameSequence: "bow-leg-rain",
     desc: "远程压制，将箭雨集中倾泻到脚部。",
   },
@@ -687,6 +707,8 @@ let lastTime = performance.now();
 let floaters = [];
 let playerHitFloaters = [];
 let soulHoldTimer = null;
+let skillDescriptionHoldTimer = null;
+let battleSkillPageByWeapon = Object.create(null);
 let hoveredTargetParts = [];
 let activeVideoSkipHandler = null;
 let activeVideoPlaybackId = 0;
@@ -706,10 +728,11 @@ const weaponLoadoutSlots = [
   { id: "weaponA", label: "武器A" },
   { id: "weaponB", label: "武器B" },
 ];
-const WEAPON_SKILL_SLOT_COUNT = 3;
+const WEAPON_SKILL_SLOT_COUNT = 6;
+const BATTLE_SKILLS_PER_PAGE = 3;
 const UPPER_ARMOR_PASSIVE_SLOT_COUNT = 3;
 const defaultWeaponSkillLoadout = {
-  greatsword: ["gs_guard_stance", "gs_arm_sunder", "gs_blood_reap"],
+  greatsword: ["gs_guard_stance", "gs_arm_sunder", "gs_blood_reap", "gs_leg_cleave"],
 };
 const defaultUpperArmorPassiveInlays = ["gs_counter_transfer", "gs_combo_rhythm", null];
 
@@ -886,7 +909,7 @@ const loadoutPresets = [
     },
     weaponSkills: {
       fists: ["fist_arm_rush", "fist_leg_drive", "fist_flurry"],
-      greatsword: ["gs_guard_stance", "gs_arm_sunder", "gs_blood_reap"],
+      greatsword: ["gs_guard_stance", "gs_arm_sunder", "gs_blood_reap", "gs_leg_cleave"],
     },
     upperArmorPassives: ["gs_counter_transfer", "gs_combo_rhythm", null],
     factorSlots: {
@@ -919,7 +942,7 @@ const loadoutPresets = [
       "pants:前腰": "酒葫芦",
     },
     weaponSkills: {
-      greatsword: ["gs_guard_stance", "gs_arm_sunder", "gs_blood_reap"],
+      greatsword: ["gs_guard_stance", "gs_arm_sunder", "gs_blood_reap", "gs_leg_cleave"],
       bow: ["bow_arm_pierce", "bow_core_burst", "bow_volley"],
     },
     upperArmorPassives: ["gs_counter_transfer", "gs_bleed_hunger", null],
@@ -1881,11 +1904,7 @@ function configuredWeaponSkills(weaponId) {
   const pool = weaponSkillPool(weaponId);
   return equippedIds
     .map((id) => pool.find((skill) => skill.id === id))
-    .filter(Boolean)
-    .sort((a, b) => {
-      const activationOrder = Number(isPassiveSkill(a)) - Number(isPassiveSkill(b));
-      return activationOrder || (a.actionCost || 0) - (b.actionCost || 0) || a.name.localeCompare(b.name, "zh-Hans-CN");
-    });
+    .filter(Boolean);
 }
 
 function isPassiveSkill(skill) {
@@ -2148,6 +2167,7 @@ function resetGame() {
   const avatarProfile = armorCombatAvatarProfile();
   floaters = [];
   playerHitFloaters = [];
+  battleSkillPageByWeapon = Object.create(null);
   buildWeaponControls();
   buildSkillControls();
   buildSoulSkillControls();
@@ -4915,11 +4935,46 @@ function selectWeapon(weaponId) {
 
 function buildSkillControls() {
   ui.skillButtons.innerHTML = "";
-  ui.battleSkillButtons.innerHTML = "";
   currentSkills().forEach((skill) => {
     ui.skillButtons.appendChild(createSkillButton(skill, false));
-    ui.battleSkillButtons.appendChild(createSkillButton(skill, true));
   });
+  renderBattleSkillPage();
+}
+
+function battleSkillPageInfo() {
+  const weaponId = state?.selectedWeaponId || "";
+  const allSkills = currentSkills();
+  const pageCount = Math.max(1, Math.ceil(allSkills.length / BATTLE_SKILLS_PER_PAGE));
+  const requestedPage = Number(battleSkillPageByWeapon[weaponId]) || 0;
+  const page = Math.max(0, Math.min(pageCount - 1, requestedPage));
+  battleSkillPageByWeapon[weaponId] = page;
+  return {
+    page,
+    pageCount,
+    skills: allSkills.slice(page * BATTLE_SKILLS_PER_PAGE, (page + 1) * BATTLE_SKILLS_PER_PAGE),
+  };
+}
+
+function renderBattleSkillPage() {
+  const { page, pageCount, skills: visibleSkills } = battleSkillPageInfo();
+  ui.battleSkillButtons.innerHTML = "";
+  visibleSkills.forEach((skill) => ui.battleSkillButtons.appendChild(createSkillButton(skill, true)));
+  ui.battleSkillPageToggle?.classList.toggle("hidden", pageCount <= 1);
+  if (ui.battleSkillPageIndex) ui.battleSkillPageIndex.textContent = `${page + 1}/${pageCount}`;
+  ui.battleSkillPageToggle?.setAttribute("aria-label", `切换技能组，当前第 ${page + 1} 组，共 ${pageCount} 组`);
+}
+
+function cycleBattleSkillPage(direction = 1) {
+  if (!state || state.soulTargetSelection) return;
+  const { page, pageCount } = battleSkillPageInfo();
+  if (pageCount <= 1) return;
+  battleSkillPageByWeapon[state.selectedWeaponId] = (page + direction + pageCount) % pageCount;
+  renderBattleSkillPage();
+  ui.battleSkillButtons.classList.remove("page-swap");
+  void ui.battleSkillButtons.offsetWidth;
+  ui.battleSkillButtons.classList.add("page-swap");
+  window.setTimeout(() => ui.battleSkillButtons.classList.remove("page-swap"), 180);
+  updateUi();
 }
 
 function createSkillButton(skill, compact) {
@@ -4929,16 +4984,26 @@ function createSkillButton(skill, compact) {
   button.className = `skill-card${skill.actionCost > 0 ? " has-action-cost" : ""}${compact ? " battle-skill-card" : ""}`;
   button.dataset.skill = skill.id;
   button.dataset.targetParts = targetParts.join(",");
-  button.innerHTML = `
-    ${skill.actionCost > 0 ? `<span class="action-cost-corner" style="--skill-color:${skill.color}"><b>${skill.actionCost}</b></span>` : ""}
-    <span class="part-badge${targetParts.length > 1 ? " part-badge-ring" : ""}${skill.stance ? " self-target" : ""}${skillTargetClass(skill)}${skillTargetCountClass(skill)}" style="--skill-color:${skill.color}">${skill.stance ? renderWeaponSkillTarget(skill) : renderPartIconGroup(targetParts, "badge")}</span>
-    <span class="skill-copy">
-      <strong>${skill.name}</strong>
-      ${renderSkillTags(skill)}
-      <small>${skill.desc} ${skillSummaryText(skill)}</small>
-      <small class="avatar-skill-hint">${combatAvatarSkillHint(skill)}</small>
-    </span>
-  `;
+  button.style.setProperty("--skill-color", skill.color);
+  button.setAttribute("aria-label", `${skill.name}，长按查看技能说明`);
+  button.innerHTML = compact
+    ? `
+      <span class="battle-skill-icon">
+        ${skill.icon ? `<img src="${skill.icon}" alt="" draggable="false" />` : renderWeaponSkillTarget(skill)}
+      </span>
+      <strong class="battle-skill-name">${skill.name}</strong>
+      ${skill.actionCost > 0 ? `<span class="battle-skill-cost"><b>${skill.actionCost}</b></span>` : ""}
+    `
+    : `
+      ${skill.actionCost > 0 ? `<span class="action-cost-corner" style="--skill-color:${skill.color}"><b>${skill.actionCost}</b></span>` : ""}
+      <span class="part-badge${targetParts.length > 1 ? " part-badge-ring" : ""}${skill.stance ? " self-target" : ""}${skillTargetClass(skill)}${skillTargetCountClass(skill)}" style="--skill-color:${skill.color}">${skill.stance ? renderWeaponSkillTarget(skill) : renderPartIconGroup(targetParts, "badge")}</span>
+      <span class="skill-copy">
+        <strong>${skill.name}</strong>
+        ${renderSkillTags(skill)}
+        <small>${skill.desc} ${skillSummaryText(skill)}</small>
+        <small class="avatar-skill-hint">${combatAvatarSkillHint(skill)}</small>
+      </span>
+    `;
   button.addEventListener("pointerenter", () => setHoveredTargetParts(targetParts));
   button.addEventListener("pointerleave", () => clearHoveredTargetParts());
   button.addEventListener("focus", () => setHoveredTargetParts(targetParts));
@@ -4949,8 +5014,144 @@ function createSkillButton(skill, compact) {
       showSkillTagBubble(tagButton, skill, tagButton.dataset.skillTag);
     });
   });
-  button.addEventListener("click", () => useSkill(skill.id));
+  if (compact) bindSkillDescriptionHold(button, skill);
+  button.addEventListener("click", (event) => {
+    if (button._skillLongPressTriggered) {
+      event.preventDefault();
+      button._skillLongPressTriggered = false;
+      return;
+    }
+    useSkill(skill.id);
+  });
   return button;
+}
+
+function bindSkillDescriptionHold(button, skill) {
+  const cancelHold = () => {
+    window.clearTimeout(skillDescriptionHoldTimer);
+    skillDescriptionHoldTimer = null;
+    button.classList.remove("holding");
+  };
+
+  button.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || button.disabled) return;
+    cancelHold();
+    button._skillLongPressTriggered = false;
+    button.classList.add("holding");
+    button.setPointerCapture?.(event.pointerId);
+    skillDescriptionHoldTimer = window.setTimeout(() => {
+      button._skillLongPressTriggered = true;
+      button.classList.remove("holding");
+      showSkillDescription(skill);
+    }, 520);
+  });
+  button.addEventListener("pointerup", cancelHold);
+  button.addEventListener("pointercancel", cancelHold);
+  button.addEventListener("lostpointercapture", cancelHold);
+  button.addEventListener("contextmenu", (event) => event.preventDefault());
+}
+
+function showSkillDescription(skill) {
+  if (!ui.skillDescriptionOverlay || !ui.skillDescriptionPanel) return;
+  const targetText = skill.targetLabel || (skill.targetParts?.length ? skill.targetParts.join("、") : "自身");
+  const tags = [
+    skill.kindLabel,
+    skill.damage > 0 ? "伤害" : null,
+    skill.armorBreaker ? "破甲" : null,
+    ...(skill.tags || []),
+  ].filter(Boolean);
+  const effectText = skillDescriptionEffectText(skill, targetText);
+  ui.skillDescriptionPanel.innerHTML = `
+    <header>
+      <span class="skill-description-icon" style="--skill-color:${skill.color}">
+        ${skill.icon ? `<img src="${skill.icon}" alt="" />` : renderWeaponSkillTarget(skill)}
+      </span>
+      <span class="skill-description-content">
+        <small>${currentWeapon().name}</small>
+        <span class="skill-description-title-line">
+          <strong id="skillDescriptionName">${skill.name}</strong>
+          <span class="skill-description-tags">${[...new Set(tags)]
+            .map((tag) => `<i class="${skillDescriptionTagClass(tag)}">${tag}</i>`)
+            .join("")}</span>
+        </span>
+        <p class="skill-description-effect">${renderSkillRichText(effectText)}</p>
+        <p class="skill-description-note">${renderSkillRichText(skill.desc)}</p>
+      </span>
+    </header>
+    <footer class="skill-description-meta">
+      <span><small>目标</small><b>${targetText}</b></span>
+      <span><small>消耗</small><b>${skill.actionCost || 0} 行动力${skill.ammoCost ? ` · ${skill.ammoCost} 弹药` : ""}</b></span>
+    </footer>
+  `;
+  ui.skillDescriptionOverlay.classList.remove("hidden");
+  ui.skillDescriptionOverlay.classList.add("active");
+}
+
+function skillDescriptionEffectText(skill, targetText) {
+  if (skill.stance === "greatsword_counter") {
+    return `本回合进入【防御姿态】，获得 ${Math.round((skill.counterChance || 0) * 100)}% 反击率；反击造成 ${skill.counterDamage || 0} 点伤害，但【无法闪避】。`;
+  }
+
+  if (isPassiveSkill(skill)) {
+    return skill.summaryOverride || skill.desc;
+  }
+
+  const clauses = [];
+  if (skill.damage > 0) clauses.push(`对敌方${targetText}造成 ${skill.damage} 点伤害`);
+  const armorDamage = effectiveArmorDamage(skill);
+  if (skill.armorBreaker && armorDamage > 0) {
+    clauses.push(`造成 ${armorDamage} 点护甲伤害，并优先打破【硬甲】`);
+  }
+  if (skill.exposedBonus > 1) {
+    clauses.push(`命中【裸露】部位时，伤害提高 ${Math.round((skill.exposedBonus - 1) * 100)}%`);
+  }
+  if (skill.comboChance) {
+    clauses.push(`${Math.round(skill.comboChance * 100)}% 概率触发【连击】，追加 1 次普通攻击`);
+  }
+  if (skill.bloodReap) {
+    clauses.push(`嗜血达到 9、15 层时，提前结算全部【流血】`);
+  }
+  return `${clauses.join("；")}。`;
+}
+
+function renderSkillRichText(text) {
+  const tokenPattern = /(【[^】]+】|\[[^\]]+\]|\d+(?:、\d+)+\s*层|\d+(?:\.\d+)?\s*(?:%|点|层|回合|次|发)|弱点|破甲|硬甲|裸露|流血|嗜血|反击|连击|弹反|无法闪避)/g;
+  return String(text || "")
+    .split(tokenPattern)
+    .filter((part) => part !== "")
+    .map((part) => {
+      const escaped = escapeSkillDescriptionHtml(part);
+      if (/^【|^\[/.test(part)) return `<strong class="skill-rich-state">${escaped}</strong>`;
+      if (/\d/.test(part) && /%|点|层|回合|次|发/.test(part)) return `<strong class="skill-rich-number">${escaped}</strong>`;
+      if (/弱点|破甲|硬甲|裸露/.test(part)) return `<strong class="skill-rich-keyword">${escaped}</strong>`;
+      if (/流血|嗜血|反击|连击|弹反|无法闪避/.test(part)) return `<strong class="skill-rich-state">${escaped}</strong>`;
+      return escaped;
+    })
+    .join("");
+}
+
+function escapeSkillDescriptionHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function skillDescriptionTagClass(tag) {
+  if (tag === "伤害") return "tag-damage";
+  if (tag === "破甲") return "tag-break";
+  if (tag === "流血") return "tag-bleed";
+  if (tag === "反击") return "tag-counter";
+  if (tag === "连击") return "tag-combo";
+  return "tag-type";
+}
+
+function hideSkillDescription() {
+  if (!ui.skillDescriptionOverlay) return;
+  ui.skillDescriptionOverlay.classList.remove("active");
+  ui.skillDescriptionOverlay.classList.add("hidden");
 }
 
 function showSkillTagBubble(anchor, skill, tag) {
@@ -5004,6 +5205,7 @@ function showSoulArmorTargetSelection(skill, dots) {
   state.activeSkill = skill;
   state.activeTarget = null;
   ui.battleSkillButtons.innerHTML = "";
+  ui.battleSkillPageToggle?.classList.add("hidden");
   skill.targetParts.forEach((partId) => {
     const part = partById(partId);
     if (part) ui.battleSkillButtons.appendChild(createSoulTargetButton(skill, part));
@@ -5019,16 +5221,10 @@ function createSoulTargetButton(skill, part) {
   button.type = "button";
   button.className = "skill-card battle-skill-card soul-target-card";
   button.dataset.soulTarget = part.id;
+  button.style.setProperty("--skill-color", skill.color);
   button.innerHTML = `
-    <span class="part-badge" style="--skill-color:${skill.color}">${renderPartIconGroup([part.id], "badge")}</span>
-    <span class="skill-copy">
-      <strong>${part.label}</strong>
-      <span class="skill-tags">
-        <span class="skill-tag" style="--skill-color:${skill.color}">灵魂战甲</span>
-        <span class="skill-tag" style="--skill-color:${skill.color}">目标部位</span>
-      </span>
-      <small>选择该部位释放当前蓄力档位。</small>
-    </span>
+    <span class="battle-skill-icon soul-target-icon">${renderPartIconGroup([part.id], "badge")}</span>
+    <strong class="battle-skill-name">${part.label}</strong>
   `;
   button.addEventListener("click", () => confirmSoulArmorTarget(part.id));
   return button;
@@ -6855,7 +7051,6 @@ function drawCombatants() {
     drawSprite(bossImage, boss.x, boss.bottom - boss.height, boss.height, false);
   }
   if (!battleUiHidden) {
-    drawPlayerHud(canvas.width - 172, canvas.height - 42);
     const bossHpW = Math.min(360, canvas.width * 0.34);
     const bossHpX = canvas.width / 2 - bossHpW / 2;
     const bossHpY = 18;
@@ -7728,6 +7923,18 @@ function updateUi() {
   ui.phaseLabel.textContent = state.phase;
   ui.soulGauge.style.width = `${state.player.soul}%`;
   ui.playerHp.textContent = `${state.player.hp} / ${state.player.maxHp}`;
+  ui.playerHudHp.textContent = `${state.player.hp} / ${state.player.maxHp}`;
+  ui.playerHudHpFill.style.width = `${Math.max(0, Math.min(100, (state.player.hp / state.player.maxHp) * 100))}%`;
+  ui.playerMana.textContent = `${state.player.action} / ${state.player.maxAction}`;
+  ui.playerManaCells.style.setProperty("--mana-cell-count", String(state.player.maxAction));
+  if (ui.playerManaCells.children.length !== state.player.maxAction) {
+    ui.playerManaCells.replaceChildren(
+      ...Array.from({ length: state.player.maxAction }, () => document.createElement("i")),
+    );
+  }
+  [...ui.playerManaCells.children].forEach((cell, index) => {
+    cell.classList.toggle("filled", index < state.player.action);
+  });
   ui.selectedWeapon.textContent = weapon.name;
   ui.turnState.textContent = state.phase;
   ui.turnInfo.textContent = `第 ${state.round} 回合：${turnDisplayName()}`;
@@ -7808,6 +8015,10 @@ document.getElementById("enterBattleBtn")?.addEventListener("click", enterBattle
 ui.nextLoadoutBtn?.addEventListener("click", () => setPrebattleStep("presets"));
 ui.nextLoadoutFromCharacterBtn?.addEventListener("click", () => setPrebattleStep("battle"));
 ui.nextSkillBtn?.addEventListener("click", () => setPrebattleStep("skills"));
+ui.skillDescriptionOverlay?.addEventListener("click", hideSkillDescription);
+ui.skillDescriptionPanel?.addEventListener("click", (event) => event.stopPropagation());
+ui.battleSkillPagePrev?.addEventListener("click", () => cycleBattleSkillPage(-1));
+ui.battleSkillPageNext?.addEventListener("click", () => cycleBattleSkillPage(1));
 ui.nextSkillFromWeaponBtn?.addEventListener("click", () => setPrebattleStep("skills"));
 ui.backToBossBtn?.addEventListener("click", () => setPrebattleStep("presets"));
 ui.backToBossFromCharacterBtn?.addEventListener("click", () => setPrebattleStep("boss"));

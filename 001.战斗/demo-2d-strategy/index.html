@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>M98 战斗策略版 Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=full-attack-qte-20260803" />
+    <link rel="stylesheet" href="./styles.css?v=centered-resource-rows-20260903" />
   </head>
   <body>
     <div class="demo-version" data-demo-version>Demo --</div>
@@ -200,24 +200,52 @@
 
         <div class="battle-frame">
           <canvas id="battleCanvas" width="1366" height="768" aria-label="2D 战斗验证画面"></canvas>
-          <div class="weapon-overlay" id="weaponOverlay">
-            <button class="weapon-toggle" id="weaponToggle" type="button" aria-label="武器切换" aria-expanded="false"></button>
-            <div class="weapon-dock">
-              <div class="weapon-list" id="weaponButtons"></div>
+          <div class="combat-action-dock" aria-label="战斗操作区">
+            <div class="weapon-overlay" id="weaponOverlay">
+              <button class="weapon-toggle" id="weaponToggle" type="button" aria-label="武器切换" aria-expanded="false"></button>
+              <div class="weapon-dock">
+                <div class="weapon-list" id="weaponButtons"></div>
+              </div>
+            </div>
+            <div class="battle-skill-overlay" id="battleSkillOverlay" aria-label="战斗技能栏">
+              <div class="battle-skill-list" id="battleSkillButtons"></div>
+              <div class="battle-skill-page-toggle hidden" id="battleSkillPageToggle" aria-label="技能组分页">
+                <button id="battleSkillPagePrev" type="button" aria-label="上一组技能">‹</button>
+                <small id="battleSkillPageIndex">1/1</small>
+                <button id="battleSkillPageNext" type="button" aria-label="下一组技能">›</button>
+              </div>
             </div>
           </div>
-          <div class="battle-skill-overlay" id="battleSkillOverlay" aria-label="战斗技能栏">
-            <div class="battle-skill-list" id="battleSkillButtons"></div>
+          <div class="player-status-dock" aria-label="角色战斗状态">
+            <button class="soul-armor-button" id="soulArmorButton" type="button" aria-label="灵魂战甲技能">
+              <span class="soul-armor-core">
+                <img src="./assets/soul-armor-skill.jpg?v=soul-armor-icon-20260618" alt="" />
+                <strong id="soulArmorCount">0</strong>
+              </span>
+              <span class="soul-armor-dots" aria-hidden="true">
+                <i></i><i></i><i></i><i></i>
+              </span>
+            </button>
           </div>
-          <button class="soul-armor-button" id="soulArmorButton" type="button" aria-label="灵魂战甲技能">
-            <span class="soul-armor-core">
-              <img src="./assets/soul-armor-skill.jpg?v=soul-armor-icon-20260618" alt="" />
-              <strong id="soulArmorCount">0</strong>
-            </span>
-            <span class="soul-armor-dots" aria-hidden="true">
-              <i></i><i></i><i></i><i></i>
-            </span>
-          </button>
+          <div class="player-resource-stack" aria-label="角色生命与蓝量">
+            <div class="player-combat-hud">
+              <span class="player-combat-vitals player-resource-row">
+                <span class="player-resource-mark health" aria-hidden="true">♥</span>
+                <span class="player-hp-track" aria-hidden="true"><i id="playerHudHpFill"></i></span>
+                <strong id="playerHudHp">--</strong>
+              </span>
+            </div>
+            <div class="player-mana-hud" aria-label="角色蓝量">
+              <span class="player-mana-body player-resource-row">
+                <span class="player-resource-mark mana" aria-hidden="true">ϟ</span>
+                <span class="player-mana-track" id="playerManaCells" aria-hidden="true"></span>
+                <strong id="playerMana">--</strong>
+              </span>
+            </div>
+          </div>
+          <div class="skill-description-overlay hidden" id="skillDescriptionOverlay" role="dialog" aria-modal="true" aria-labelledby="skillDescriptionName">
+            <article class="skill-description-panel" id="skillDescriptionPanel"></article>
+          </div>
           <div class="video-overlay hidden" id="videoOverlay">
             <video id="skillVideo" playsinline muted preload="auto"></video>
             <img class="skill-frame-sequence hidden" id="skillFrameSequence" alt="" />
@@ -286,7 +314,7 @@
       <button class="gm-ui-restore" id="gmShowBattleUi" type="button">GM 显示 UI</button>
     </main>
 
-    <script src="./game.js?v=full-attack-qte-20260803"></script>
+    <script src="./game.js?v=centered-resource-rows-20260903"></script>
   </body>
 </html>
 
