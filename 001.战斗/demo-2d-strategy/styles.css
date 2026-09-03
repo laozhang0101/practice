@@ -498,6 +498,31 @@ button:disabled {
   text-shadow: 0 1px 3px #000;
 }
 
+.battle-skill-type {
+  --skill-type-color: #555f6d;
+  min-width: 38px;
+  padding-inline: 7px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--skill-type-color);
+  color: #fff;
+  text-align: center;
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.battle-skill-type.is-single {
+  --skill-type-color: #c94c4c;
+}
+
+.battle-skill-type.is-group {
+  --skill-type-color: #268fc7;
+}
+
+.battle-skill-type.is-status {
+  --skill-type-color: #7f5bb5;
+}
+
 .battle-skill-cost {
   position: absolute;
   left: -3px;
@@ -571,6 +596,253 @@ button:disabled {
   font-size: 11px;
   font-weight: 900;
   line-height: 1;
+}
+
+.combat-action-dock .battle-skill-list {
+  z-index: 3;
+  pointer-events: none;
+}
+
+.combat-action-dock .battle-skill-card {
+  pointer-events: auto;
+}
+
+.battle-skill-overlay.has-multiple-groups .battle-skill-card {
+  cursor: grab;
+}
+
+.battle-skill-overlay.has-multiple-groups .battle-skill-card.wheel-drag-source {
+  cursor: grabbing;
+  border-color: #fff0b8;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 233, 164, 0.34),
+    0 0 0 4px rgba(218, 178, 82, 0.18),
+    0 0 24px rgba(255, 185, 55, 0.52),
+    0 10px 22px rgba(0, 0, 0, 0.52);
+}
+
+.skill-wheel-guide {
+  --wheel-guide-color: #d6b464;
+  --wheel-drag-progress: 0;
+  position: absolute;
+  inset: -8px -7px -9px -15px;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.skill-wheel-guide.hidden {
+  display: none;
+}
+
+.skill-wheel-arc,
+.skill-wheel-page-dots {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.skill-wheel-track,
+.skill-wheel-track-flow,
+.skill-wheel-hit-path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.skill-wheel-track {
+  stroke: rgba(221, 202, 150, 0.48);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 7;
+  filter: drop-shadow(0 0 4px rgba(226, 186, 91, 0.28));
+}
+
+.skill-wheel-track-flow {
+  stroke: rgba(255, 224, 144, 0.92);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 1 36;
+  animation: skill-wheel-track-flow 2.8s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(255, 197, 72, 0.82));
+}
+
+.skill-wheel-hit-path {
+  stroke: transparent;
+  stroke-width: 32;
+  pointer-events: stroke;
+  cursor: grab;
+  touch-action: none;
+}
+
+.skill-wheel-guide.is-dragging .skill-wheel-hit-path {
+  cursor: grabbing;
+}
+
+.skill-wheel-guide.is-dragging .skill-wheel-track {
+  stroke: color-mix(in srgb, var(--wheel-guide-color), white calc(var(--wheel-drag-progress) * 34%));
+  stroke-width: calc(1.4px + var(--wheel-drag-progress) * 1.2px);
+  filter: drop-shadow(0 0 calc(4px + var(--wheel-drag-progress) * 9px) rgba(255, 195, 65, 0.72));
+}
+
+.skill-wheel-page-index {
+  position: absolute;
+  right: 1%;
+  top: 31%;
+  min-width: 34px;
+  padding: 2px 5px;
+  border: 1px solid rgba(225, 205, 151, 0.38);
+  border-radius: 3px;
+  background: rgba(4, 8, 12, 0.76);
+  color: #f5e8c5;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 1px 3px #000;
+  transform: translateY(-50%);
+}
+
+.skill-wheel-page-dots {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.skill-wheel-page-dot {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid rgba(221, 203, 158, 0.64);
+  border-radius: 50%;
+  background: rgba(10, 15, 20, 0.94);
+  color: rgba(233, 224, 198, 0.74);
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.48),
+    0 0 0 2px rgba(210, 178, 102, 0.08);
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  pointer-events: auto;
+}
+
+.skill-wheel-page-dot::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1px solid transparent;
+  border-radius: 50%;
+}
+
+.skill-wheel-page-dot.active {
+  border-color: #ffe8a7;
+  background: radial-gradient(circle, #fff3bd 0 12%, #eeb94e 20%, #5c3c14 72%);
+  color: #120d05;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 247, 208, 0.34),
+    0 0 0 3px rgba(229, 185, 80, 0.2),
+    0 0 13px rgba(255, 190, 58, 0.68);
+  transform: translate(-50%, -50%) scale(1.14);
+  animation: skill-wheel-node-pulse 1.8s ease-in-out infinite;
+}
+
+.skill-wheel-page-dot.active::after {
+  border-color: rgba(255, 221, 130, 0.34);
+}
+
+.skill-card.battle-skill-card.wheel-selected {
+  border-color: #ffe39a;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 230, 158, 0.32),
+    0 0 0 3px rgba(218, 178, 82, 0.16),
+    0 0 19px rgba(255, 185, 55, 0.42),
+    0 10px 22px rgba(0, 0, 0, 0.52);
+}
+
+.skill-card.battle-skill-card.wheel-selected .battle-skill-icon::after {
+  border-color: rgba(255, 232, 169, 0.46);
+  background:
+    radial-gradient(circle at 50% 50%, transparent 54%, rgba(255, 193, 69, 0.2) 82%, rgba(255, 225, 151, 0.4) 100%),
+    linear-gradient(180deg, transparent 58%, rgba(0, 0, 0, 0.4));
+}
+
+.battle-skill-list.page-leave-next .battle-skill-card,
+.battle-skill-list.page-leave-prev .battle-skill-card,
+.battle-skill-list.page-enter-next .battle-skill-card,
+.battle-skill-list.page-enter-prev .battle-skill-card {
+  animation-duration: 0.26s;
+  animation-timing-function: cubic-bezier(0.2, 0.72, 0.18, 1);
+  animation-fill-mode: both;
+  animation-delay: calc(var(--wheel-slot, 0) * 24ms);
+  pointer-events: none;
+}
+
+.battle-skill-list.page-leave-next .battle-skill-card {
+  animation-name: skill-wheel-leave-next;
+}
+
+.battle-skill-list.page-leave-prev .battle-skill-card {
+  animation-name: skill-wheel-leave-prev;
+}
+
+.battle-skill-list.page-enter-next .battle-skill-card {
+  animation-name: skill-wheel-enter-next;
+}
+
+.battle-skill-list.page-enter-prev .battle-skill-card {
+  animation-name: skill-wheel-enter-prev;
+}
+
+.skill-wheel-guide.switching-next .skill-wheel-track-flow {
+  animation-duration: 0.62s;
+}
+
+.skill-wheel-guide.switching-prev .skill-wheel-track-flow {
+  animation-direction: reverse;
+  animation-duration: 0.62s;
+}
+
+@keyframes skill-wheel-track-flow {
+  to { stroke-dashoffset: -74; }
+}
+
+@keyframes skill-wheel-node-pulse {
+  0%, 100% { filter: brightness(0.92); }
+  50% { filter: brightness(1.24); }
+}
+
+@keyframes skill-wheel-leave-next {
+  to { opacity: 0; transform: translate(-22px, 16px) rotate(-8deg) scale(0.76); }
+}
+
+@keyframes skill-wheel-leave-prev {
+  to { opacity: 0; transform: translate(20px, -17px) rotate(8deg) scale(0.76); }
+}
+
+@keyframes skill-wheel-enter-next {
+  from { opacity: 0; transform: translate(24px, -18px) rotate(9deg) scale(0.72); }
+  to { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); }
+}
+
+@keyframes skill-wheel-enter-prev {
+  from { opacity: 0; transform: translate(-23px, 18px) rotate(-9deg) scale(0.72); }
+  to { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-wheel-track-flow,
+  .skill-wheel-page-dot.active,
+  .battle-skill-list.page-leave-next .battle-skill-card,
+  .battle-skill-list.page-leave-prev .battle-skill-card,
+  .battle-skill-list.page-enter-next .battle-skill-card,
+  .battle-skill-list.page-enter-prev .battle-skill-card {
+    animation: none;
+  }
 }
 
 .battle-skill-list.page-swap {
@@ -9328,6 +9600,452 @@ button:disabled {
   .soul-armor-button {
     right: 14px;
     bottom: 56px;
+  }
+}
+
+/* Combat weapon fan: the skill wheel and weapon picker are mutually exclusive. */
+.skill-wheel-track-flow {
+  animation: none;
+  stroke-dasharray: 2 34;
+  stroke-dashoffset: -10;
+}
+
+.skill-wheel-page-dot.active,
+.skill-wheel-guide.switching-next .skill-wheel-track-flow,
+.skill-wheel-guide.switching-prev .skill-wheel-track-flow {
+  animation: none;
+}
+
+.combat-action-dock {
+  --weapon-toggle-size: clamp(72px, 6.1vw, 82px);
+}
+
+.combat-action-dock .weapon-overlay {
+  position: absolute;
+  inset: auto 0 0 auto;
+  display: block;
+  width: var(--weapon-toggle-size);
+  height: var(--weapon-toggle-size);
+  pointer-events: none;
+}
+
+.combat-action-dock .weapon-toggle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  width: var(--weapon-toggle-size);
+  height: var(--weapon-toggle-size);
+  pointer-events: auto;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.combat-action-dock.weapon-mode .weapon-toggle {
+  border-color: rgba(255, 226, 147, 0.96);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 238, 190, 0.12),
+    0 0 0 2px rgba(214, 169, 71, 0.28),
+    0 0 22px rgba(235, 178, 51, 0.42),
+    0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.combat-action-dock .weapon-dock,
+.combat-action-dock .weapon-overlay.expanded .weapon-dock {
+  position: absolute;
+  right: 50%;
+  bottom: 50%;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  opacity: 1;
+  transform: none;
+  transition: none;
+  pointer-events: none;
+}
+
+.combat-action-dock .weapon-overlay .weapon-list {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: block;
+  width: 0;
+  height: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.combat-action-dock .weapon-overlay .weapon-card {
+  position: absolute;
+  right: -1px;
+  bottom: -28px;
+  display: grid;
+  grid-template: 1fr / 1fr;
+  place-items: center start;
+  width: clamp(108px, 9.4vw, 128px);
+  height: 56px;
+  min-height: 0;
+  margin: 0;
+  padding: 4px 22px 4px 9px;
+  overflow: visible;
+  border: 1px solid rgba(202, 211, 219, 0.3);
+  border-right-color: rgba(231, 194, 105, 0.54);
+  border-radius: 3px;
+  clip-path: polygon(0 7%, 72% 7%, 100% 50%, 72% 93%, 0 93%);
+  background:
+    linear-gradient(90deg, rgba(27, 31, 38, 0.96), rgba(45, 47, 48, 0.88) 68%, rgba(97, 77, 38, 0.72));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 7px 18px rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  transform: rotate(var(--weapon-angle)) scale(0.62);
+  transform-origin: calc(100% - 1px) 50%;
+  transition:
+    opacity 0.18s ease,
+    transform 0.28s cubic-bezier(0.2, 0.82, 0.2, 1),
+    filter 0.16s ease;
+  transition-delay: 0s;
+  pointer-events: none;
+}
+
+.combat-action-dock .weapon-overlay.expanded .weapon-card {
+  opacity: 1;
+  transform: rotate(var(--weapon-angle)) scale(1);
+  transition-delay: calc(var(--weapon-order) * 48ms);
+  pointer-events: auto;
+}
+
+.combat-action-dock .weapon-overlay .weapon-card::after {
+  content: "";
+  position: absolute;
+  inset: 5px 9px 5px 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.38);
+  pointer-events: none;
+}
+
+.combat-action-dock .weapon-overlay .weapon-card.active {
+  border-color: rgba(255, 224, 145, 0.9);
+  background:
+    linear-gradient(90deg, rgba(43, 39, 31, 0.98), rgba(116, 82, 29, 0.92) 70%, rgba(221, 164, 48, 0.82));
+  filter: drop-shadow(0 0 7px rgba(240, 181, 58, 0.5));
+}
+
+.combat-action-dock .weapon-overlay .weapon-card:hover,
+.combat-action-dock .weapon-overlay .weapon-card:focus-visible,
+.combat-action-dock .weapon-overlay .weapon-card.confirming {
+  border-color: #ffe5a3;
+  filter: brightness(1.2) drop-shadow(0 0 9px rgba(255, 191, 61, 0.66));
+}
+
+.combat-action-dock .weapon-overlay .weapon-icon-frame {
+  width: 50px;
+  height: 42px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  transform: rotate(var(--weapon-counter-angle));
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.72));
+}
+
+.combat-action-dock .weapon-overlay .weapon-icon-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.combat-action-dock .weapon-overlay .weapon-card small {
+  display: none;
+}
+
+.combat-action-dock.skills-leaving .battle-skill-overlay {
+  opacity: 0;
+  filter: blur(2px);
+  transform: translate(30px, 12px) scale(0.78) !important;
+  pointer-events: none;
+}
+
+.combat-action-dock.skills-entering .battle-skill-card {
+  animation: combat-skill-return 0.3s cubic-bezier(0.18, 0.76, 0.2, 1) both;
+  animation-delay: calc(var(--wheel-slot, 0) * 34ms);
+}
+
+@keyframes combat-skill-return {
+  from {
+    opacity: 0;
+    transform: translate(24px, 12px) scale(0.76);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@media (max-height: 620px) and (orientation: landscape), (max-width: 980px) and (min-aspect-ratio: 13 / 9) {
+  .combat-action-dock {
+    --weapon-toggle-size: clamp(54px, 14vh, 62px);
+  }
+
+  .combat-action-dock .weapon-overlay .weapon-card {
+    bottom: -23px;
+    width: clamp(92px, 13vw, 106px);
+    height: 46px;
+    padding: 3px 18px 3px 7px;
+  }
+
+  .combat-action-dock .weapon-overlay .weapon-icon-frame {
+    width: 42px;
+    height: 34px;
+  }
+}
+
+/* Phone landscape: prioritize the battle surface and keep touch controls in safe areas. */
+@media (orientation: landscape) and (max-height: 600px) {
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .demo-version {
+    display: none;
+  }
+
+  .app-shell:not(.is-hidden) {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: 100vw;
+    height: 100dvh;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .app-shell:not(.is-hidden) .stage-area {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .app-shell:not(.is-hidden) .topbar,
+  .app-shell:not(.is-hidden) .timeline,
+  .app-shell:not(.is-hidden) .control-area {
+    display: none !important;
+  }
+
+  .app-shell:not(.is-hidden) .battle-frame {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    width: 100vw;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .app-shell:not(.is-hidden) #battleCanvas {
+    width: min(100vw, calc(100dvh * 1.7786458333));
+    height: min(100dvh, calc(100vw / 1.7786458333));
+    max-height: none;
+    aspect-ratio: 1366 / 768;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .combat-action-dock {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: clamp(172px, 26vw, 202px);
+    height: min(72vh, 286px);
+  }
+
+  .combat-action-dock .weapon-toggle {
+    width: clamp(54px, 14vh, 62px);
+    height: clamp(54px, 14vh, 62px);
+  }
+
+  .combat-action-dock .weapon-toggle::after {
+    top: -3px;
+    right: -3px;
+    width: 19px;
+    height: 19px;
+    font-size: 10px;
+  }
+
+  .combat-action-dock .weapon-overlay .weapon-list {
+    grid-template-columns: repeat(var(--weapon-count, 2), 58px);
+    gap: 5px;
+    padding: 5px;
+  }
+
+  .combat-action-dock .weapon-overlay.expanded .weapon-dock {
+    width: calc(var(--weapon-count, 2) * 63px + 10px);
+  }
+
+  .combat-action-dock .weapon-card {
+    grid-template-rows: 30px auto;
+    gap: 2px;
+    min-height: 52px;
+    padding: 4px;
+    font-size: 9px;
+  }
+
+  .combat-action-dock .weapon-icon-frame {
+    width: 30px;
+    height: 30px;
+  }
+
+  .combat-action-dock .battle-skill-card:nth-child(1) {
+    right: 0;
+    bottom: 35%;
+  }
+
+  .combat-action-dock .battle-skill-card:nth-child(2) {
+    right: 33%;
+    bottom: 20%;
+  }
+
+  .combat-action-dock .battle-skill-card:nth-child(3) {
+    right: 48%;
+    bottom: 0;
+  }
+
+  .combat-action-dock .skill-card.battle-skill-card {
+    width: clamp(50px, 13.2vh, 58px);
+    height: clamp(50px, 13.2vh, 58px);
+    padding: 3px;
+  }
+
+  .combat-action-dock .skill-card.battle-skill-card.has-action-cost {
+    padding: 3px;
+  }
+
+  .battle-skill-name {
+    top: calc(100% + 3px);
+    padding: 2px 5px;
+    font-size: 9px;
+  }
+
+  .battle-skill-cost {
+    left: -2px;
+    top: -2px;
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+
+  .combat-action-dock .battle-skill-page-toggle {
+    right: 0;
+    bottom: 66px;
+    grid-template-columns: 20px 24px 20px;
+    width: 64px;
+    height: 25px;
+  }
+
+  .combat-action-dock .battle-skill-page-toggle button {
+    width: 20px;
+    height: 24px;
+    font-size: 18px;
+  }
+
+  .combat-action-dock .battle-skill-page-toggle small {
+    font-size: 9px;
+  }
+
+  .player-status-dock {
+    left: max(12px, env(safe-area-inset-left));
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .player-status-dock .soul-armor-button {
+    width: clamp(58px, 15.5vh, 68px);
+    height: clamp(58px, 15.5vh, 68px);
+  }
+
+  .player-resource-stack {
+    bottom: max(11px, env(safe-area-inset-bottom));
+    gap: 3px;
+    width: clamp(210px, 34vw, 270px);
+  }
+
+  .player-resource-row {
+    grid-template-columns: 13px minmax(0, 1fr) 52px;
+    gap: 5px;
+    min-height: 13px;
+  }
+
+  .player-resource-row > strong {
+    font-size: 10px;
+  }
+
+  .player-resource-mark {
+    width: 13px;
+    height: 13px;
+    font-size: 11px;
+  }
+
+  .player-resource-mark.mana {
+    font-size: 13px;
+  }
+
+  .player-hp-track {
+    height: 7px;
+  }
+
+  .player-mana-track {
+    height: 12px;
+    gap: 1px;
+    padding: 2px;
+  }
+
+  .weakpoint-tip {
+    left: max(10px, env(safe-area-inset-left));
+    top: max(10px, env(safe-area-inset-top));
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 8px;
+    width: min(260px, 43vw);
+    padding: 8px 10px;
+  }
+
+  .weakpoint-tip img {
+    width: 40px;
+    height: 40px;
+  }
+
+  .weakpoint-tip strong {
+    font-size: 11px;
+  }
+
+  .weakpoint-tip p {
+    margin-top: 2px;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .skill-description-panel {
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    width: min(360px, 55vw);
+    max-height: calc(100dvh - 20px);
+    padding: 9px 11px;
+    overflow: auto;
+  }
+
+  .qte-overlay {
+    bottom: 10%;
+    transform: translateX(-50%) scale(0.86);
   }
 }
 

@@ -2,9 +2,10 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>M98 战斗策略版 Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=segmented-mana-bar-20260903" />
+    <link rel="stylesheet" href="./styles.css?v=stable-skill-arc-20260903" />
+    <link rel="stylesheet" href="./mobile-landscape.css?v=stable-skill-arc-20260903" />
   </head>
   <body>
     <div class="demo-version" data-demo-version>Demo --</div>
@@ -200,7 +201,7 @@
 
         <div class="battle-frame">
           <canvas id="battleCanvas" width="1366" height="768" aria-label="2D 战斗验证画面"></canvas>
-          <div class="combat-action-dock" aria-label="战斗操作区">
+          <div class="combat-action-dock" id="combatActionDock" aria-label="战斗操作区">
             <div class="weapon-overlay" id="weaponOverlay">
               <button class="weapon-toggle" id="weaponToggle" type="button" aria-label="武器切换" aria-expanded="false"></button>
               <div class="weapon-dock">
@@ -208,12 +209,16 @@
               </div>
             </div>
             <div class="battle-skill-overlay" id="battleSkillOverlay" aria-label="战斗技能栏">
-              <div class="battle-skill-list" id="battleSkillButtons"></div>
-              <div class="battle-skill-page-toggle hidden" id="battleSkillPageToggle" aria-label="技能组分页">
-                <button id="battleSkillPagePrev" type="button" aria-label="上一组技能">‹</button>
-                <small id="battleSkillPageIndex">1/1</small>
-                <button id="battleSkillPageNext" type="button" aria-label="下一组技能">›</button>
+              <div class="skill-wheel-guide hidden" id="battleSkillPageToggle" aria-label="技能组轮盘">
+                <svg class="skill-wheel-arc" viewBox="0 0 240 320" preserveAspectRatio="none" aria-hidden="true">
+                  <path class="skill-wheel-track" d="M 203 145 A 136 136 0 0 0 67 281"></path>
+                  <path class="skill-wheel-track-flow" d="M 203 145 A 136 136 0 0 0 67 281"></path>
+                  <path class="skill-wheel-hit-path" id="skillWheelGesturePath" d="M 203 145 A 136 136 0 0 0 67 281"></path>
+                </svg>
+                <small class="skill-wheel-page-index" id="battleSkillPageIndex">1/1</small>
+                <div class="skill-wheel-page-dots" id="skillWheelPageDots"></div>
               </div>
+              <div class="battle-skill-list" id="battleSkillButtons"></div>
             </div>
           </div>
           <div class="player-status-dock" aria-label="角色战斗状态">
@@ -314,7 +319,7 @@
       <button class="gm-ui-restore" id="gmShowBattleUi" type="button">GM 显示 UI</button>
     </main>
 
-    <script src="./game.js?v=segmented-mana-bar-20260903"></script>
+    <script src="./game.js?v=stable-skill-arc-20260903"></script>
   </body>
 </html>
 

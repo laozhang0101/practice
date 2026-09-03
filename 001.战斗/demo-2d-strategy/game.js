@@ -1,6 +1,6 @@
 ﻿const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
-const DEMO_VERSION = "2026.09.03-segmented-mana-bar";
+const DEMO_VERSION = "2026.09.03-stable-skill-arc";
 const DEFAULT_MELEE_CINEMATIC_DURATION = 0.82;
 const NORMAL_ATTACK_DAMAGE = 22;
 const GOURD_HEAL_CHANCE = 0.5;
@@ -57,15 +57,16 @@ const ui = {
   turnState: document.getElementById("turnState"),
   currentTarget: document.getElementById("currentTarget"),
   brokenParts: document.getElementById("brokenParts"),
+  combatActionDock: document.getElementById("combatActionDock"),
   weaponOverlay: document.getElementById("weaponOverlay"),
   weaponToggle: document.getElementById("weaponToggle"),
   weaponButtons: document.getElementById("weaponButtons"),
   battleSkillOverlay: document.getElementById("battleSkillOverlay"),
   battleSkillButtons: document.getElementById("battleSkillButtons"),
   battleSkillPageToggle: document.getElementById("battleSkillPageToggle"),
-  battleSkillPagePrev: document.getElementById("battleSkillPagePrev"),
-  battleSkillPageNext: document.getElementById("battleSkillPageNext"),
   battleSkillPageIndex: document.getElementById("battleSkillPageIndex"),
+  skillWheelGesturePath: document.getElementById("skillWheelGesturePath"),
+  skillWheelPageDots: document.getElementById("skillWheelPageDots"),
   skillDescriptionOverlay: document.getElementById("skillDescriptionOverlay"),
   skillDescriptionPanel: document.getElementById("skillDescriptionPanel"),
   skillButtons: document.getElementById("skillButtons"),
@@ -709,6 +710,13 @@ let playerHitFloaters = [];
 let soulHoldTimer = null;
 let skillDescriptionHoldTimer = null;
 let battleSkillPageByWeapon = Object.create(null);
+let selectedBattleSkillByWeapon = Object.create(null);
+let battleSkillPageTransitionTimer = null;
+let skillWheelGeometryFrame = null;
+let skillWheelGeometrySettleTimer = null;
+let skillWheelGeometry = null;
+let weaponOverlayTransitionTimer = null;
+let combatDockMode = "skills";
 let hoveredTargetParts = [];
 let activeVideoSkipHandler = null;
 let activeVideoPlaybackId = 0;
@@ -2168,6 +2176,15 @@ function resetGame() {
   floaters = [];
   playerHitFloaters = [];
   battleSkillPageByWeapon = Object.create(null);
+  selectedBattleSkillByWeapon = Object.create(null);
+  window.clearTimeout(battleSkillPageTransitionTimer);
+  battleSkillPageTransitionTimer = null;
+  window.cancelAnimationFrame(skillWheelGeometryFrame);
+  skillWheelGeometryFrame = null;
+  window.clearTimeout(skillWheelGeometrySettleTimer);
+  skillWheelGeometrySettleTimer = null;
+  skillWheelGeometry = null;
+  closeWeaponOverlay();
   buildWeaponControls();
   buildSkillControls();
   buildSoulSkillControls();
@@ -4894,11 +4911,19 @@ function buildWeaponControls() {
   ui.weaponButtons.innerHTML = "";
   const equippedWeapons = carriedWeapons();
   ui.weaponOverlay?.style.setProperty("--weapon-count", String(equippedWeapons.length));
-  equippedWeapons.forEach((weapon) => {
+  equippedWeapons.forEach((weapon, index) => {
+    const angle = equippedWeapons.length <= 1
+      ? 34
+      : 14 + (index / (equippedWeapons.length - 1)) * 48;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "weapon-card";
     button.dataset.weapon = weapon.id;
+    button.style.setProperty("--weapon-order", String(index));
+    button.style.setProperty("--weapon-angle", `${angle}deg`);
+    button.style.setProperty("--weapon-counter-angle", `${-angle}deg`);
+    button.setAttribute("aria-label", `${weapon.name} ${weapon.role}`);
+    button.title = `${weapon.name} · ${weapon.role}`;
     button.innerHTML = `
       <span class="weapon-icon-frame">
         ${weapon.icon ? `<img src="${weapon.icon}" alt="${weapon.name}" />` : `<span class="weapon-icon-fallback">${weapon.short}</span>`}
@@ -4921,16 +4946,27 @@ function renderWeaponToggle() {
 function selectWeapon(weaponId) {
   if (!state || state.turn !== "player" || state.enemy.intent || state.result) return;
   if (!isWeaponCarried(weaponId)) return;
-  if (state.selectedWeaponId === weaponId) return;
-  clearGreatswordCounterStance("切换武器");
-  state.selectedWeaponId = weaponId;
-  const weapon = currentWeapon();
-  updatePlayerSpriteForWeapon();
-  log(`切换武器：${weapon.name}，技能列表已更新。`);
-  buildSkillControls();
-  renderWeaponToggle();
-  closeWeaponOverlay();
+  const changedWeapon = state.selectedWeaponId !== weaponId;
+  window.clearTimeout(battleSkillPageTransitionTimer);
+  battleSkillPageTransitionTimer = null;
+  clearBattleSkillPageAnimation();
+  if (changedWeapon) {
+    clearGreatswordCounterStance("切换武器");
+    state.selectedWeaponId = weaponId;
+    const weapon = currentWeapon();
+    updatePlayerSpriteForWeapon();
+    log(`切换武器：${weapon.name}，技能列表已更新。`);
+    buildSkillControls();
+    renderWeaponToggle();
+  }
+  combatDockMode = "weapon-confirm";
+  ui.weaponButtons.querySelector(`[data-weapon="${weaponId}"]`)?.classList.add("confirming");
   updateUi();
+  window.clearTimeout(weaponOverlayTransitionTimer);
+  weaponOverlayTransitionTimer = window.setTimeout(() => {
+    weaponOverlayTransitionTimer = null;
+    collapseWeaponOverlayAnimated();
+  }, 130);
 }
 
 function buildSkillControls() {
@@ -4958,27 +4994,324 @@ function battleSkillPageInfo() {
 function renderBattleSkillPage() {
   const { page, pageCount, skills: visibleSkills } = battleSkillPageInfo();
   ui.battleSkillButtons.innerHTML = "";
-  visibleSkills.forEach((skill) => ui.battleSkillButtons.appendChild(createSkillButton(skill, true)));
-  ui.battleSkillPageToggle?.classList.toggle("hidden", pageCount <= 1);
+  let selectedSkillId = selectedBattleSkillByWeapon[state.selectedWeaponId];
+  if (!visibleSkills.some((skill) => skill.id === selectedSkillId)) {
+    selectedSkillId = visibleSkills[0]?.id || "";
+    selectedBattleSkillByWeapon[state.selectedWeaponId] = selectedSkillId;
+  }
+  visibleSkills.forEach((skill, index) => {
+    const button = createSkillButton(skill, true);
+    button.style.setProperty("--wheel-slot", String(index));
+    button.classList.toggle("wheel-selected", skill.id === selectedSkillId);
+    button.addEventListener("pointerenter", () => selectBattleSkillOnWheel(skill.id));
+    button.addEventListener("pointerdown", () => selectBattleSkillOnWheel(skill.id));
+    button.addEventListener("focus", () => selectBattleSkillOnWheel(skill.id));
+    ui.battleSkillButtons.appendChild(button);
+  });
+  const hasMultipleGroups = pageCount > 1;
+  ui.battleSkillPageToggle?.classList.toggle("hidden", !hasMultipleGroups);
+  ui.battleSkillOverlay?.classList.toggle("has-multiple-groups", hasMultipleGroups);
   if (ui.battleSkillPageIndex) ui.battleSkillPageIndex.textContent = `${page + 1}/${pageCount}`;
   ui.battleSkillPageToggle?.setAttribute("aria-label", `切换技能组，当前第 ${page + 1} 组，共 ${pageCount} 组`);
+  if (hasMultipleGroups && updateSkillWheelGuideGeometry()) {
+    renderSkillWheelPageDots(page, pageCount);
+  } else {
+    ui.skillWheelPageDots?.replaceChildren();
+  }
+  if (hasMultipleGroups) queueSkillWheelGeometryUpdate();
 }
 
-function cycleBattleSkillPage(direction = 1) {
+function measureSkillWheelSlotRects(sourceButton) {
+  const overlay = ui.battleSkillOverlay;
+  if (!overlay || !sourceButton) return [];
+
+  const probeList = document.createElement("div");
+  probeList.className = "battle-skill-list";
+  probeList.setAttribute("aria-hidden", "true");
+  probeList.style.visibility = "hidden";
+  probeList.style.pointerEvents = "none";
+  for (let index = 0; index < BATTLE_SKILLS_PER_PAGE; index += 1) {
+    const probeButton = document.createElement("span");
+    probeButton.className = "skill-card battle-skill-card";
+    probeButton.style.animation = "none";
+    probeButton.style.transform = "none";
+    probeButton.style.opacity = "1";
+    probeList.appendChild(probeButton);
+  }
+  overlay.appendChild(probeList);
+  const rects = [...probeList.children].map((button) => button.getBoundingClientRect());
+  probeList.remove();
+  return rects;
+}
+
+function updateSkillWheelGuideGeometry() {
+  const guide = ui.battleSkillPageToggle;
+  const toggle = ui.weaponToggle;
+  const buttons = [...ui.battleSkillButtons.children].filter((button) => !button.hidden);
+  if (!guide || !toggle || guide.classList.contains("hidden") || buttons.length === 0) return false;
+
+  const guideRect = guide.getBoundingClientRect();
+  const toggleRect = toggle.getBoundingClientRect();
+  if (guideRect.width <= 0 || guideRect.height <= 0 || toggleRect.width <= 0) return false;
+
+  const centerX = toggleRect.left + toggleRect.width / 2;
+  const centerY = toggleRect.top + toggleRect.height / 2;
+  // Measure all three fixed slots so pages with fewer skills keep the same arc.
+  const buttonRects = measureSkillWheelSlotRects(buttons[0]);
+  if (buttonRects.length === 0) return false;
+  const skillRadius = Math.max(...buttonRects.map((rect) => Math.hypot(
+    rect.left + rect.width / 2 - centerX,
+    rect.top + rect.height / 2 - centerY,
+  )));
+  const buttonRadius = Math.max(...buttonRects.map((rect) => Math.max(rect.width, rect.height))) / 2;
+  const cx = centerX - guideRect.left;
+  const cy = centerY - guideRect.top;
+  const unclampedRadius = skillRadius + buttonRadius + 9;
+  const radius = Math.max(1, Math.min(unclampedRadius, cx - 4, cy - 4));
+  const startAngle = -Math.PI / 2;
+  const endAngle = -Math.PI;
+  const startX = cx;
+  const startY = cy - radius;
+  const endX = cx - radius;
+  const endY = cy;
+  const pathData = `M ${startX.toFixed(2)} ${startY.toFixed(2)} A ${radius.toFixed(2)} ${radius.toFixed(2)} 0 0 0 ${endX.toFixed(2)} ${endY.toFixed(2)}`;
+  const svg = ui.skillWheelGesturePath?.closest("svg");
+  svg?.setAttribute("viewBox", `0 0 ${guideRect.width.toFixed(2)} ${guideRect.height.toFixed(2)}`);
+  svg?.querySelectorAll("path").forEach((path) => path.setAttribute("d", pathData));
+
+  skillWheelGeometry = {
+    cx,
+    cy,
+    radius,
+    width: guideRect.width,
+    height: guideRect.height,
+    startAngle,
+    endAngle,
+  };
+  if (ui.battleSkillPageIndex) {
+    ui.battleSkillPageIndex.style.left = `${((cx + 7) / guideRect.width) * 100}%`;
+    ui.battleSkillPageIndex.style.right = "auto";
+    ui.battleSkillPageIndex.style.top = `${((startY - 23) / guideRect.height) * 100}%`;
+  }
+  return true;
+}
+
+function skillWheelPointAt(t) {
+  const geometry = skillWheelGeometry;
+  if (!geometry) return { x: 50, y: 50 };
+  const angle = geometry.startAngle + (geometry.endAngle - geometry.startAngle) * t;
+  return {
+    x: ((geometry.cx + Math.cos(angle) * geometry.radius) / geometry.width) * 100,
+    y: ((geometry.cy + Math.sin(angle) * geometry.radius) / geometry.height) * 100,
+  };
+}
+
+function queueSkillWheelGeometryUpdate() {
+  window.cancelAnimationFrame(skillWheelGeometryFrame);
+  skillWheelGeometryFrame = window.requestAnimationFrame(() => {
+    skillWheelGeometryFrame = null;
+    if (!state || battleSkillPageInfo().pageCount <= 1 || !updateSkillWheelGuideGeometry()) return;
+    const { page, pageCount } = battleSkillPageInfo();
+    renderSkillWheelPageDots(page, pageCount);
+  });
+}
+
+function renderSkillWheelPageDots(page, pageCount) {
+  if (!ui.skillWheelPageDots) return;
+  ui.skillWheelPageDots.innerHTML = "";
+  Array.from({ length: pageCount }, (_, index) => {
+    const button = document.createElement("button");
+    const t = pageCount <= 1 ? 0.5 : 0.18 + (index / (pageCount - 1)) * 0.64;
+    const point = skillWheelPointAt(t);
+    button.type = "button";
+    button.className = `skill-wheel-page-dot${index === page ? " active" : ""}`;
+    button.style.left = `${point.x}%`;
+    button.style.top = `${point.y}%`;
+    button.dataset.page = String(index);
+    button.setAttribute("aria-label", `切换到第 ${index + 1} 组技能`);
+    button.setAttribute("aria-current", index === page ? "page" : "false");
+    button.innerHTML = `<span>${index + 1}</span>`;
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setBattleSkillPage(index);
+    });
+    ui.skillWheelPageDots.appendChild(button);
+  });
+}
+
+function selectBattleSkillOnWheel(skillId) {
+  if (!state || !skillId) return;
+  selectedBattleSkillByWeapon[state.selectedWeaponId] = skillId;
+  [...ui.battleSkillButtons.children].forEach((button) => {
+    button.classList.toggle("wheel-selected", button.dataset.skill === skillId);
+  });
+}
+
+function clearBattleSkillPageAnimation() {
+  ui.battleSkillButtons?.classList.remove(
+    "page-leave-next",
+    "page-leave-prev",
+    "page-enter-next",
+    "page-enter-prev",
+  );
+  ui.battleSkillPageToggle?.classList.remove("switching-next", "switching-prev");
+}
+
+function setBattleSkillPage(targetPage, preferredDirection = 0) {
   if (!state || state.soulTargetSelection) return;
   const { page, pageCount } = battleSkillPageInfo();
   if (pageCount <= 1) return;
-  battleSkillPageByWeapon[state.selectedWeaponId] = (page + direction + pageCount) % pageCount;
-  renderBattleSkillPage();
-  ui.battleSkillButtons.classList.remove("page-swap");
-  void ui.battleSkillButtons.offsetWidth;
-  ui.battleSkillButtons.classList.add("page-swap");
-  window.setTimeout(() => ui.battleSkillButtons.classList.remove("page-swap"), 180);
-  updateUi();
+  const weaponId = state.selectedWeaponId;
+  const nextPage = (Number(targetPage) + pageCount) % pageCount;
+  if (nextPage === page) return;
+  const direction = preferredDirection || (nextPage > page ? 1 : -1);
+  window.clearTimeout(battleSkillPageTransitionTimer);
+  clearBattleSkillPageAnimation();
+  ui.battleSkillButtons.classList.add(direction > 0 ? "page-leave-next" : "page-leave-prev");
+  ui.battleSkillPageToggle?.classList.add(direction > 0 ? "switching-next" : "switching-prev");
+  battleSkillPageTransitionTimer = window.setTimeout(() => {
+    if (!state || state.selectedWeaponId !== weaponId) {
+      clearBattleSkillPageAnimation();
+      battleSkillPageTransitionTimer = null;
+      return;
+    }
+    battleSkillPageByWeapon[weaponId] = nextPage;
+    renderBattleSkillPage();
+    clearBattleSkillPageAnimation();
+    ui.battleSkillButtons.classList.add(direction > 0 ? "page-enter-next" : "page-enter-prev");
+    ui.battleSkillPageToggle?.classList.add(direction > 0 ? "switching-next" : "switching-prev");
+    updateUi();
+    battleSkillPageTransitionTimer = window.setTimeout(() => {
+      clearBattleSkillPageAnimation();
+      battleSkillPageTransitionTimer = null;
+    }, 280);
+  }, 130);
+}
+
+function cycleBattleSkillPage(direction = 1) {
+  const { page, pageCount } = battleSkillPageInfo();
+  if (pageCount <= 1) return;
+  setBattleSkillPage(page + direction, direction);
+}
+
+function bindSkillWheelGesture() {
+  const gesturePath = ui.skillWheelGesturePath;
+  const skillList = ui.battleSkillButtons;
+  const guide = ui.battleSkillPageToggle;
+  if (!gesturePath || !skillList || !guide) return;
+  let gesture = null;
+
+  const resetGesture = ({ preserveSwipeFlag = false } = {}) => {
+    const sourceButton = gesture?.sourceButton;
+    sourceButton?.classList.remove("wheel-drag-source");
+    if (sourceButton && !preserveSwipeFlag) sourceButton._skillWheelSwipeTriggered = false;
+    gesture = null;
+    guide.classList.remove("is-dragging", "drag-next", "drag-prev");
+    guide.style.removeProperty("--wheel-drag-progress");
+    if (sourceButton && preserveSwipeFlag) {
+      window.setTimeout(() => {
+        sourceButton._skillWheelSwipeTriggered = false;
+      }, 120);
+    }
+  };
+
+  const beginGesture = (event, sourceButton, captureTarget) => {
+    if (!event.isPrimary || event.button !== 0 || battleSkillPageInfo().pageCount <= 1) return;
+    if (sourceButton?.disabled) return;
+    gesture = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      travel: 0,
+      sourceButton,
+      captureTarget,
+    };
+    guide.classList.add("is-dragging");
+    captureTarget.setPointerCapture?.(event.pointerId);
+    if (!sourceButton) event.preventDefault();
+  };
+
+  const moveGesture = (event) => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    const dx = event.clientX - gesture.startX;
+    const dy = event.clientY - gesture.startY;
+    gesture.travel = (dy - dx) / Math.SQRT2;
+    if (gesture.sourceButton && Math.hypot(dx, dy) > 10) {
+      gesture.sourceButton._skillWheelSwipeTriggered = true;
+      gesture.sourceButton.classList.add("wheel-drag-source");
+      window.clearTimeout(skillDescriptionHoldTimer);
+      skillDescriptionHoldTimer = null;
+      gesture.sourceButton.classList.remove("holding");
+    }
+    guide.classList.toggle("drag-next", gesture.travel > 8);
+    guide.classList.toggle("drag-prev", gesture.travel < -8);
+    guide.style.setProperty("--wheel-drag-progress", String(Math.min(1, Math.abs(gesture.travel) / 70)));
+    if (gesture.sourceButton?._skillWheelSwipeTriggered || !gesture.sourceButton) event.preventDefault();
+  };
+
+  const finishGesture = (event) => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    const { travel, sourceButton, captureTarget } = gesture;
+    const draggedFromSkill = Boolean(sourceButton?._skillWheelSwipeTriggered);
+    if (Math.abs(travel) >= 34) cycleBattleSkillPage(travel > 0 ? 1 : -1);
+    captureTarget.releasePointerCapture?.(event.pointerId);
+    resetGesture({ preserveSwipeFlag: draggedFromSkill });
+  };
+
+  const cancelGesture = (event) => {
+    if (!gesture || (event.pointerId != null && event.pointerId !== gesture.pointerId)) return;
+    gesture.captureTarget.releasePointerCapture?.(gesture.pointerId);
+    resetGesture();
+  };
+
+  gesturePath.addEventListener("pointerdown", (event) => {
+    beginGesture(event, null, gesturePath);
+  });
+  skillList.addEventListener("pointerdown", (event) => {
+    const sourceButton = event.target.closest(".battle-skill-card");
+    if (!sourceButton || !skillList.contains(sourceButton)) return;
+    beginGesture(event, sourceButton, sourceButton);
+  });
+
+  gesturePath.addEventListener("pointermove", moveGesture);
+  skillList.addEventListener("pointermove", moveGesture);
+  gesturePath.addEventListener("pointerup", finishGesture);
+  skillList.addEventListener("pointerup", finishGesture);
+  gesturePath.addEventListener("pointercancel", cancelGesture);
+  skillList.addEventListener("pointercancel", cancelGesture);
+  gesturePath.addEventListener("lostpointercapture", () => {
+    if (gesture) resetGesture();
+  });
+  gesturePath.addEventListener("wheel", (event) => {
+    if (battleSkillPageInfo().pageCount <= 1) return;
+    event.preventDefault();
+    cycleBattleSkillPage(event.deltaY + event.deltaX >= 0 ? 1 : -1);
+  }, { passive: false });
+}
+
+function skillCategoryLabel(skill) {
+  const isStatusSkill =
+    skill.kind === "stance" ||
+    skill.kind === "passive" ||
+    skill.kind === "status" ||
+    skill.kind === "buff" ||
+    skill.stance ||
+    skill.damage <= 0;
+  if (isStatusSkill) return { key: "status", label: "状态" };
+
+  const isGroupSkill =
+    skill.kind === "aoe" ||
+    skill.kind === "group" ||
+    (skill.targetParts || []).length > 1 ||
+    /AOE|群体/.test(skill.kindLabel || "");
+  if (isGroupSkill) return { key: "group", label: "群体" };
+
+  return { key: "single", label: "单体" };
 }
 
 function createSkillButton(skill, compact) {
   const targetParts = skill.targetParts || [];
+  const skillCategory = compact ? skillCategoryLabel(skill) : null;
   const button = document.createElement("button");
   button.type = "button";
   button.className = `skill-card${skill.actionCost > 0 ? " has-action-cost" : ""}${compact ? " battle-skill-card" : ""}`;
@@ -4991,7 +5324,7 @@ function createSkillButton(skill, compact) {
       <span class="battle-skill-icon">
         ${skill.icon ? `<img src="${skill.icon}" alt="" draggable="false" />` : renderWeaponSkillTarget(skill)}
       </span>
-      <strong class="battle-skill-name">${skill.name}</strong>
+      <strong class="battle-skill-name battle-skill-type is-${skillCategory.key}">${skillCategory.label}</strong>
       ${skill.actionCost > 0 ? `<span class="battle-skill-cost"><b>${skill.actionCost}</b></span>` : ""}
     `
     : `
@@ -5016,9 +5349,10 @@ function createSkillButton(skill, compact) {
   });
   if (compact) bindSkillDescriptionHold(button, skill);
   button.addEventListener("click", (event) => {
-    if (button._skillLongPressTriggered) {
+    if (button._skillLongPressTriggered || button._skillWheelSwipeTriggered) {
       event.preventDefault();
       button._skillLongPressTriggered = false;
+      button._skillWheelSwipeTriggered = false;
       return;
     }
     useSkill(skill.id);
@@ -5295,19 +5629,82 @@ function effectiveArmorDamage(skill) {
 
 function toggleWeaponOverlay() {
   if (!state || state.result || state.turn !== "player" || state.enemy.intent) return;
-  const expanded = !ui.weaponOverlay.classList.contains("expanded");
-  ui.weaponOverlay.classList.toggle("expanded", expanded);
-  ui.weaponToggle.setAttribute("aria-expanded", String(expanded));
+  if (combatDockMode === "weapon-confirm" || combatDockMode === "weapons-leaving") return;
+  if (combatDockMode === "weapons" || combatDockMode === "skills-leaving") {
+    collapseWeaponOverlayAnimated();
+    return;
+  }
+
+  window.clearTimeout(weaponOverlayTransitionTimer);
+  combatDockMode = "skills-leaving";
+  ui.combatActionDock?.classList.remove("weapon-mode", "weapons-leaving", "skills-entering");
+  ui.combatActionDock?.classList.add("skills-leaving");
+  ui.weaponToggle.setAttribute("aria-expanded", "true");
+  updateBattleSkillOverlay();
+  weaponOverlayTransitionTimer = window.setTimeout(() => {
+    if (combatDockMode !== "skills-leaving") return;
+    combatDockMode = "weapons";
+    ui.combatActionDock?.classList.remove("skills-leaving");
+    ui.combatActionDock?.classList.add("weapon-mode");
+    ui.weaponOverlay.classList.add("expanded");
+    weaponOverlayTransitionTimer = null;
+  }, 180);
 }
 
 function closeWeaponOverlay() {
+  window.clearTimeout(weaponOverlayTransitionTimer);
+  weaponOverlayTransitionTimer = null;
+  combatDockMode = "skills";
   ui.weaponOverlay.classList.remove("expanded");
+  ui.weaponButtons.querySelectorAll(".confirming").forEach((button) => button.classList.remove("confirming"));
+  ui.combatActionDock?.classList.remove(
+    "skills-leaving",
+    "weapon-mode",
+    "weapon-confirm",
+    "weapons-leaving",
+    "skills-entering",
+  );
   ui.weaponToggle.setAttribute("aria-expanded", "false");
 }
 
+function collapseWeaponOverlayAnimated() {
+  window.clearTimeout(weaponOverlayTransitionTimer);
+  combatDockMode = "weapons-leaving";
+  ui.combatActionDock?.classList.remove("skills-leaving", "skills-entering");
+  ui.combatActionDock?.classList.add("weapon-mode", "weapons-leaving");
+  ui.weaponOverlay.classList.remove("expanded");
+  ui.weaponToggle.setAttribute("aria-expanded", "false");
+  weaponOverlayTransitionTimer = window.setTimeout(() => {
+    if (combatDockMode !== "weapons-leaving") return;
+    combatDockMode = "skills";
+    ui.weaponButtons.querySelectorAll(".confirming").forEach((button) => button.classList.remove("confirming"));
+    ui.combatActionDock?.classList.remove("weapon-mode", "weapons-leaving");
+    ui.combatActionDock?.classList.add("skills-entering");
+    updateBattleSkillOverlay();
+    weaponOverlayTransitionTimer = window.setTimeout(() => {
+      ui.combatActionDock?.classList.remove("skills-entering");
+      weaponOverlayTransitionTimer = null;
+    }, 300);
+  }, 210);
+}
+
 function updateBattleSkillOverlay() {
-  const visible = state && state.turn === "player" && !state.enemy.intent && !state.result && !state.skillCinematic;
+  const visible = combatDockMode === "skills"
+    && state
+    && state.turn === "player"
+    && !state.enemy.intent
+    && !state.result
+    && !state.skillCinematic;
   ui.battleSkillOverlay.classList.toggle("active", Boolean(visible));
+  window.clearTimeout(skillWheelGeometrySettleTimer);
+  skillWheelGeometrySettleTimer = null;
+  if (visible) {
+    queueSkillWheelGeometryUpdate();
+    skillWheelGeometrySettleTimer = window.setTimeout(() => {
+      skillWheelGeometrySettleTimer = null;
+      queueSkillWheelGeometryUpdate();
+    }, 190);
+  }
 }
 
 function availableSoulDots() {
@@ -7056,7 +7453,6 @@ function drawCombatants() {
     const bossHpY = 18;
     drawHealthBar(bossHpX, bossHpY, bossHpW, state.enemy.hp / state.enemy.maxHp, "#e86c62");
     drawBarText(bossHpX, bossHpY, bossHpW, 7, `${state.enemy.hp}/${state.enemy.maxHp}`);
-    drawArmorStatus(bossHpX, bossHpY + 14, bossHpW);
   }
 }
 
@@ -8017,8 +8413,7 @@ ui.nextLoadoutFromCharacterBtn?.addEventListener("click", () => setPrebattleStep
 ui.nextSkillBtn?.addEventListener("click", () => setPrebattleStep("skills"));
 ui.skillDescriptionOverlay?.addEventListener("click", hideSkillDescription);
 ui.skillDescriptionPanel?.addEventListener("click", (event) => event.stopPropagation());
-ui.battleSkillPagePrev?.addEventListener("click", () => cycleBattleSkillPage(-1));
-ui.battleSkillPageNext?.addEventListener("click", () => cycleBattleSkillPage(1));
+bindSkillWheelGesture();
 ui.nextSkillFromWeaponBtn?.addEventListener("click", () => setPrebattleStep("skills"));
 ui.backToBossBtn?.addEventListener("click", () => setPrebattleStep("presets"));
 ui.backToBossFromCharacterBtn?.addEventListener("click", () => setPrebattleStep("boss"));
@@ -8055,6 +8450,7 @@ ui.prebattleScreen?.addEventListener("click", (event) => {
   renderPrebattleWeapons();
 });
 ui.weaponToggle.addEventListener("click", toggleWeaponOverlay);
+window.addEventListener("resize", queueSkillWheelGeometryUpdate);
 document.addEventListener("click", (event) => {
   if (event.target.closest?.("[data-skill-tag]") || event.target.closest?.("#skillTagBubble")) return;
   hideSkillTagBubble();
