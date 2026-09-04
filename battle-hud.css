@@ -1,0 +1,552 @@
+/* In-battle HUD assembled from the supplied temporary game assets. */
+.combat-action-dock {
+  --battle-skill-size: clamp(88px, 7.4vw, 104px);
+  --weapon-toggle-size: clamp(112px, 10.2vw, 142px);
+  --weapon-overlay-right: clamp(94px, 9.5vw, 138px);
+  --skill-orbit-radius: calc(var(--weapon-toggle-size) * 1.28);
+}
+
+.combat-action-dock .skill-card.battle-skill-card,
+.combat-action-dock .skill-card.battle-skill-card.has-action-cost {
+  width: var(--battle-skill-size);
+  height: var(--battle-skill-size);
+  padding: 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.combat-action-dock .battle-skill-overlay {
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  transform: none !important;
+}
+
+.combat-action-dock .battle-skill-overlay.active {
+  transform: none !important;
+}
+
+.combat-action-dock .battle-skill-card:nth-child(1) {
+  right: calc(
+    var(--weapon-overlay-right) + var(--weapon-toggle-size) * 0.5 - var(--battle-skill-size) * 0.5 + var(--skill-orbit-radius) * 0.9848
+  );
+  bottom: calc(
+    var(--weapon-toggle-size) * 0.5 - var(--battle-skill-size) * 0.5 + var(--skill-orbit-radius) * 0.17365
+  );
+}
+
+.combat-action-dock .battle-skill-card:nth-child(2) {
+  right: calc(
+    var(--weapon-overlay-right) + var(--weapon-toggle-size) * 0.5 - var(--battle-skill-size) * 0.5
+  );
+  bottom: calc(
+    var(--weapon-toggle-size) * 0.5 - var(--battle-skill-size) * 0.5 + var(--skill-orbit-radius)
+  );
+}
+
+.combat-action-dock .battle-skill-card:nth-child(3) {
+  right: calc(
+    var(--weapon-overlay-right) + var(--weapon-toggle-size) * 0.5 - var(--battle-skill-size) * 0.5 + var(--skill-orbit-radius) * 0.66913
+  );
+  bottom: calc(
+    var(--weapon-toggle-size) * 0.5 - var(--battle-skill-size) * 0.5 + var(--skill-orbit-radius) * 0.74314
+  );
+}
+
+.combat-action-dock .skill-wheel-page-dot {
+  width: 6px;
+  height: 6px;
+  border: 0;
+  background: rgba(171, 178, 179, 0.62);
+  box-shadow: 0 0 3px rgba(207, 222, 222, 0.35);
+  font-size: 0;
+}
+
+.combat-action-dock .skill-wheel-page-dot.active {
+  background: #e9bd59;
+  box-shadow: 0 0 5px rgba(239, 190, 68, 0.72);
+  transform: translate(-50%, -50%);
+  animation: none;
+}
+
+.combat-action-dock .skill-wheel-page-dot span {
+  display: none;
+}
+
+.combat-action-dock .skill-wheel-page-index {
+  display: none;
+}
+
+.combat-action-dock .skill-wheel-track {
+  stroke: rgba(221, 210, 178, 0.7);
+  stroke-width: 1.5;
+}
+
+.combat-action-dock .skill-wheel-track-flow {
+  stroke: rgba(255, 220, 132, 0.94);
+  stroke-width: 2;
+}
+
+.combat-action-dock .battle-skill-icon {
+  display: grid;
+  place-items: center;
+  padding: 13%;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: url("./assets/battle-hud/skill-frame.png") center / contain no-repeat;
+  box-shadow: none;
+}
+
+.combat-action-dock .battle-skill-icon::after {
+  display: none;
+}
+
+.combat-action-dock .battle-skill-icon img {
+  border-radius: 50%;
+  filter: saturate(1.08) contrast(1.04);
+}
+
+.combat-action-dock .battle-skill-type,
+.skill-description-primary-type {
+  width: 58px;
+  height: 25px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  text-shadow: none;
+}
+
+.combat-action-dock .battle-skill-type {
+  top: auto;
+  right: auto;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.battle-skill-type.is-single,
+.skill-description-primary-type.is-single {
+  background-image: url("./assets/battle-hud/skill-tag-single.png");
+}
+
+.battle-skill-type.is-group,
+.skill-description-primary-type.is-group {
+  background-image: url("./assets/battle-hud/skill-tag-group.png");
+}
+
+.battle-skill-type.is-status,
+.skill-description-primary-type.is-status {
+  background-image: url("./assets/battle-hud/skill-tag-status.png");
+}
+
+.combat-action-dock .battle-skill-cost {
+  top: 7px;
+  right: 7px;
+  z-index: 4;
+}
+
+.combat-action-dock .weapon-overlay {
+  right: var(--weapon-overlay-right);
+  bottom: 0;
+  width: var(--weapon-toggle-size);
+  height: var(--weapon-toggle-size);
+}
+
+.combat-action-dock .weapon-toggle,
+.combat-action-dock.weapon-mode .weapon-toggle {
+  width: var(--weapon-toggle-size);
+  height: var(--weapon-toggle-size);
+  padding: 20%;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: url("./assets/battle-hud/weapon-current-frame.png") center / contain no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.58));
+}
+
+.combat-action-dock.weapon-mode .weapon-toggle {
+  filter: brightness(1.12) drop-shadow(0 0 12px rgba(240, 197, 104, 0.45));
+}
+
+.combat-action-dock .weapon-toggle::after {
+  content: "";
+  top: auto;
+  right: 50%;
+  bottom: -3px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 0;
+  background: url("./assets/battle-hud/weapon-swap-icon.png") center / contain no-repeat;
+  transform: translateX(50%);
+}
+
+.combat-action-dock .weapon-toggle > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: brightness(1.2) saturate(1.08) drop-shadow(0 3px 5px rgba(0, 0, 0, 0.8));
+}
+
+.combat-action-dock .weapon-toggle > small {
+  position: absolute;
+  left: 50%;
+  bottom: 17%;
+  z-index: 3;
+  color: #f2e3bd;
+  font-size: clamp(9px, 0.72vw, 11px);
+  font-weight: 800;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px #000;
+  transform: translateX(-50%);
+}
+
+.combat-action-dock .weapon-dock,
+.combat-action-dock .weapon-overlay.expanded .weapon-dock {
+  right: 50%;
+  bottom: 50%;
+  width: calc(var(--weapon-toggle-size) * 2.27);
+  height: calc(var(--weapon-toggle-size) * 1.03);
+  opacity: 0;
+  background: url("./assets/battle-hud/weapon-switch-panel.png") center / 100% 100% no-repeat;
+  transform: translate(50%, 50%) scale(0.88);
+  transition: opacity 0.18s ease, transform 0.24s ease;
+  pointer-events: none;
+}
+
+.combat-action-dock .weapon-overlay.expanded .weapon-dock {
+  opacity: 1;
+  transform: translate(50%, 50%) scale(1);
+  pointer-events: auto;
+}
+
+.combat-action-dock .weapon-overlay .weapon-list {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.combat-action-dock .weapon-overlay .weapon-card {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  display: grid;
+  place-items: center;
+  width: 31%;
+  height: 74%;
+  padding: 8px;
+  overflow: visible;
+  border: 0;
+  border-radius: 50%;
+  clip-path: none;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  transform: translateY(-50%) scale(0.68);
+  transform-origin: center;
+}
+
+.combat-action-dock .weapon-overlay .weapon-card:nth-child(1) {
+  right: auto;
+  left: 2.5%;
+}
+
+.combat-action-dock .weapon-overlay .weapon-card:nth-child(2) {
+  right: 2.5%;
+  left: auto;
+}
+
+.combat-action-dock .weapon-overlay.expanded .weapon-card {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+
+.combat-action-dock .weapon-overlay .weapon-card::after {
+  display: none;
+}
+
+.combat-action-dock .weapon-overlay .weapon-card.active,
+.combat-action-dock .weapon-overlay .weapon-card:hover,
+.combat-action-dock .weapon-overlay .weapon-card:focus-visible,
+.combat-action-dock .weapon-overlay .weapon-card.confirming {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  filter: brightness(1.18) drop-shadow(0 0 8px rgba(243, 202, 111, 0.52));
+}
+
+.combat-action-dock .weapon-overlay .weapon-icon-frame {
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
+
+.combat-action-dock .weapon-overlay .weapon-icon-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  filter: brightness(1.28) saturate(1.12) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.82));
+  transform: scale(1.12);
+}
+
+.combat-action-dock .weapon-overlay .weapon-card small {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  display: block;
+  color: #e9dbb8;
+  font-size: clamp(8px, 0.62vw, 10px);
+  font-weight: 800;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px #000;
+  transform: translateX(-50%);
+}
+
+.skill-description-panel {
+  top: clamp(56px, 10%, 76px);
+  right: clamp(26px, 3.2%, 48px);
+  gap: 8px;
+  width: min(523px, 46%);
+  min-height: 210px;
+  padding: 26px 32px 22px 27px;
+  border: 0;
+  border-radius: 0;
+  background: url("./assets/battle-hud/skill-description-panel.png") center / 100% 100% no-repeat;
+  box-shadow: none;
+}
+
+.skill-description-panel header {
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.skill-description-icon {
+  display: grid;
+  place-items: center;
+  width: 104px;
+  padding: 14px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: url("./assets/battle-hud/skill-frame.png") center / contain no-repeat;
+  box-shadow: none;
+}
+
+.skill-description-icon img {
+  border-radius: 50%;
+}
+
+.skill-description-primary-type {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.skill-description-panel .skill-description-meta {
+  padding-left: 120px;
+}
+
+/* Player vitals mirror the reference: shield/white HP over a segmented cyan action bar. */
+.battle-frame .player-resource-stack {
+  left: 50%;
+  bottom: clamp(18px, 2.8vh, 30px);
+  gap: 5px;
+  width: clamp(300px, 24vw, 460px);
+  transform: translateX(-50%);
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.78));
+}
+
+.battle-frame .player-resource-row {
+  grid-template-columns: 22px minmax(0, 1fr) 72px;
+  gap: 8px;
+  min-height: 16px;
+}
+
+.battle-frame .player-resource-row > strong {
+  color: #edf1f3;
+  font-size: clamp(12px, 0.92vw, 15px);
+  font-weight: 800;
+  text-shadow: 0 1px 3px #000, 0 0 3px rgba(255, 255, 255, 0.2);
+}
+
+.battle-frame .player-resource-mark {
+  position: relative;
+  width: 19px;
+  height: 19px;
+  color: transparent;
+  font-size: 0;
+  text-shadow: none;
+}
+
+.battle-frame .player-resource-mark.health::before,
+.battle-frame .player-resource-mark.health::after {
+  content: "";
+  position: absolute;
+  inset: 2px 3px;
+  clip-path: polygon(50% 0, 94% 18%, 84% 69%, 50% 100%, 16% 69%, 6% 18%);
+}
+
+.battle-frame .player-resource-mark.health::before {
+  background: #e8eef1;
+  filter: drop-shadow(0 0 3px rgba(235, 246, 251, 0.72));
+}
+
+.battle-frame .player-resource-mark.health::after {
+  inset: 4px 5px 5px;
+  background: #65717a;
+}
+
+.battle-frame .player-resource-mark.mana {
+  display: grid;
+  place-items: center;
+  color: #27c8ff;
+  font-size: 0;
+}
+
+.battle-frame .player-resource-mark.mana::before {
+  content: "ϟ";
+  color: #2cd1ff;
+  font-size: 23px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0 6px rgba(33, 198, 255, 0.82);
+  transform: skewX(-8deg);
+}
+
+.battle-frame .player-hp-track,
+.battle-frame .player-mana-track {
+  box-sizing: border-box;
+  width: 100%;
+  height: 14px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(220, 231, 235, 0.52);
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(20, 24, 28, 0.96), rgba(2, 5, 8, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.88),
+    0 1px 2px rgba(0, 0, 0, 0.82);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+}
+
+.battle-frame .player-hp-track {
+  height: 13px;
+}
+
+.battle-frame .player-hp-track i {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafb 52%, #cfd9de 100%);
+  box-shadow: inset 0 -2px 2px rgba(103, 116, 123, 0.44), 0 0 7px rgba(244, 251, 255, 0.42);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+}
+
+.battle-frame .player-combat-vitals::after {
+  content: "◆";
+  position: absolute;
+  top: 50%;
+  right: -18px;
+  color: #e7ba55;
+  font-size: 15px;
+  text-shadow: 0 0 3px #fff2bc, 0 0 8px rgba(227, 168, 46, 0.82);
+  transform: translateY(-50%);
+}
+
+.battle-frame .player-mana-track {
+  display: grid;
+  grid-template-columns: repeat(var(--mana-cell-count, 7), minmax(0, 1fr));
+  gap: 0;
+  padding: 2px 4px 2px 2px;
+  border-color: rgba(90, 112, 125, 0.52);
+}
+
+.battle-frame .player-mana-track i {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-right: 1px solid rgba(62, 93, 108, 0.82);
+  background: linear-gradient(180deg, #17252d, #091218);
+  clip-path: none;
+  box-shadow: inset 0 1px 0 rgba(134, 163, 177, 0.12);
+}
+
+.battle-frame .player-mana-track i.filled {
+  border-right-color: rgba(65, 215, 255, 0.72);
+  background: linear-gradient(180deg, #55e4ff 0%, #12b9e8 45%, #087aa8 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(218, 250, 255, 0.78),
+    inset 0 -2px 2px rgba(0, 67, 99, 0.72),
+    0 0 5px rgba(23, 196, 241, 0.38);
+}
+
+@media (max-height: 720px), (max-width: 1180px) {
+  .combat-action-dock {
+    --battle-skill-size: clamp(70px, 11vh, 86px);
+    --weapon-toggle-size: clamp(94px, 14vh, 110px);
+    --weapon-overlay-right: clamp(68px, 8vw, 96px);
+  }
+
+  .combat-action-dock .skill-card.battle-skill-card,
+  .combat-action-dock .skill-card.battle-skill-card.has-action-cost {
+    padding: 9px;
+  }
+
+  .combat-action-dock .weapon-overlay {
+    right: var(--weapon-overlay-right);
+  }
+
+  .combat-action-dock .weapon-toggle::after {
+    width: 26px;
+    height: 26px;
+  }
+
+  .skill-description-panel {
+    top: 12px;
+    width: min(470px, 48%);
+    min-height: 176px;
+    max-height: calc(100% - 24px);
+    padding: 19px 24px 16px 22px;
+    overflow: auto;
+  }
+
+  .skill-description-panel header {
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .skill-description-icon {
+    width: 82px;
+    padding: 11px;
+  }
+
+  .skill-description-panel .skill-description-meta {
+    padding-left: 94px;
+  }
+
+  .battle-frame .player-resource-stack {
+    bottom: 12px;
+    width: clamp(280px, 24vw, 350px);
+  }
+
+  .battle-frame .player-resource-row {
+    grid-template-columns: 18px minmax(0, 1fr) 62px;
+    gap: 6px;
+  }
+
+  .battle-frame .player-hp-track,
+  .battle-frame .player-mana-track {
+    height: 12px;
+  }
+}
