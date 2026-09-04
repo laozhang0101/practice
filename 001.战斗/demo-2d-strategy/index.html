@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>M98 战斗策略版 Demo</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./styles.css?v=compact-tree-labels-20260904" />
-    <link rel="stylesheet" href="./mobile-landscape.css?v=compact-tree-labels-20260904" />
+    <link rel="stylesheet" href="./styles.css?v=click-tree-drag-equip-20260904" />
+    <link rel="stylesheet" href="./mobile-landscape.css?v=click-tree-drag-equip-20260904" />
+    <link rel="stylesheet" href="./battle-hud.css?v=battle-resource-pass-20260904" />
   </head>
   <body>
     <div class="demo-version" data-demo-version>Demo --</div>
@@ -139,6 +140,19 @@
       </section>
 
       <section class="prebattle-page weapon-page" data-prebattle-page="weapons" aria-label="武器搭配">
+        <header class="weapon-selection-head">
+          <span>
+            <small>PRE-BATTLE LOADOUT</small>
+            <strong>战甲与武器</strong>
+          </span>
+          <span class="weapon-selection-count">
+            <small>已选武器</small>
+            <b id="weaponSelectedCount">0 把</b>
+          </span>
+        </header>
+
+        <nav class="weapon-armor-options" id="weaponArmorOptions" aria-label="选择战甲套装"></nav>
+
         <div class="weapon-page-hero">
           <img class="weapon-page-character" src="./assets/loadout-character-front.png" alt="武器搭配角色预览" />
           <img class="weapon-page-drone" src="./assets/loadout-drone.png" alt="" />
@@ -146,14 +160,12 @@
 
         <section class="weapon-equip-panel" aria-label="武器选择">
           <div class="weapon-carry-slots" id="weaponCarrySlots"></div>
-          <p class="weapon-selection-title" id="weaponSelectionTitle">选择携带武器：武器A</p>
-          <div class="weapon-gallery" id="weaponGallery"></div>
+          <div class="weapon-gallery" id="weaponGallery" data-weapon-unequip-drop aria-label="武器候选区，将已装备武器拖回这里可卸下"></div>
         </section>
-        <aside class="weapon-detail-panel" id="weaponDetailPanel" aria-label="武器技能装配"></aside>
 
         <footer class="weapon-page-actions">
-          <button class="edit-appearance" id="backToCharacterFromWeaponBtn" type="button">返回装配方案</button>
-          <button class="save-loadout" type="button">保存</button>
+          <button class="edit-appearance" id="backToCharacterFromWeaponBtn" type="button">返回</button>
+          <button class="enter-battle" id="nextSkillFromWeaponBtn" type="button">下一步</button>
         </footer>
       </section>
 
@@ -317,7 +329,7 @@
       <button class="gm-ui-restore" id="gmShowBattleUi" type="button">GM 显示 UI</button>
     </main>
 
-    <script src="./game.js?v=compact-tree-labels-20260904"></script>
+    <script src="./game.js?v=click-tree-drag-equip-20260904"></script>
   </body>
 </html>
 

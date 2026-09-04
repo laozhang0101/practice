@@ -1,6 +1,6 @@
 ﻿const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
-const DEMO_VERSION = "2026.09.04-compact-tree-labels";
+const DEMO_VERSION = "2026.09.04-drag-equip";
 const DEFAULT_MELEE_CINEMATIC_DURATION = 0.82;
 const NORMAL_ATTACK_DAMAGE = 22;
 const GOURD_HEAL_CHANCE = 0.5;
@@ -114,7 +114,8 @@ const ui = {
   bossCards: document.getElementById("bossCards"),
   bossIntel: document.getElementById("bossIntel"),
   weaponCarrySlots: document.getElementById("weaponCarrySlots"),
-  weaponSelectionTitle: document.getElementById("weaponSelectionTitle"),
+  weaponArmorOptions: document.getElementById("weaponArmorOptions"),
+  weaponSelectedCount: document.getElementById("weaponSelectedCount"),
   weaponGallery: document.getElementById("weaponGallery"),
   weaponDetailPanel: document.getElementById("weaponDetailPanel"),
   skillLoadoutWeapons: document.getElementById("skillLoadoutWeapons"),
@@ -246,6 +247,7 @@ const weapons = [
     name: "拳套",
     short: "拳",
     icon: "./assets/weapon-fists.png",
+    battleIcon: "./assets/battle-hud/weapon-icon-3.png",
     playerSprite: "./assets/player-fists.png",
     role: "近战猛攻",
   },
@@ -254,6 +256,7 @@ const weapons = [
     name: "大剑",
     short: "剑",
     icon: "./assets/weapon-greatsword.png",
+    battleIcon: "./assets/battle-hud/weapon-icon-1.png",
     playerSprite: "./assets/player-greatsword.png",
     role: "重型破甲",
   },
@@ -262,6 +265,7 @@ const weapons = [
     name: "弓弩",
     short: "弓",
     icon: "./assets/weapon-bow.png",
+    battleIcon: "./assets/battle-hud/weapon-icon-4.png",
     playerSprite: "./assets/player-bow.png",
     role: "远程点破",
   },
@@ -269,6 +273,7 @@ const weapons = [
     id: "hammer",
     name: "战锤",
     short: "锤",
+    battleIcon: "./assets/battle-hud/weapon-icon-5.png",
     role: "重装震击",
     locked: true,
   },
@@ -276,6 +281,7 @@ const weapons = [
     id: "spear",
     name: "长枪",
     short: "枪",
+    battleIcon: "./assets/battle-hud/weapon-icon-2.png",
     role: "中距突刺",
     locked: true,
   },
@@ -283,6 +289,7 @@ const weapons = [
     id: "staff",
     name: "法杖",
     short: "杖",
+    battleIcon: "./assets/battle-hud/weapon-icon-4.png",
     role: "能量操控",
     locked: true,
   },
@@ -721,6 +728,10 @@ let hoveredTargetParts = [];
 let portraitDraggedSkillId = "";
 let portraitPointerDrag = null;
 let portraitSuppressSkillClickUntil = 0;
+let portraitDraggedWeaponId = "";
+let portraitDraggedWeaponSource = "";
+let portraitWeaponPointerDrag = null;
+let portraitSuppressWeaponClickUntil = 0;
 let activeVideoSkipHandler = null;
 let activeVideoPlaybackId = 0;
 let activeFrameSequenceTimer = null;
@@ -736,9 +747,10 @@ const loadoutParts = [
 ];
 
 const weaponLoadoutSlots = [
-  { id: "weaponA", label: "武器A" },
-  { id: "weaponB", label: "武器B" },
+  { id: "weaponA", label: "武器 1", preferred: true },
+  { id: "weaponB", label: "武器 2", preferred: true },
 ];
+const MAX_WEAPON_GALLERY_ITEMS = 5;
 const WEAPON_SKILL_SLOT_COUNT = 6;
 const DEFAULT_PORTRAIT_SKILLS_PER_WEAPON = 3;
 const BATTLE_SKILLS_PER_PAGE = 3;
@@ -753,9 +765,9 @@ const loadoutState = {
   selectedBossId: "lava_golem",
   activeLoadoutPresetId: "balanced_hunter",
   activeLoadoutPresetSection: "weapons",
-  selectedWeaponIds: ["fists", "greatsword"],
+  selectedWeaponIds: ["greatsword", "fists"],
   activeWeaponSlot: 0,
-  activeWeaponDetailId: "fists",
+  activeWeaponDetailId: "greatsword",
   weaponDetailOpen: false,
   weaponSkillLoadout: {},
   weaponSkillPickerOpen: false,
@@ -775,6 +787,8 @@ const loadoutState = {
   activePartId: "head",
   activeSlot: "base",
   portraitLoadoutView: "armor",
+  portraitTreePreviewWeaponId: "",
+  portraitTreeReturnStep: "presets",
   activePortraitArmorSetId: "bio_full",
   activePortraitWeaponId: "",
   activePortraitSkillId: "",
@@ -916,7 +930,7 @@ const loadoutPresets = [
     role: "先拆甲，再转火",
     tone: "balanced",
     summary: "拳套负责试探与追击，大剑负责打开手部硬甲，挂件补足爆发和续航。",
-    weapons: ["fists", "greatsword"],
+    weapons: ["greatsword", "fists"],
     armorTheme: "修罗",
     attachments: {
       "torso:肩膀": "喷气式装置",
@@ -1540,9 +1554,9 @@ function applyLoadoutPreset(presetId, options = {}) {
   });
 
   loadoutState.activeLoadoutPresetId = preset.id;
-  loadoutState.selectedWeaponIds = [...preset.weapons];
+  if (!options.preserveWeapons) loadoutState.selectedWeaponIds = [...preset.weapons];
   loadoutState.activeWeaponSlot = 0;
-  loadoutState.activeWeaponDetailId = preset.weapons[0] || "";
+  loadoutState.activeWeaponDetailId = loadoutState.selectedWeaponIds.find(Boolean) || "";
   loadoutState.weaponDetailOpen = false;
   loadoutState.weaponSkillPickerOpen = false;
   loadoutState.weaponSkillLoadout = Object.fromEntries(
@@ -1562,6 +1576,8 @@ function applyLoadoutPreset(presetId, options = {}) {
   loadoutState.activePartId = "head";
   loadoutState.activeSlot = "base";
   loadoutState.portraitLoadoutView = "armor";
+  loadoutState.portraitTreePreviewWeaponId = "";
+  loadoutState.portraitTreeReturnStep = "presets";
   loadoutState.activePortraitArmorSetId = "bio_full";
   loadoutState.activePortraitWeaponId = "";
   loadoutState.activePortraitSkillId = "";
@@ -1772,24 +1788,36 @@ const portraitSkillBranchPositions = [
   { x: 28, y: 14 },
 ];
 
+const portraitSingleWeaponPositions = [
+  { x: 34, y: 99 },
+  { x: 20, y: 76 },
+  { x: 16, y: 44 },
+  { x: 84, y: 44 },
+  { x: 80, y: 76 },
+  { x: 66, y: 99 },
+];
+
 const portraitArmorSetTabs = [
   {
     id: "bio_full",
     label: "生物全甲套",
     image: "./assets/armor-set-bio-full-emblem.png",
     unlocked: true,
+    weaponIds: ["fists", "greatsword"],
   },
   {
     id: "tech_half",
     label: "科技半甲套",
     image: "./assets/loadout-shura-head.jpeg",
     unlocked: false,
+    weaponIds: ["bow", "staff"],
   },
   {
     id: "bio_heavy",
     label: "生物重甲套",
     image: "./assets/loadout-shura-pants.jpeg",
     unlocked: false,
+    weaponIds: ["hammer", "spear"],
   },
 ];
 
@@ -1880,6 +1908,54 @@ const portraitDemoSkills = [
     tags: ["蓄势"],
     desc: "本回合放弃闪避，下一次大剑攻击伤害提高 65%，且不会被打断。",
   },
+  {
+    id: "bow_shadow_step",
+    weaponId: "bow",
+    name: "游猎步",
+    targetParts: [],
+    targetLabel: "自身",
+    kind: "buff",
+    kindLabel: "状态",
+    damage: 0,
+    armorDamage: 0,
+    actionCost: 1,
+    color: "#58b7ff",
+    icon: "./assets/skill-icons/bow-arm-pierce.webp",
+    tags: ["闪避"],
+    desc: "调整射击位置，获得短暂闪避并强化下一次远程攻击。",
+  },
+  {
+    id: "bow_split_barrage",
+    weaponId: "bow",
+    name: "裂空散射",
+    targetParts: ["arms", "legs"],
+    targetLabel: "手部+脚部",
+    kind: "aoe",
+    kindLabel: "群体",
+    damage: 62,
+    armorDamage: 24,
+    actionCost: 3,
+    color: "#6bc9ee",
+    icon: "./assets/skill-icons/bow-volley.webp",
+    tags: ["压制"],
+    desc: "向两个部位散射箭矢，对完整护甲造成额外压制。",
+  },
+  {
+    id: "bow_falcon_mark",
+    weaponId: "bow",
+    name: "隼印狙击",
+    targetParts: ["core"],
+    targetLabel: "胸部",
+    kind: "single",
+    kindLabel: "单体",
+    damage: 96,
+    armorDamage: 18,
+    actionCost: 4,
+    color: "#79d7f2",
+    icon: "./assets/skill-icons/bow-core-burst.webp",
+    tags: ["标记"],
+    desc: "锁定核心后蓄力射击，目标已裸露时显著提高最终伤害。",
+  },
 ];
 
 function portraitWeaponTreeSkills(weaponId) {
@@ -1890,12 +1966,46 @@ function portraitWeaponTreeSkills(weaponId) {
 }
 
 function initializePortraitSkillSelection() {
-  const initialSkillIds = carriedWeapons()
-    .flatMap((weapon) => portraitWeaponTreeSkills(weapon.id).slice(0, DEFAULT_PORTRAIT_SKILLS_PER_WEAPON).map((skill) => skill.id))
+  const equippedWeapons = carriedWeapons();
+  const skillsPerWeapon = equippedWeapons.length === 1
+    ? WEAPON_SKILL_SLOT_COUNT
+    : DEFAULT_PORTRAIT_SKILLS_PER_WEAPON;
+  const initialSkillIds = equippedWeapons
+    .flatMap((weapon) => portraitWeaponTreeSkills(weapon.id).slice(0, skillsPerWeapon).map((skill) => skill.id))
     .slice(0, WEAPON_SKILL_SLOT_COUNT);
   loadoutState.portraitEquippedSkillIds = Array.from(
     { length: WEAPON_SKILL_SLOT_COUNT },
     (_, slotIndex) => initialSkillIds[slotIndex] || null,
+  );
+}
+
+function syncPortraitSkillSelectionToWeapons() {
+  const equippedWeapons = carriedWeapons();
+  const allowedSkills = equippedWeapons.flatMap((weapon) => portraitWeaponTreeSkills(weapon.id));
+  const allowedIds = new Set(allowedSkills.map((skill) => skill.id));
+  const quotaPerWeapon = equippedWeapons.length === 1
+    ? WEAPON_SKILL_SLOT_COUNT
+    : DEFAULT_PORTRAIT_SKILLS_PER_WEAPON;
+  const preferredIds = equippedWeapons
+    .flatMap((weapon) => portraitWeaponTreeSkills(weapon.id).slice(0, quotaPerWeapon).map((skill) => skill.id));
+  const nextIds = [];
+  const weaponCounts = new Map();
+
+  const addWithinQuota = (skillId) => {
+    if (!skillId || !allowedIds.has(skillId) || nextIds.includes(skillId) || nextIds.length >= WEAPON_SKILL_SLOT_COUNT) return;
+    const skill = portraitSkillById(skillId);
+    const weaponId = skill?.weaponId;
+    if (!weaponId || (weaponCounts.get(weaponId) || 0) >= quotaPerWeapon) return;
+    nextIds.push(skillId);
+    weaponCounts.set(weaponId, (weaponCounts.get(weaponId) || 0) + 1);
+  };
+
+  (loadoutState.portraitEquippedSkillIds || []).forEach(addWithinQuota);
+  [...preferredIds, ...allowedSkills.map((skill) => skill.id)].forEach(addWithinQuota);
+
+  loadoutState.portraitEquippedSkillIds = Array.from(
+    { length: WEAPON_SKILL_SLOT_COUNT },
+    (_, slotIndex) => nextIds[slotIndex] || null,
   );
 }
 
@@ -1909,10 +2019,41 @@ function portraitEquippedSkillCount() {
   return loadoutState.portraitEquippedSkillIds.filter(Boolean).length;
 }
 
+function portraitSkillQuotaForWeapon(weaponId) {
+  const equippedWeapons = carriedWeapons();
+  if (!equippedWeapons.some((weapon) => weapon.id === weaponId)) return 0;
+  return equippedWeapons.length === 1 ? WEAPON_SKILL_SLOT_COUNT : DEFAULT_PORTRAIT_SKILLS_PER_WEAPON;
+}
+
+function portraitEquippedSkillCountForWeapon(weaponId, slots = loadoutState.portraitEquippedSkillIds) {
+  return (slots || []).reduce((count, skillId) => {
+    return count + (portraitSkillById(skillId)?.weaponId === weaponId ? 1 : 0);
+  }, 0);
+}
+
+function canAssignPortraitSkillToSlot(skillId, slotIndex) {
+  const skill = portraitSkillById(skillId);
+  const targetIndex = Number(slotIndex);
+  if (!skill || !Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= WEAPON_SKILL_SLOT_COUNT) return false;
+  const quota = portraitSkillQuotaForWeapon(skill.weaponId);
+  if (quota <= 0) return false;
+  const slots = Array.from(
+    { length: WEAPON_SKILL_SLOT_COUNT },
+    (_, index) => loadoutState.portraitEquippedSkillIds[index] || null,
+  );
+  const sourceIndex = slots.indexOf(skillId);
+  if (sourceIndex >= 0) return true;
+  const replacedSkill = portraitSkillById(slots[targetIndex]);
+  const currentWeaponCount = portraitEquippedSkillCountForWeapon(skill.weaponId, slots);
+  const nextWeaponCount = currentWeaponCount + (replacedSkill?.weaponId === skill.weaponId ? 0 : 1);
+  return nextWeaponCount <= quota;
+}
+
 function assignPortraitSkillToSlot(skillId, slotIndex) {
   const skill = portraitSkillById(skillId);
   const targetIndex = Number(slotIndex);
   if (!skill || !Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= WEAPON_SKILL_SLOT_COUNT) return false;
+  if (!canAssignPortraitSkillToSlot(skillId, targetIndex)) return false;
 
   const slots = Array.from(
     { length: WEAPON_SKILL_SLOT_COUNT },
@@ -1946,26 +2087,37 @@ function portraitArmorAttachments(partId) {
     .map(([, item]) => item);
 }
 
-function renderPortraitSkillNode(weapon, skill, slotIndex, branchIndex) {
+function portraitSkillNodePosition(slotIndex, branchIndex, branchCount) {
+  if (branchCount === 1) return portraitSingleWeaponPositions[slotIndex];
   const basePosition = portraitSkillBranchPositions[slotIndex];
-  const x = branchIndex === 0 ? basePosition.x : 100 - basePosition.x;
+  return {
+    x: branchIndex === 0 ? basePosition.x : 100 - basePosition.x,
+    y: basePosition.y,
+  };
+}
+
+function renderPortraitSkillNode(weapon, skill, slotIndex, branchIndex, branchCount) {
+  const basePosition = portraitSkillNodePosition(slotIndex, branchIndex, branchCount);
+  const x = basePosition.x;
   const active = skill?.id === loadoutState.activePortraitSkillId;
   const equipped = skill ? isPortraitSkillEquipped(skill.id) : false;
+  const weaponCarried = isWeaponCarried(weapon.id);
   const category = skill ? skillCategoryLabel(skill) : null;
   const style = skill
     ? `--node-x:${x}%;--node-y:${basePosition.y}%;--skill-color:${skill.color || "#79c8ef"}`
     : `--node-x:${x}%;--node-y:${basePosition.y}%;--skill-color:#52606b`;
   return `
     <button
-      class="portrait-skill-node${skill ? " unlocked" : " locked"}${equipped ? " equipped" : " unequipped"}${active ? " active" : ""}"
+      class="portrait-skill-node${skill ? " unlocked" : " locked"}${equipped ? " equipped" : " unequipped"}${skill && !weaponCarried ? " preview-only" : ""}${active ? " active" : ""}"
       style="${style}"
       type="button"
-      ${skill ? `data-portrait-skill="${skill.id}" data-portrait-weapon="${weapon.id}" draggable="true"` : "disabled"}
-      aria-label="${skill ? skill.name : `未解锁技能 ${slotIndex + 1}`}"
+      ${skill ? `data-portrait-skill="${skill.id}" data-portrait-weapon="${weapon.id}"${weaponCarried ? ` draggable="true"` : ""}` : "disabled"}
+      aria-label="${skill ? `${skill.name}，${equipped ? "已装备" : weaponCarried ? "未装备，可拖动" : "仅预览"}` : `未解锁技能 ${slotIndex + 1}`}"
     >
       <span class="portrait-skill-node-art">
         ${skill?.icon ? `<img src="${skill.icon}" alt="" draggable="false" />` : `<i>锁</i>`}
       </span>
+      ${equipped ? `<span class="portrait-skill-equipped-mark" aria-hidden="true">&#10003;</span>` : ""}
       ${skill ? `<b class="portrait-skill-cost-badge" aria-label="消耗${skill.actionCost || 0}点行动力">${skill.actionCost || 0}</b>` : ""}
       <span class="portrait-skill-node-copy${category ? ` is-${category.key}` : ""}">
         <small>${category?.label || "未解锁"}</small>
@@ -1974,28 +2126,33 @@ function renderPortraitSkillNode(weapon, skill, slotIndex, branchIndex) {
   `;
 }
 
-function renderPortraitSkillConnections(branchIndex, skillCount) {
-  const points = portraitSkillBranchPositions.map((position) => ({
-    x: (branchIndex === 0 ? position.x : 100 - position.x) * 10,
-    y: position.y * 12,
-  })).slice(0, skillCount);
+function renderPortraitSkillConnections(branchIndex, skillCount, branchCount) {
+  const points = Array.from({ length: skillCount }, (_, slotIndex) => {
+    const position = portraitSkillNodePosition(slotIndex, branchIndex, branchCount);
+    return { x: position.x * 10, y: position.y * 12 };
+  });
   if (points.length < 2) return "";
 
-  const path = points.slice(0, -1).reduce((commands, point, index) => {
-    const previous = points[index - 1] || point;
-    const next = points[index + 1];
-    const afterNext = points[index + 2] || next;
-    const control1 = {
-      x: point.x + (next.x - previous.x) / 6,
-      y: point.y + (next.y - previous.y) / 6,
-    };
-    const control2 = {
-      x: next.x - (afterNext.x - point.x) / 6,
-      y: next.y - (afterNext.y - point.y) / 6,
-    };
-    return `${commands} C ${control1.x.toFixed(1)} ${control1.y.toFixed(1)}, ${control2.x.toFixed(1)} ${control2.y.toFixed(1)}, ${next.x} ${next.y}`;
-  }, `M ${points[0].x} ${points[0].y}`);
-  return `<path class="portrait-tree-link branch-${branchIndex + 1} unlocked" d="${path}" />`;
+  const pointGroups = branchCount === 1
+    ? [points.slice(0, 3), points.slice(3)]
+    : [points];
+  return pointGroups.map((group) => {
+    const path = group.slice(0, -1).reduce((commands, point, index) => {
+      const previous = group[index - 1] || point;
+      const next = group[index + 1];
+      const afterNext = group[index + 2] || next;
+      const control1 = {
+        x: point.x + (next.x - previous.x) / 6,
+        y: point.y + (next.y - previous.y) / 6,
+      };
+      const control2 = {
+        x: next.x - (afterNext.x - point.x) / 6,
+        y: next.y - (afterNext.y - point.y) / 6,
+      };
+      return `${commands} C ${control1.x.toFixed(1)} ${control1.y.toFixed(1)}, ${control2.x.toFixed(1)} ${control2.y.toFixed(1)}, ${next.x} ${next.y}`;
+    }, `M ${group[0].x} ${group[0].y}`);
+    return `<path class="portrait-tree-link branch-${branchIndex + 1}${branchCount === 1 ? " single-branch" : ""} unlocked" d="${path}" />`;
+  }).join("");
 }
 
 function portraitSelectedSkill() {
@@ -2106,7 +2263,10 @@ function bindPortraitSkillDrag(root) {
         drag.ghost.style.left = `${event.clientX}px`;
         drag.ghost.style.top = `${event.clientY}px`;
       }
-      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-portrait-skill-slot]");
+      const candidateTarget = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-portrait-skill-slot]");
+      const target = candidateTarget && canAssignPortraitSkillToSlot(skillId, candidateTarget.dataset.portraitSkillSlot)
+        ? candidateTarget
+        : null;
       drag.over?.classList.remove("drag-over");
       drag.over = target || null;
       drag.over?.classList.add("drag-over");
@@ -2116,7 +2276,10 @@ function bindPortraitSkillDrag(root) {
       if (!drag || drag.pointerId !== event.pointerId || drag.source !== source) return;
       if (drag.moved) {
         portraitSuppressSkillClickUntil = Date.now() + 450;
-        const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-portrait-skill-slot]");
+        const candidateTarget = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-portrait-skill-slot]");
+        const target = candidateTarget && canAssignPortraitSkillToSlot(skillId, candidateTarget.dataset.portraitSkillSlot)
+          ? candidateTarget
+          : null;
         const slotIndex = target?.dataset.portraitSkillSlot;
         if (target) {
           clearPortraitSkillDrag(root);
@@ -2134,7 +2297,7 @@ function bindPortraitSkillDrag(root) {
     target.addEventListener("dragover", (event) => {
       const skillId = portraitDraggedSkillId || event.dataTransfer?.getData("text/plain");
       const skill = portraitSkillById(skillId);
-      if (!skill) return;
+      if (!skill || !canAssignPortraitSkillToSlot(skillId, target.dataset.portraitSkillSlot)) return;
       event.preventDefault();
       if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
       targets.forEach((slot) => slot.classList.toggle("drag-over", slot === target));
@@ -2180,8 +2343,16 @@ function renderPortraitSkillPopup(skill, weapon) {
   const secondTag = skill.tags?.[0] || skill.kindLabel || "技能";
   const equipped = isPortraitSkillEquipped(skill.id);
   const equippedCount = portraitEquippedSkillCount();
-  const atCapacity = !equipped && equippedCount >= WEAPON_SKILL_SLOT_COUNT;
-  const capacityTitle = "已达到六个装备槽上限；也可将该技能拖到任意格子直接替换";
+  const weaponQuota = portraitSkillQuotaForWeapon(skill.weaponId);
+  const weaponSkillCount = portraitEquippedSkillCountForWeapon(skill.weaponId);
+  const weaponNotCarried = weaponQuota <= 0;
+  const atCapacity = !equipped && (equippedCount >= WEAPON_SKILL_SLOT_COUNT || weaponSkillCount >= weaponQuota);
+  const capacityTitle = weaponNotCarried
+    ? "该武器尚未携带，仅可查看技能"
+    : weaponSkillCount >= weaponQuota
+      ? `该武器最多装备 ${weaponQuota} 个技能；可拖到同武器技能格直接替换`
+      : "已达到六个装备槽上限；可将该技能拖到任意格子直接替换";
+  const equipButtonLabel = weaponNotCarried ? "未携带" : equipped ? "卸下" : "装备";
   return `
     <button class="portrait-skill-popup-backdrop" type="button" data-close-skill-popup aria-label="关闭技能说明"></button>
     <aside class="portrait-skill-popup" style="--popup-color:${skill.color || "#e5b651"}" aria-label="${skill.name}技能说明">
@@ -2197,7 +2368,7 @@ function renderPortraitSkillPopup(skill, weapon) {
       <footer>
         <span>目标 <b>${skill.targetLabel || "自身"}</b></span>
         <span>消耗 <b>${skill.actionCost || 0}</b> 行动力</span>
-        <button class="portrait-popup-equip${equipped ? " equipped" : ""}" type="button" data-toggle-skill-equip="${skill.id}" ${atCapacity ? `disabled title="${capacityTitle}"` : ""}>${equipped ? "卸下" : "装备"}</button>
+        <button class="portrait-popup-equip${equipped ? " equipped" : ""}" type="button" data-toggle-skill-equip="${skill.id}" ${(atCapacity || weaponNotCarried) ? `disabled title="${capacityTitle}"` : ""}>${equipButtonLabel}</button>
       </footer>
       <button class="portrait-popup-close" type="button" data-close-skill-popup aria-label="关闭">×</button>
     </aside>
@@ -2246,12 +2417,15 @@ function renderLoadoutPresetPage() {
   const boss = currentBossBlueprint();
   const equippedWeapons = carriedWeapons();
   const treeOpen = loadoutState.portraitLoadoutView === "weapon";
-  const selectedWeapon = equippedWeapons.find((weapon) => weapon.id === loadoutState.activePortraitWeaponId)
-    || equippedWeapons[0];
-  const activeArmorSet = portraitArmorSetTabs.find((armorSet) => armorSet.id === loadoutState.activePortraitArmorSetId)
-    || portraitArmorSetTabs.find((armorSet) => armorSet.unlocked)
-    || portraitArmorSetTabs[0];
-
+  const previewWeapon = treeOpen
+    ? weapons.find((weapon) => weapon.id === loadoutState.portraitTreePreviewWeaponId && isWeaponUnlocked(weapon))
+    : null;
+  const treeWeapons = previewWeapon ? [previewWeapon] : equippedWeapons;
+  const selectedWeapon = treeWeapons.find((weapon) => weapon.id === loadoutState.activePortraitWeaponId)
+    || treeWeapons[0];
+  const visibleTreeWeapons = treeWeapons.length > 2 && selectedWeapon
+    ? [selectedWeapon]
+    : treeWeapons;
   if (ui.enterBattleFromPresetsBtn) ui.enterBattleFromPresetsBtn.hidden = treeOpen;
 
   if (ui.presetOwnedCount) ui.presetOwnedCount.textContent = `${loadoutPresets.length} 套`;
@@ -2302,15 +2476,13 @@ function renderLoadoutPresetPage() {
       ${isLoadoutItemEquipped("无人机") ? `<img class="preset-character-drone" src="./assets/loadout-drone.png" alt="" />` : ""}
     </section>
 
-    <section class="portrait-skill-tree${treeOpen ? " open" : ""}" data-active-branch="${Math.max(0, equippedWeapons.findIndex((weapon) => weapon.id === selectedWeapon?.id))}" aria-hidden="${!treeOpen}">
+    <section class="portrait-skill-tree${treeOpen ? " open" : ""}" data-active-branch="${Math.max(0, visibleTreeWeapons.findIndex((weapon) => weapon.id === selectedWeapon?.id))}" aria-hidden="${!treeOpen}">
       <svg class="portrait-tree-lines" viewBox="0 0 1000 1200" preserveAspectRatio="none" aria-hidden="true">
-        <ellipse cx="500" cy="830" rx="430" ry="680" />
-        <ellipse cx="500" cy="825" rx="310" ry="545" />
-        ${equippedWeapons.map((weapon, branchIndex) => renderPortraitSkillConnections(branchIndex, portraitWeaponTreeSkills(weapon.id).length)).join("")}
+        ${visibleTreeWeapons.map((weapon, branchIndex) => renderPortraitSkillConnections(branchIndex, portraitWeaponTreeSkills(weapon.id).length, visibleTreeWeapons.length)).join("")}
         <path class="portrait-tree-root-link branch-1" d="M 340 1188 C 370 1280 430 1398 500 1450" />
         <path class="portrait-tree-root-link branch-2" d="M 660 1188 C 630 1280 570 1398 500 1450" />
       </svg>
-      ${equippedWeapons.map((weapon, branchIndex) => {
+      ${visibleTreeWeapons.map((weapon, branchIndex) => {
         const weaponSkills = portraitWeaponTreeSkills(weapon.id);
         const branchActive = weapon.id === selectedWeapon?.id;
         return `
@@ -2320,15 +2492,26 @@ function renderLoadoutPresetPage() {
               weaponSkills[slotIndex] || null,
               slotIndex,
               branchIndex,
+              visibleTreeWeapons.length,
             )).join("")}
           </div>
         `;
       }).join("")}
+      ${treeWeapons.length > 2 ? `
+        <nav class="portrait-tree-weapon-switcher" aria-label="切换武器技能分支">
+          ${treeWeapons.map((weapon) => `
+            <button class="${weapon.id === selectedWeapon?.id ? "active" : ""}" type="button" data-portrait-tree-weapon="${weapon.id}" aria-label="${weapon.name}" title="${weapon.name}">
+              ${renderWeaponPreview(weapon, weapon.short)}
+            </button>
+          `).join("")}
+        </nav>
+      ` : ""}
     </section>
 
-    <button class="portrait-tree-armor-root${treeOpen ? " tree-open" : ""}" type="button" data-portrait-armor-root aria-label="${activeArmorSet.label}">
-      <span><img src="${activeArmorSet.image}" alt="" draggable="false" /></span>
-      <small>战甲</small>
+    <button class="portrait-tree-armor-root portrait-tree-weapon-root${treeOpen ? " tree-open" : ""}" type="button" data-portrait-armor-root aria-label="打开武器技能树">
+      <span><img src="./assets/weapon-skill-tree-emblem.png" alt="" draggable="false" /></span>
+      <b class="portrait-tree-weapon-count">${equippedWeapons.length}</b>
+      <small>武器</small>
     </button>
 
     ${renderPortraitSkillLoadout(equippedWeapons, treeOpen)}
@@ -2355,6 +2538,8 @@ function renderLoadoutPresetPage() {
       const treeIsOpen = loadoutState.portraitLoadoutView === "weapon";
       const firstWeapon = carriedWeapons()[0];
       loadoutState.portraitLoadoutView = treeIsOpen ? "armor" : "weapon";
+      loadoutState.portraitTreePreviewWeaponId = "";
+      loadoutState.portraitTreeReturnStep = "presets";
       loadoutState.activePortraitWeaponId = treeIsOpen ? "" : loadoutState.activePortraitWeaponId || firstWeapon?.id || "";
       loadoutState.activePortraitSkillId = "";
       loadoutState.portraitSkillPopupOpen = false;
@@ -2366,6 +2551,17 @@ function renderLoadoutPresetPage() {
       if (Date.now() < portraitSuppressSkillClickUntil) return;
       const skillId = button.dataset.slotSkill || "";
       const skill = portraitSkillById(skillId);
+      if (loadoutState.portraitLoadoutView !== "weapon") {
+        const firstWeapon = carriedWeapons()[0];
+        loadoutState.portraitLoadoutView = "weapon";
+        loadoutState.portraitTreePreviewWeaponId = "";
+        loadoutState.portraitTreeReturnStep = "presets";
+        loadoutState.activePortraitWeaponId = skill?.weaponId || firstWeapon?.id || "";
+        loadoutState.activePortraitSkillId = "";
+        loadoutState.portraitSkillPopupOpen = false;
+        renderLoadoutPresetPage();
+        return;
+      }
       if (!skill) return;
       loadoutState.activePortraitWeaponId = skill.weaponId || "";
       loadoutState.activePortraitSkillId = skillId;
@@ -2379,6 +2575,14 @@ function renderLoadoutPresetPage() {
       loadoutState.activePortraitWeaponId = button.dataset.portraitWeapon;
       loadoutState.activePortraitSkillId = button.dataset.portraitSkill;
       loadoutState.portraitSkillPopupOpen = true;
+      renderLoadoutPresetPage();
+    });
+  });
+  ui.loadoutPresetStage.querySelectorAll("[data-portrait-tree-weapon]").forEach((button) => {
+    button.addEventListener("click", () => {
+      loadoutState.activePortraitWeaponId = button.dataset.portraitTreeWeapon;
+      loadoutState.activePortraitSkillId = "";
+      loadoutState.portraitSkillPopupOpen = false;
       renderLoadoutPresetPage();
     });
   });
@@ -2408,8 +2612,14 @@ function isBossUnlocked(boss) {
   return boss && !boss.locked;
 }
 
+function isWeaponCompatibleWithActiveArmor(weapon) {
+  if (!weapon) return false;
+  const armorSet = portraitArmorSetTabs.find((armor) => armor.id === loadoutState.activePortraitArmorSetId);
+  return !armorSet?.weaponIds?.length || armorSet.weaponIds.includes(weapon.id);
+}
+
 function isWeaponUnlocked(weapon) {
-  return weapon && !weapon.locked;
+  return weapon && !weapon.locked && isWeaponCompatibleWithActiveArmor(weapon);
 }
 
 function currentBossBlueprint() {
@@ -2590,45 +2800,60 @@ function isWeaponCarried(weaponId) {
   return carriedWeapons().some((weapon) => weapon.id === weaponId);
 }
 
-function toggleLoadoutWeapon(weaponId) {
+function selectedWeaponSlots() {
+  const selected = loadoutState.selectedWeaponIds || [];
+  return Array.from({ length: weaponLoadoutSlots.length }, (_, index) => selected[index] || null);
+}
+
+function normalizeSelectedWeaponsForActiveArmor() {
+  const compatibleIds = (loadoutState.selectedWeaponIds || [])
+    .filter((id, index, all) => all.indexOf(id) === index)
+    .filter((id) => weapons.some((weapon) => weapon.id === id && isWeaponUnlocked(weapon)))
+    .slice(0, weaponLoadoutSlots.length);
+  if (!compatibleIds.length) {
+    const fallbackWeapon = weapons.find(isWeaponUnlocked);
+    if (fallbackWeapon) compatibleIds.push(fallbackWeapon.id);
+  }
+  loadoutState.selectedWeaponIds = compatibleIds;
+  loadoutState.activeWeaponSlot = Math.min(loadoutState.activeWeaponSlot || 0, Math.max(0, compatibleIds.length - 1));
+}
+
+function assignLoadoutWeaponToSlot(weaponId, slotIndex) {
   const targetWeapon = weapons.find((weapon) => weapon.id === weaponId);
   if (!isWeaponUnlocked(targetWeapon)) return;
-  const selected = [...(loadoutState.selectedWeaponIds || [])];
-  const slotIndex = Math.max(0, Math.min(1, loadoutState.activeWeaponSlot || 0));
-  while (selected.length < 2) {
-    const fallback = weapons.find((weapon) => isWeaponUnlocked(weapon) && !selected.includes(weapon.id));
-    selected.push(fallback?.id || weapons.find(isWeaponUnlocked)?.id || weapons[0].id);
-  }
-  if (selected[slotIndex] === weaponId) {
-    return;
-  }
-  const existingIndex = selected.findIndex((id, index) => id === weaponId && index !== slotIndex);
+  const selected = selectedWeaponSlots();
+  const targetIndex = Math.max(0, Math.min(weaponLoadoutSlots.length - 1, Number(slotIndex) || 0));
+  if (selected[targetIndex] === weaponId) return;
+  const existingIndex = selected.indexOf(weaponId);
   if (existingIndex >= 0) {
-    const previous = selected[slotIndex];
-    selected[slotIndex] = weaponId;
-    selected[existingIndex] = previous;
+    [selected[existingIndex], selected[targetIndex]] = [selected[targetIndex], selected[existingIndex]];
   } else {
-    selected[slotIndex] = weaponId;
+    selected[targetIndex] = weaponId;
   }
-  loadoutState.selectedWeaponIds = selected.slice(0, 2);
+  loadoutState.selectedWeaponIds = selected;
+  loadoutState.activeWeaponSlot = targetIndex;
   loadoutState.activeWeaponDetailId = weaponId;
+  loadoutState.weaponDetailOpen = false;
   loadoutState.weaponSkillPickerOpen = false;
-  if (loadoutState.prebattleStep === "weapons") {
-    renderPrebattleWeapons();
-  } else {
-    renderPrebattleLoadout();
-  }
+  syncPortraitSkillSelectionToWeapons();
+  renderPrebattleWeapons();
+}
+
+function toggleLoadoutWeapon(weaponId) {
+  assignLoadoutWeaponToSlot(weaponId, loadoutState.activeWeaponSlot || 0);
 }
 
 function removeLoadoutWeapon(weaponId) {
-  const selected = [...(loadoutState.selectedWeaponIds || [])];
+  const selected = selectedWeaponSlots();
   const equippedIndex = selected.indexOf(weaponId);
   if (equippedIndex < 0) return;
-  selected.splice(equippedIndex, 1);
-  loadoutState.selectedWeaponIds = selected;
-  loadoutState.activeWeaponSlot = Math.min(equippedIndex, Math.max(0, selected.length - 1));
-  loadoutState.activeWeaponDetailId = weaponId;
+  if (selected.filter(Boolean).length <= 1) return;
+  selected[equippedIndex] = null;
+  loadoutState.selectedWeaponIds = selected.filter(Boolean);
+  loadoutState.activeWeaponSlot = Math.min(equippedIndex, Math.max(0, loadoutState.selectedWeaponIds.length));
+  loadoutState.activeWeaponDetailId = loadoutState.selectedWeaponIds[loadoutState.activeWeaponSlot] || "";
   loadoutState.weaponSkillPickerOpen = false;
+  syncPortraitSkillSelectionToWeapons();
   renderPrebattleWeapons();
 }
 
@@ -2651,7 +2876,7 @@ function createState() {
     phase: "玩家回合准备",
     turn: "player_start",
     round: 1,
-    selectedWeaponId: equippedWeapons[0]?.id || weapons[0].id,
+    selectedWeaponId: equippedWeapons.find((weapon) => weapon.id === "greatsword")?.id || equippedWeapons[0]?.id || weapons[0].id,
     player: {
       hp: playerMaxHp,
       maxHp: playerMaxHp,
@@ -3336,71 +3561,233 @@ function renderWeaponDetailPanel(weapon) {
   ui.weaponDetailPanel.querySelector("[data-remove-weapon]")?.addEventListener("click", () => removeLoadoutWeapon(weapon.id));
 }
 
+function clearPortraitWeaponDrag(root) {
+  portraitDraggedWeaponId = "";
+  portraitDraggedWeaponSource = "";
+  root.classList.remove("dragging-equipped-weapon");
+  root.querySelectorAll(".is-dragging, .drag-over").forEach((node) => {
+    node.classList.remove("is-dragging", "drag-over");
+  });
+  document.querySelector(".weapon-selection-drag-ghost")?.remove();
+  portraitWeaponPointerDrag = null;
+}
+
+function bindPortraitWeaponDrag(root) {
+  const sources = root.querySelectorAll("[data-weapon-drag]");
+  const targets = root.querySelectorAll("[data-weapon-drop-slot]");
+
+  sources.forEach((source) => {
+    const weaponId = source.dataset.weaponDrag;
+    const dragSource = source.dataset.weaponDragSource || "gallery";
+    source.addEventListener("dragstart", (event) => {
+      portraitDraggedWeaponId = weaponId;
+      portraitDraggedWeaponSource = dragSource;
+      source.classList.add("is-dragging");
+      root.classList.toggle("dragging-equipped-weapon", dragSource === "carry");
+      event.dataTransfer?.setData("text/plain", weaponId);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+    });
+    source.addEventListener("dragend", () => clearPortraitWeaponDrag(root));
+    source.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" || event.button !== 0) return;
+      portraitWeaponPointerDrag = {
+        pointerId: event.pointerId,
+        source,
+        weaponId,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+        over: null,
+        dragSource,
+      };
+      source.setPointerCapture?.(event.pointerId);
+    });
+    source.addEventListener("pointermove", (event) => {
+      const drag = portraitWeaponPointerDrag;
+      if (!drag || drag.pointerId !== event.pointerId || drag.source !== source) return;
+      const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+      if (!drag.moved && distance < 8) return;
+      event.preventDefault();
+      if (!drag.moved) {
+        drag.moved = true;
+        portraitDraggedWeaponId = weaponId;
+        portraitDraggedWeaponSource = dragSource;
+        source.classList.add("is-dragging");
+        root.classList.toggle("dragging-equipped-weapon", dragSource === "carry");
+        const ghost = document.createElement("span");
+        ghost.className = "weapon-selection-drag-ghost";
+        const image = source.querySelector("img")?.cloneNode();
+        if (image) ghost.append(image);
+        document.body.append(ghost);
+        drag.ghost = ghost;
+      }
+      if (drag.ghost) {
+        drag.ghost.style.left = `${event.clientX}px`;
+        drag.ghost.style.top = `${event.clientY}px`;
+      }
+      const pointElement = document.elementFromPoint(event.clientX, event.clientY);
+      const target = pointElement?.closest("[data-weapon-drop-slot], [data-weapon-unequip-drop]");
+      drag.over?.closest(".weapon-carry-card, [data-weapon-unequip-drop]")?.classList.remove("drag-over");
+      drag.over = target || null;
+      drag.over?.closest(".weapon-carry-card, [data-weapon-unequip-drop]")?.classList.add("drag-over");
+    }, { passive: false });
+    const finishPointerDrag = (event) => {
+      const drag = portraitWeaponPointerDrag;
+      if (!drag || drag.pointerId !== event.pointerId || drag.source !== source) return;
+      if (drag.moved) {
+        portraitSuppressWeaponClickUntil = Date.now() + 450;
+        const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-weapon-drop-slot], [data-weapon-unequip-drop]");
+        if (target) {
+          const shouldUnequip = target.hasAttribute("data-weapon-unequip-drop");
+          const targetIndex = Number(target.dataset.weaponDropSlot);
+          clearPortraitWeaponDrag(root);
+          if (shouldUnequip) removeLoadoutWeapon(weaponId);
+          else assignLoadoutWeaponToSlot(weaponId, targetIndex);
+          return;
+        }
+      }
+      clearPortraitWeaponDrag(root);
+    };
+    source.addEventListener("pointerup", finishPointerDrag);
+    source.addEventListener("pointercancel", finishPointerDrag);
+  });
+
+  targets.forEach((target) => {
+    const wrapper = target.closest(".weapon-carry-card");
+    target.addEventListener("dragover", (event) => {
+      const weaponId = portraitDraggedWeaponId || event.dataTransfer?.getData("text/plain");
+      if (!isWeaponUnlocked(weapons.find((weapon) => weapon.id === weaponId))) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      root.querySelectorAll(".weapon-carry-card").forEach((slot) => slot.classList.toggle("drag-over", slot === wrapper));
+    });
+    target.addEventListener("dragleave", () => wrapper?.classList.remove("drag-over"));
+    target.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const weaponId = portraitDraggedWeaponId || event.dataTransfer?.getData("text/plain");
+      const targetIndex = Number(target.dataset.weaponDropSlot);
+      clearPortraitWeaponDrag(root);
+      assignLoadoutWeaponToSlot(weaponId, targetIndex);
+    });
+  });
+
+  const unequipTarget = root.querySelector("[data-weapon-unequip-drop]");
+  unequipTarget?.addEventListener("dragover", (event) => {
+    const weaponId = portraitDraggedWeaponId || event.dataTransfer?.getData("text/plain");
+    if (!isWeaponCarried(weaponId)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    unequipTarget.classList.add("drag-over");
+  });
+  unequipTarget?.addEventListener("dragleave", () => unequipTarget.classList.remove("drag-over"));
+  unequipTarget?.addEventListener("drop", (event) => {
+    event.preventDefault();
+    const weaponId = portraitDraggedWeaponId || event.dataTransfer?.getData("text/plain");
+    clearPortraitWeaponDrag(root);
+    removeLoadoutWeapon(weaponId);
+  });
+}
+
+function openWeaponTreePreview(weaponId) {
+  if (Date.now() < portraitSuppressWeaponClickUntil) return;
+  const weapon = weapons.find((item) => item.id === weaponId);
+  if (!isWeaponUnlocked(weapon)) return;
+  loadoutState.portraitLoadoutView = "weapon";
+  loadoutState.portraitTreePreviewWeaponId = weapon.id;
+  loadoutState.portraitTreeReturnStep = "weapons";
+  loadoutState.activePortraitWeaponId = weapon.id;
+  loadoutState.activePortraitSkillId = "";
+  loadoutState.portraitSkillPopupOpen = false;
+  setPrebattleStep("presets");
+}
+
 function renderPrebattleWeapons() {
   if (!ui.weaponCarrySlots || !ui.weaponGallery) return;
+  normalizeSelectedWeaponsForActiveArmor();
   ensureWeaponSkillLoadout();
   renderPrebattleFlow();
   updateEnterBattleState();
-  const selected = loadoutState.selectedWeaponIds || [];
-  const activeSlot = Math.max(0, Math.min(1, loadoutState.activeWeaponSlot || 0));
-  const detailWeapon = weapons.find((weapon) => weapon.id === loadoutState.activeWeaponDetailId)
-    || weapons.find((weapon) => weapon.id === selected[activeSlot])
-    || weapons.find(isWeaponUnlocked)
-    || weapons[0];
-  loadoutState.activeWeaponDetailId = detailWeapon?.id || "";
-  if (ui.weaponSelectionTitle) {
-    ui.weaponSelectionTitle.textContent = `当前装配槽：${weaponLoadoutSlots[activeSlot].label}`;
+  const selected = selectedWeaponSlots();
+  const selectedCount = selected.filter(Boolean).length;
+  const activeSlot = Math.max(0, Math.min(weaponLoadoutSlots.length - 1, loadoutState.activeWeaponSlot || 0));
+
+  if (ui.weaponSelectedCount) ui.weaponSelectedCount.textContent = `${selectedCount} 把`;
+  if (ui.weaponArmorOptions) {
+    ui.weaponArmorOptions.innerHTML = `
+      <span class="weapon-armor-title">战甲</span>
+      ${portraitArmorSetTabs.map((armorSet) => {
+        const active = armorSet.id === loadoutState.activePortraitArmorSetId;
+        return `
+          <button class="weapon-armor-option${active ? " active" : ""}${armorSet.unlocked ? " unlocked" : " locked"}" type="button" data-weapon-armor="${armorSet.id}" ${armorSet.unlocked ? "" : "disabled"} aria-pressed="${active}">
+            <span><img src="${armorSet.image}" alt="" />${armorSet.unlocked ? "" : "<i>锁</i>"}</span>
+            <small>${armorSet.label}</small>
+            <em>${armorSet.unlocked ? (active ? "已选择" : "可选择") : "未解锁"}</em>
+          </button>
+        `;
+      }).join("")}
+    `;
+    ui.weaponArmorOptions.querySelectorAll("[data-weapon-armor]").forEach((button) => {
+      button.addEventListener("click", () => {
+        loadoutState.activePortraitArmorSetId = button.dataset.weaponArmor;
+        renderPrebattleWeapons();
+      });
+    });
   }
 
   ui.weaponCarrySlots.innerHTML = "";
+  ui.weaponCarrySlots.classList.toggle("single-weapon", selectedCount === 1);
+  ui.weaponCarrySlots.classList.toggle("dual-weapon", selectedCount > 1);
   weaponLoadoutSlots.forEach((slot, index) => {
     const weapon = weapons.find((item) => item.id === selected[index]);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `weapon-carry-card${index === activeSlot ? " active" : ""}`;
-    button.dataset.weaponSlot = slot.id;
-    button.innerHTML = `
-      <span>${slot.label}</span>
-      <span class="weapon-carry-box${weapon ? " equipped" : ""}">
-        ${renderWeaponPreview(weapon, "+")}
-      </span>
+    const optionalAdd = !weapon && selectedCount === 1;
+    const slotEl = document.createElement("article");
+    slotEl.className = `weapon-carry-card${slot.preferred ? " preferred" : " reserve"}${index === activeSlot ? " active" : ""}${weapon ? " filled" : " empty"}${optionalAdd ? " optional-add" : ""}`;
+    slotEl.innerHTML = `
+      <button class="weapon-carry-target" type="button" data-weapon-drop-slot="${index}" ${weapon ? `data-weapon-drag="${weapon.id}" data-weapon-drag-source="carry" draggable="true"` : ""} aria-label="${weapon ? `${slot.label}，${weapon.name}` : `${slot.label}，空槽`}">
+        <i class="weapon-slot-order">${index + 1}</i>
+        <span class="weapon-carry-box${weapon ? " equipped" : ""}">${renderWeaponPreview(weapon, "+")}</span>
+        <small>${weapon?.name || (optionalAdd ? "副武器 · 可选" : "空槽")}</small>
+      </button>
     `;
-    button.addEventListener("click", () => {
+    slotEl.querySelector("[data-weapon-drop-slot]")?.addEventListener("click", () => {
+      if (weapon) {
+        openWeaponTreePreview(weapon.id);
+        return;
+      }
       loadoutState.activeWeaponSlot = index;
-      if (weapon) loadoutState.activeWeaponDetailId = weapon.id;
-      loadoutState.weaponDetailOpen = Boolean(weapon);
-      loadoutState.weaponSkillPickerOpen = false;
       renderPrebattleWeapons();
     });
-    ui.weaponCarrySlots.appendChild(button);
+    ui.weaponCarrySlots.appendChild(slotEl);
   });
 
   ui.weaponGallery.innerHTML = "";
-  weapons.forEach((weapon) => {
+  weapons.slice(0, MAX_WEAPON_GALLERY_ITEMS).forEach((weapon) => {
     const equippedIndex = selected.indexOf(weapon.id);
-    const active = selected[activeSlot] === weapon.id;
+    const armorCompatible = isWeaponCompatibleWithActiveArmor(weapon);
     const locked = !isWeaponUnlocked(weapon);
-    const statusLabel = locked ? "未解锁" : "";
+    const lockedLabel = armorCompatible ? "未解锁" : "战甲不适配";
     const card = document.createElement("button");
     card.type = "button";
-    card.className = `weapon-gallery-card${weapon.id === detailWeapon.id ? " active" : ""}${equippedIndex >= 0 ? " equipped" : ""}${locked ? " locked" : ""}`;
+    card.className = `weapon-gallery-card${equippedIndex >= 0 ? " equipped" : ""}${locked ? " locked" : ""}`;
     card.disabled = locked;
+    card.draggable = !locked;
     card.dataset.weapon = weapon.id;
+    card.setAttribute("aria-label", `${weapon.name}，${weapon.role}${locked ? `，${lockedLabel}` : "，查看技能树"}`);
+    card.title = locked ? `${weapon.name} · ${lockedLabel}` : `${weapon.name} · 查看技能树`;
+    if (!locked) card.dataset.weaponDrag = weapon.id;
+    if (!locked) card.dataset.weaponDragSource = "gallery";
     card.innerHTML = `
+      ${locked ? `<i class="weapon-gallery-lock" aria-hidden="true">锁</i>` : ""}
       <span class="weapon-gallery-art">${renderWeaponPreview(weapon, weapon.short)}</span>
-      <span class="weapon-gallery-name">${weapon.name}</span>
-      <small>${statusLabel || (equippedIndex >= 0 ? `已装配：${weaponLoadoutSlots[equippedIndex]?.label}` : weapon.role)}</small>
+      <span class="weapon-gallery-tag">${weapon.role}</span>
     `;
-    card.addEventListener("click", () => {
-      loadoutState.activeWeaponDetailId = weapon.id;
-      loadoutState.weaponDetailOpen = true;
-      loadoutState.weaponSkillPickerOpen = false;
-      renderPrebattleWeapons();
-    });
+    if (!locked) {
+      card.addEventListener("click", () => openWeaponTreePreview(weapon.id));
+    }
     ui.weaponGallery.appendChild(card);
   });
 
-  renderWeaponDetailPanel(detailWeapon);
+  bindPortraitWeaponDrag(document.querySelector('[data-prebattle-page="weapons"]'));
 }
 
 function renderBossTrendIcon(trend) {
@@ -5145,29 +5532,30 @@ function renderSkillEditor(skill, source) {
 
 function updateEnterBattleState() {
   if (!ui.enterBattleBtn) return;
-  const selectedWeapons = loadoutState.selectedWeaponIds || [];
+  const selectedWeapons = (loadoutState.selectedWeaponIds || []).filter(Boolean);
   const readyBoss = bossBlueprints.some((boss) => boss.id === loadoutState.selectedBossId && isBossUnlocked(boss));
-  const readyWeapons = selectedWeapons.length === 2
-    && new Set(selectedWeapons).size === 2
+  const readyWeapons = selectedWeapons.length >= 1
+    && selectedWeapons.length <= weaponLoadoutSlots.length
+    && new Set(selectedWeapons).size === selectedWeapons.length
     && selectedWeapons.every((id) => weapons.some((weapon) => weapon.id === id && isWeaponUnlocked(weapon)));
   const ready = readyBoss && readyWeapons;
   ui.enterBattleBtn.disabled = !ready;
-  ui.enterBattleBtn.title = ready ? "进入挑战" : "请选择 Boss，并携带 2 件武器";
+  ui.enterBattleBtn.title = ready ? "进入挑战" : "请选择 Boss，并携带至少 1 把武器";
   if (ui.nextSkillBtn) {
     ui.nextSkillBtn.disabled = !ready;
-    ui.nextSkillBtn.title = ready ? "进入技能配置" : "请选择 Boss，并携带 2 件武器";
+    ui.nextSkillBtn.title = ready ? "进入技能配置" : "请选择 Boss，并携带至少 1 把武器";
   }
   if (ui.nextSkillFromWeaponBtn) {
     ui.nextSkillFromWeaponBtn.disabled = !ready;
-    ui.nextSkillFromWeaponBtn.title = ready ? "进入技能配置" : "请选择 Boss，并携带 2 件武器";
+    ui.nextSkillFromWeaponBtn.title = ready ? "进入技能装配" : "请至少选择 1 把武器";
   }
   if (ui.enterBattleFromLinksBtn) {
     ui.enterBattleFromLinksBtn.disabled = !ready;
-    ui.enterBattleFromLinksBtn.title = ready ? "进入挑战" : "请选择 Boss，并携带 2 件武器";
+    ui.enterBattleFromLinksBtn.title = ready ? "进入挑战" : "请选择 Boss，并携带至少 1 把武器";
   }
   if (ui.enterBattleFromPresetsBtn) {
     ui.enterBattleFromPresetsBtn.disabled = !ready;
-    ui.enterBattleFromPresetsBtn.title = ready ? "进入挑战" : "请选择 Boss，并携带 2 件武器";
+    ui.enterBattleFromPresetsBtn.title = ready ? "进入挑战" : "请选择 Boss，并携带至少 1 把武器";
   }
 }
 
@@ -5468,11 +5856,12 @@ function buildWeaponControls() {
     button.style.setProperty("--weapon-counter-angle", `${-angle}deg`);
     button.setAttribute("aria-label", `${weapon.name} ${weapon.role}`);
     button.title = `${weapon.name} · ${weapon.role}`;
+    const battleIcon = weapon.battleIcon || weapon.icon;
     button.innerHTML = `
       <span class="weapon-icon-frame">
-        ${weapon.icon ? `<img src="${weapon.icon}" alt="${weapon.name}" />` : `<span class="weapon-icon-fallback">${weapon.short}</span>`}
+        ${battleIcon ? `<img src="${battleIcon}" alt="${weapon.name}" />` : `<span class="weapon-icon-fallback">${weapon.short}</span>`}
       </span>
-      <small>${weapon.role}</small>
+      <small>${weapon.name}</small>
     `;
     button.addEventListener("click", () => selectWeapon(weapon.id));
     ui.weaponButtons.appendChild(button);
@@ -5481,9 +5870,10 @@ function buildWeaponControls() {
 
 function renderWeaponToggle() {
   const weapon = currentWeapon();
-  ui.weaponToggle.innerHTML = weapon.icon
-    ? `<img src="${weapon.icon}" alt="${weapon.name}" />`
-    : `<span class="weapon-icon-fallback">${weapon.short}</span>`;
+  const battleIcon = weapon.battleIcon || weapon.icon;
+  ui.weaponToggle.innerHTML = battleIcon
+    ? `<img src="${battleIcon}" alt="${weapon.name}" /><small>${weapon.name}</small>`
+    : `<span class="weapon-icon-fallback">${weapon.short}</span><small>${weapon.name}</small>`;
   ui.weaponToggle.title = weapon.name;
 }
 
@@ -5603,21 +5993,22 @@ function updateSkillWheelGuideGeometry() {
   // Measure all three fixed slots so pages with fewer skills keep the same arc.
   const buttonRects = measureSkillWheelSlotRects(buttons[0]);
   if (buttonRects.length === 0) return false;
-  const skillRadius = Math.max(...buttonRects.map((rect) => Math.hypot(
-    rect.left + rect.width / 2 - centerX,
-    rect.top + rect.height / 2 - centerY,
-  )));
+  const slotVectors = buttonRects.map((rect) => ({
+    x: rect.left + rect.width / 2 - centerX,
+    y: rect.top + rect.height / 2 - centerY,
+  }));
+  const skillRadius = slotVectors.reduce((sum, point) => sum + Math.hypot(point.x, point.y), 0) / slotVectors.length;
   const buttonRadius = Math.max(...buttonRects.map((rect) => Math.max(rect.width, rect.height))) / 2;
   const cx = centerX - guideRect.left;
   const cy = centerY - guideRect.top;
-  const unclampedRadius = skillRadius + buttonRadius + 9;
-  const radius = Math.max(1, Math.min(unclampedRadius, cx - 4, cy - 4));
-  const startAngle = -Math.PI / 2;
-  const endAngle = -Math.PI;
-  const startX = cx;
-  const startY = cy - radius;
-  const endX = cx - radius;
-  const endY = cy;
+  const radius = Math.max(1, skillRadius + buttonRadius + 10);
+  const slotAngles = slotVectors.map((point) => Math.atan2(point.y, point.x));
+  const startAngle = Math.max(...slotAngles);
+  const endAngle = Math.min(...slotAngles);
+  const startX = cx + Math.cos(startAngle) * radius;
+  const startY = cy + Math.sin(startAngle) * radius;
+  const endX = cx + Math.cos(endAngle) * radius;
+  const endY = cy + Math.sin(endAngle) * radius;
   const pathData = `M ${startX.toFixed(2)} ${startY.toFixed(2)} A ${radius.toFixed(2)} ${radius.toFixed(2)} 0 0 0 ${endX.toFixed(2)} ${endY.toFixed(2)}`;
   const svg = ui.skillWheelGesturePath?.closest("svg");
   svg?.setAttribute("viewBox", `0 0 ${guideRect.width.toFixed(2)} ${guideRect.height.toFixed(2)}`);
@@ -5933,12 +6324,12 @@ function showSkillDescription(skill) {
   if (!ui.skillDescriptionOverlay || !ui.skillDescriptionPanel) return;
   const targetText = skill.targetLabel || (skill.targetParts?.length ? skill.targetParts.join("、") : "自身");
   const tags = [
-    skill.kindLabel,
     skill.damage > 0 ? "伤害" : null,
     skill.armorBreaker ? "破甲" : null,
     ...(skill.tags || []),
   ].filter(Boolean);
   const effectText = skillDescriptionEffectText(skill, targetText);
+  const skillCategory = skillCategoryLabel(skill);
   ui.skillDescriptionPanel.innerHTML = `
     <header>
       <span class="skill-description-icon" style="--skill-color:${skill.color}">
@@ -5948,6 +6339,7 @@ function showSkillDescription(skill) {
         <small>${currentWeapon().name}</small>
         <span class="skill-description-title-line">
           <strong id="skillDescriptionName">${skill.name}</strong>
+          <i class="skill-description-primary-type is-${skillCategory.key}">${skillCategory.label}</i>
           <span class="skill-description-tags">${[...new Set(tags)]
             .map((tag) => `<i class="${skillDescriptionTagClass(tag)}">${tag}</i>`)
             .join("")}</span>
@@ -8952,30 +9344,46 @@ ui.resetBtn.addEventListener("click", resetGame);
 ui.gmHideBattleUi?.addEventListener("click", () => setBattleUiHidden(true));
 ui.gmShowBattleUi?.addEventListener("click", () => setBattleUiHidden(false));
 document.getElementById("enterBattleBtn")?.addEventListener("click", enterBattleFromLoadout);
-ui.nextLoadoutBtn?.addEventListener("click", () => setPrebattleStep("presets"));
+ui.nextLoadoutBtn?.addEventListener("click", () => setPrebattleStep("weapons"));
 ui.nextLoadoutFromCharacterBtn?.addEventListener("click", () => setPrebattleStep("battle"));
 ui.nextSkillBtn?.addEventListener("click", () => setPrebattleStep("skills"));
 ui.skillDescriptionOverlay?.addEventListener("click", hideSkillDescription);
 ui.skillDescriptionPanel?.addEventListener("click", (event) => event.stopPropagation());
 bindSkillWheelGesture();
-ui.nextSkillFromWeaponBtn?.addEventListener("click", () => setPrebattleStep("skills"));
+ui.nextSkillFromWeaponBtn?.addEventListener("click", () => {
+  syncPortraitSkillSelectionToWeapons();
+  loadoutState.portraitLoadoutView = "armor";
+  loadoutState.portraitTreePreviewWeaponId = "";
+  loadoutState.portraitTreeReturnStep = "presets";
+  loadoutState.activePortraitWeaponId = "";
+  loadoutState.activePortraitSkillId = "";
+  loadoutState.portraitSkillPopupOpen = false;
+  setPrebattleStep("presets");
+});
 ui.backToBossBtn?.addEventListener("click", () => setPrebattleStep("presets"));
 ui.backToBossFromCharacterBtn?.addEventListener("click", () => setPrebattleStep("boss"));
-ui.backToCharacterFromWeaponBtn?.addEventListener("click", () => setPrebattleStep("presets"));
+ui.backToCharacterFromWeaponBtn?.addEventListener("click", () => setPrebattleStep("boss"));
 ui.backToLoadoutBtn?.addEventListener("click", () => setPrebattleStep("presets"));
 ui.backToCharacterFromLinksBtn?.addEventListener("click", () => setPrebattleStep("character"));
 ui.backToLoadoutFromArmorBoardBtn?.addEventListener("click", () => setPrebattleStep("loadout"));
 ui.enterBattleFromLinksBtn?.addEventListener("click", enterBattleFromLoadout);
 ui.backToBossFromPresetsBtn?.addEventListener("click", () => {
   if (loadoutState.portraitLoadoutView === "weapon") {
+    const returnToWeaponSelection = loadoutState.portraitTreeReturnStep === "weapons";
     loadoutState.portraitLoadoutView = "armor";
+    loadoutState.portraitTreePreviewWeaponId = "";
+    loadoutState.portraitTreeReturnStep = "presets";
     loadoutState.activePortraitWeaponId = "";
     loadoutState.activePortraitSkillId = "";
     loadoutState.portraitSkillPopupOpen = false;
+    if (returnToWeaponSelection) {
+      setPrebattleStep("weapons");
+      return;
+    }
     renderLoadoutPresetPage();
     return;
   }
-  setPrebattleStep("boss");
+  setPrebattleStep("weapons");
 });
 ui.enterBattleFromPresetsBtn?.addEventListener("click", enterBattleFromLoadout);
 ui.characterTabButtons.forEach((button) => {
@@ -9047,7 +9455,7 @@ function turnDisplayName() {
 
 renderDemoVersion();
 initializeDefaultLoadout();
-applyLoadoutPreset(loadoutState.activeLoadoutPresetId, { render: false });
+applyLoadoutPreset(loadoutState.activeLoadoutPresetId, { render: false, preserveWeapons: true });
 renderPrebattleLoadout();
 resetGame();
 if ("requestIdleCallback" in window) {
