@@ -137,6 +137,1022 @@ button:disabled {
   transform: translateX(-50%);
 }
 
+/* Portrait pre-battle loadout: 1080 x 1920 logical canvas */
+.prebattle-screen[data-step="presets"] {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background: #020507;
+}
+
+body:has(.prebattle-screen[data-step="presets"]:not(.is-hidden)) {
+  overflow: hidden;
+}
+
+body:has(.prebattle-screen[data-step="presets"]:not(.is-hidden)) > .demo-version {
+  display: none;
+}
+
+.prebattle-screen[data-step="presets"] > .prebattle-bg,
+.prebattle-screen[data-step="presets"] > .prebattle-top {
+  display: none;
+}
+
+.prebattle-screen[data-step="presets"] .preset-page {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  background: #020507;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-shell {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 8% 5.5% minmax(0, 1fr) 8% 6.5%;
+  grid-template-areas:
+    "head"
+    "library"
+    "stage"
+    "analysis"
+    "actions";
+  gap: 0;
+  width: min(100vw, calc(100dvh * 9 / 16));
+  height: min(100dvh, calc(100vw * 16 / 9));
+  aspect-ratio: 9 / 16;
+  padding: 0;
+  overflow: hidden;
+  color: #eef5f8;
+  background: #091116;
+  box-shadow: 0 0 64px rgba(0, 0, 0, 0.82);
+  isolation: isolate;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-shell::before {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background: url("./assets/arena-bg.jpeg") center / cover no-repeat;
+  filter: saturate(0.58) brightness(0.42);
+  content: "";
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-shell::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: rgba(3, 9, 13, 0.48);
+  box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.7);
+  content: "";
+  pointer-events: none;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-head {
+  grid-area: head;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: max(18px, env(safe-area-inset-top)) 22px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(3, 8, 12, 0.84);
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-head > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-head > span small {
+  color: #e9b950;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-head > span strong {
+  color: #f5f8f9;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-head > span p {
+  overflow: hidden;
+  margin: 0;
+  color: #84939b;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prebattle-screen[data-step="presets"] .preset-boss-context {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 128px;
+  padding: 5px 7px 5px 5px;
+  border: 1px solid rgba(220, 91, 69, 0.5);
+  border-left: 3px solid #dc604b;
+  background: rgba(25, 13, 12, 0.76);
+}
+
+.prebattle-screen[data-step="presets"] .preset-boss-portrait {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #151a1e;
+}
+
+.prebattle-screen[data-step="presets"] .preset-boss-context small,
+.prebattle-screen[data-step="presets"] .preset-boss-context em {
+  font-size: 7px;
+}
+
+.prebattle-screen[data-step="presets"] .preset-boss-context strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prebattle-screen[data-step="presets"] .preset-library {
+  grid-area: library;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 15, 20, 0.74);
+}
+
+.prebattle-screen[data-step="presets"] .preset-library > strong {
+  color: #788890;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.prebattle-screen[data-step="presets"] .preset-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+  overflow: visible;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 1px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  background: rgba(14, 22, 28, 0.82);
+  color: #b6c2c8;
+  text-align: left;
+  transform: none;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-card:hover,
+.prebattle-screen[data-step="presets"] .loadout-preset-card:focus-visible {
+  border-color: rgba(105, 203, 235, 0.56);
+  background: #14242c;
+  transform: none;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-card.active {
+  border-color: #dfb554;
+  background: #463617;
+  box-shadow: inset 0 -2px 0 #edc76b;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-card small {
+  overflow: hidden;
+  color: #7e929d;
+  font-size: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-card strong {
+  overflow: hidden;
+  color: #e7edf0;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prebattle-screen[data-step="presets"] .preset-stage {
+  grid-area: stage;
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+}
+
+.portrait-stage-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.42;
+  background-image:
+    linear-gradient(rgba(102, 168, 187, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(102, 168, 187, 0.08) 1px, transparent 1px);
+  background-size: 9% 5%;
+  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 78%, transparent);
+  pointer-events: none;
+}
+
+.portrait-armor-tabs {
+  position: absolute;
+  z-index: 8;
+  top: 8%;
+  bottom: 19%;
+  left: 14px;
+  display: grid;
+  grid-template-rows: auto repeat(5, 1fr);
+  align-items: center;
+  gap: 5px;
+  width: 58px;
+}
+
+.portrait-rail-title {
+  display: grid;
+  place-items: center;
+  min-height: 24px;
+  border-left: 2px solid #56bed8;
+  background: rgba(9, 22, 28, 0.86);
+  color: #d9f2f8;
+  font-size: 9px;
+  font-weight: 950;
+}
+
+.portrait-armor-tab {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  width: 58px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8f9ea6;
+}
+
+.portrait-armor-tab > span {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border: 1px solid rgba(147, 171, 183, 0.48);
+  border-radius: 50%;
+  background: #101a20;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.38);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.portrait-armor-tab img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portrait-armor-tab b {
+  font-size: 11px;
+}
+
+.portrait-armor-tab small {
+  padding: 1px 4px;
+  background: rgba(5, 11, 15, 0.82);
+  color: currentColor;
+  font-size: 7px;
+  font-weight: 900;
+}
+
+.portrait-armor-tab:hover > span,
+.portrait-armor-tab:focus-visible > span,
+.portrait-armor-tab.active > span {
+  border-color: #71dcf0;
+  box-shadow: 0 0 0 3px rgba(73, 180, 207, 0.18), 0 0 16px rgba(66, 194, 222, 0.42);
+  transform: translateX(3px);
+}
+
+.portrait-armor-tab.active {
+  color: #bff6ff;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-character {
+  position: absolute;
+  z-index: 2;
+  inset: 4% 4% 17% 13%;
+  display: grid;
+  place-items: end center;
+  overflow: visible;
+  transition: opacity 220ms ease, filter 220ms ease, transform 220ms ease;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-character.tree-open {
+  opacity: 0.14;
+  filter: grayscale(0.7);
+  transform: scale(0.97);
+}
+
+.prebattle-screen[data-step="presets"] .preset-live-state {
+  top: 18px;
+  left: 13%;
+  padding: 4px 7px;
+  border: 1px solid rgba(94, 214, 158, 0.3);
+  background: rgba(6, 19, 17, 0.74);
+  font-size: 8px;
+}
+
+.prebattle-screen[data-step="presets"] .preset-character-art {
+  width: 90%;
+  height: 96%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 24px 28px rgba(0, 0, 0, 0.62));
+}
+
+.prebattle-screen[data-step="presets"] .preset-character-drone {
+  top: 19%;
+  left: 68%;
+  width: 19%;
+}
+
+.portrait-skill-tree {
+  position: absolute;
+  z-index: 6;
+  inset: 2% 2% 17% 13%;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(14px) scale(0.98);
+  transition: opacity 220ms ease, transform 220ms ease, visibility 220ms;
+  pointer-events: none;
+}
+
+.portrait-skill-tree.open {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.portrait-skill-tree > header {
+  position: absolute;
+  z-index: 12;
+  top: 0;
+  right: 3%;
+  left: 3%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 9px 7px 11px;
+  border-left: 3px solid #65cce3;
+  background: rgba(5, 14, 19, 0.84);
+}
+
+.portrait-skill-tree > header > span {
+  display: grid;
+  gap: 1px;
+}
+
+.portrait-skill-tree > header small {
+  color: #6fc9dd;
+  font-size: 6px;
+  font-weight: 900;
+}
+
+.portrait-skill-tree > header strong {
+  font-size: 13px;
+}
+
+.portrait-skill-tree > header button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: #101b21;
+  color: #d9e4e9;
+  font-size: 18px;
+}
+
+.portrait-tree-lines {
+  position: absolute;
+  z-index: 1;
+  inset: 6% 0 0;
+  width: 100%;
+  height: 94%;
+  overflow: visible;
+}
+
+.portrait-tree-lines ellipse {
+  fill: none;
+  stroke: rgba(117, 168, 184, 0.16);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.portrait-tree-link {
+  fill: none;
+  stroke: rgba(91, 111, 121, 0.38);
+  stroke-width: 2;
+  stroke-dasharray: 5 6;
+  vector-effect: non-scaling-stroke;
+}
+
+.portrait-tree-link.unlocked {
+  stroke: rgba(91, 198, 226, 0.62);
+  stroke-dasharray: none;
+}
+
+.portrait-tree-root-link {
+  fill: none;
+  stroke: rgba(101, 206, 225, 0.76);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.portrait-skill-tree[data-active-branch="0"] .portrait-tree-root-link.branch-1,
+.portrait-skill-tree[data-active-branch="1"] .portrait-tree-root-link.branch-2 {
+  stroke: #8ce6f1;
+  filter: drop-shadow(0 0 4px rgba(86, 212, 232, 0.76));
+}
+
+.portrait-skill-tree[data-active-branch="0"] .portrait-tree-link.branch-1,
+.portrait-skill-tree[data-active-branch="1"] .portrait-tree-link.branch-2 {
+  stroke: #83dff1;
+  filter: drop-shadow(0 0 3px rgba(80, 205, 235, 0.68));
+}
+
+.portrait-skill-branch {
+  position: absolute;
+  z-index: 3;
+  inset: 6% 0 0;
+  transition: opacity 160ms ease;
+}
+
+.portrait-skill-branch:not(.active) .portrait-skill-node {
+  opacity: 0.56;
+}
+
+.portrait-skill-node {
+  position: absolute;
+  top: var(--node-y);
+  left: var(--node-x);
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #eaf3f6;
+  animation: portrait-node-enter 260ms ease both;
+}
+
+.portrait-skill-node:nth-child(2) { animation-delay: 25ms; }
+.portrait-skill-node:nth-child(3) { animation-delay: 50ms; }
+.portrait-skill-node:nth-child(4) { animation-delay: 75ms; }
+.portrait-skill-node:nth-child(5) { animation-delay: 100ms; }
+.portrait-skill-node:nth-child(6) { animation-delay: 125ms; }
+
+.portrait-skill-node-art {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--skill-color) 70%, #d7e7ec);
+  border-radius: 50%;
+  background: #10181d;
+  box-shadow: 0 0 0 3px rgba(3, 8, 12, 0.85), 0 4px 12px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.portrait-skill-node-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portrait-skill-node-art i {
+  color: #68747a;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.portrait-skill-node-copy {
+  position: absolute;
+  z-index: 4;
+  top: auto;
+  bottom: -6px;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: auto;
+  min-width: 30px;
+  height: 17px;
+  padding: 0 4px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  background: #56636b;
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.58);
+  pointer-events: none;
+}
+
+.portrait-skill-node-copy.is-single {
+  background: #b94752;
+}
+
+.portrait-skill-node-copy.is-group {
+  background: #287fa8;
+}
+
+.portrait-skill-node-copy.is-status {
+  background: #7553a1;
+}
+
+.portrait-skill-node-copy small {
+  color: #fff;
+  font-size: 7px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.portrait-skill-node:hover .portrait-skill-node-art,
+.portrait-skill-node:focus-visible .portrait-skill-node-art,
+.portrait-skill-node.active .portrait-skill-node-art {
+  box-shadow: 0 0 0 4px rgba(8, 17, 22, 0.9), 0 0 0 6px var(--skill-color), 0 0 18px var(--skill-color);
+  transform: scale(1.06);
+}
+
+.portrait-skill-node.locked {
+  opacity: 0.3;
+}
+
+.portrait-skill-node.locked .portrait-skill-node-art {
+  border-style: dashed;
+}
+
+.portrait-branch-label {
+  position: absolute;
+  bottom: 0;
+  left: 25%;
+  display: grid;
+  min-width: 90px;
+  padding: 5px 8px;
+  transform: translateX(-50%);
+  border-top: 2px solid #637781;
+  background: rgba(5, 12, 16, 0.88);
+  text-align: center;
+}
+
+.portrait-skill-branch.branch-2 .portrait-branch-label {
+  left: 75%;
+}
+
+.portrait-skill-branch.active .portrait-branch-label {
+  border-color: #79d5e8;
+}
+
+.portrait-branch-label small {
+  color: #788c96;
+  font-size: 6px;
+}
+
+.portrait-branch-label strong {
+  color: #e7f3f7;
+  font-size: 10px;
+}
+
+.portrait-tree-armor-root {
+  position: absolute;
+  z-index: 17;
+  top: 80.8%;
+  bottom: auto;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.portrait-tree-armor-root > span {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  overflow: hidden;
+  border: 2px solid #79d7e6;
+  border-radius: 50%;
+  background: #0a151a;
+  box-shadow: 0 0 0 4px #071014, 0 0 0 5px rgba(121, 215, 230, 0.42), 0 0 18px rgba(74, 197, 219, 0.5);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.portrait-tree-armor-root:hover > span,
+.portrait-tree-armor-root:focus-visible > span {
+  border-color: #b9f4ff;
+  box-shadow: 0 0 0 4px #071014, 0 0 0 6px rgba(121, 215, 230, 0.68), 0 0 24px rgba(74, 197, 219, 0.72);
+  transform: scale(1.05);
+}
+
+.portrait-tree-armor-root img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portrait-tree-armor-root small {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  min-width: 34px;
+  padding: 1px 6px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  background: #31899a;
+  color: #fff;
+  font-size: 7px;
+  font-weight: 950;
+  line-height: 1;
+  text-align: center;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.58);
+}
+
+.portrait-weapon-tabs {
+  position: absolute;
+  z-index: 10;
+  right: 12px;
+  bottom: 1.5%;
+  left: 78px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.portrait-weapon-tab {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 72px;
+  padding: 6px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  background: rgba(8, 15, 20, 0.92);
+  color: #c7d2d7;
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.portrait-weapon-tab:hover,
+.portrait-weapon-tab:focus-visible,
+.portrait-weapon-tab.active {
+  border-color: #e2b957;
+  background: #33280f;
+  box-shadow: inset 0 -3px 0 #efc767;
+  transform: translateY(-3px);
+}
+
+.portrait-weapon-art {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  overflow: hidden;
+  border: 1px solid rgba(228, 190, 98, 0.48);
+  border-radius: 50%;
+  background: #111a1f;
+}
+
+.portrait-weapon-art img {
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+}
+
+.portrait-weapon-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.portrait-weapon-copy small,
+.portrait-weapon-copy em {
+  overflow: hidden;
+  color: #82949d;
+  font-size: 6px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portrait-weapon-copy strong {
+  color: #f0f4f5;
+  font-size: 13px;
+}
+
+.portrait-weapon-tab.active .portrait-weapon-copy em {
+  color: #f1ca73;
+}
+
+.prebattle-screen[data-step="presets"] .preset-loadout-detail {
+  grid-area: analysis;
+  display: grid;
+  align-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px 18px;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  background: rgba(4, 10, 14, 0.9);
+}
+
+.portrait-detail-panel {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.portrait-detail-panel.skill-detail {
+  border-left: 3px solid var(--detail-color);
+  padding-left: 8px;
+}
+
+.portrait-detail-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: #111a20;
+  color: #dce6ea;
+  font-size: 11px;
+}
+
+.portrait-detail-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portrait-detail-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.portrait-detail-copy small {
+  color: #69c9dd;
+  font-size: 7px;
+}
+
+.portrait-detail-copy strong {
+  color: #f0f5f7;
+  font-size: 12px;
+}
+
+.portrait-detail-copy p {
+  overflow: hidden;
+  margin: 0;
+  color: #98a7ae;
+  font-size: 7px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portrait-detail-cost,
+.portrait-detail-state {
+  display: grid;
+  place-items: center;
+  min-width: 42px;
+  min-height: 36px;
+  padding: 4px;
+  border: 1px solid rgba(224, 179, 79, 0.4);
+  background: #2c230f;
+  color: #f0ca75;
+  font-size: 8px;
+}
+
+.portrait-detail-cost small {
+  color: #a58e5c;
+  font-size: 6px;
+}
+
+.portrait-detail-cost b {
+  font-size: 14px;
+}
+
+.prebattle-screen[data-step="presets"] .preset-page-actions {
+  grid-area: actions;
+  display: grid;
+  grid-template-columns: 0.72fr 1.28fr;
+  align-items: stretch;
+  gap: 8px;
+  padding: 9px 18px max(10px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(3, 8, 11, 0.96);
+}
+
+.prebattle-screen[data-step="presets"] .preset-page-actions button {
+  min-height: 0;
+  padding: 6px 12px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.prebattle-screen[data-step="presets"] .preset-page-actions .edit-appearance {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #121a1f;
+  color: #aab7bd;
+}
+
+.prebattle-screen[data-step="presets"] .preset-page-actions .enter-battle {
+  border-color: #d9a940;
+  background: #b77c1d;
+  color: #fff8e7;
+  box-shadow: inset 0 0 0 1px rgba(255, 225, 155, 0.24);
+}
+
+@keyframes portrait-node-enter {
+  from { opacity: 0; transform: translate(-50%, -42%) scale(0.84); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@media (min-width: 800px) and (min-height: 1100px) {
+  .prebattle-screen[data-step="presets"] .loadout-preset-head {
+    gap: 26px;
+    padding: 34px 48px 18px;
+  }
+
+  .prebattle-screen[data-step="presets"] .loadout-preset-head > span small { font-size: 16px; }
+  .prebattle-screen[data-step="presets"] .loadout-preset-head > span strong { font-size: 46px; }
+  .prebattle-screen[data-step="presets"] .loadout-preset-head > span p { font-size: 16px; }
+
+  .prebattle-screen[data-step="presets"] .preset-boss-context {
+    grid-template-columns: 68px minmax(0, 1fr);
+    gap: 14px;
+    min-width: 286px;
+    padding: 10px 16px 10px 10px;
+  }
+
+  .prebattle-screen[data-step="presets"] .preset-boss-portrait { width: 68px; height: 68px; }
+  .prebattle-screen[data-step="presets"] .preset-boss-context small,
+  .prebattle-screen[data-step="presets"] .preset-boss-context em { font-size: 13px; }
+  .prebattle-screen[data-step="presets"] .preset-boss-context strong { font-size: 20px; }
+
+  .prebattle-screen[data-step="presets"] .preset-library { gap: 16px; padding: 10px 40px; }
+  .prebattle-screen[data-step="presets"] .preset-library > strong { font-size: 14px; }
+  .prebattle-screen[data-step="presets"] .preset-list { gap: 10px; }
+  .prebattle-screen[data-step="presets"] .loadout-preset-card { min-height: 60px; padding: 8px 14px; }
+  .prebattle-screen[data-step="presets"] .loadout-preset-card small { font-size: 11px; }
+  .prebattle-screen[data-step="presets"] .loadout-preset-card strong { font-size: 16px; }
+
+  .portrait-armor-tabs {
+    top: 8%;
+    bottom: 19%;
+    left: 30px;
+    gap: 12px;
+    width: 116px;
+  }
+
+  .portrait-rail-title { min-height: 46px; font-size: 17px; }
+  .portrait-armor-tab { width: 116px; gap: 6px; }
+  .portrait-armor-tab > span { width: 86px; height: 86px; }
+  .portrait-armor-tab b { font-size: 20px; }
+  .portrait-armor-tab small { padding: 3px 8px; font-size: 13px; }
+
+  .prebattle-screen[data-step="presets"] .preset-live-state {
+    top: 28px;
+    padding: 7px 12px;
+    font-size: 14px;
+  }
+
+  .portrait-skill-tree > header { padding: 14px 18px 14px 22px; }
+  .portrait-skill-tree > header small { font-size: 11px; }
+  .portrait-skill-tree > header strong { font-size: 24px; }
+  .portrait-skill-tree > header button { width: 46px; height: 46px; font-size: 28px; }
+
+  .portrait-skill-node { width: 104px; height: 104px; }
+  .portrait-skill-node-art { width: 92px; height: 92px; }
+  .portrait-skill-node-art i { font-size: 17px; }
+  .portrait-skill-node-copy { top: auto; bottom: -7px; min-width: 46px; height: 27px; padding: 1px 7px; }
+  .portrait-skill-node-copy small { font-size: 9px; }
+  .portrait-branch-label { min-width: 168px; padding: 9px 14px; }
+  .portrait-branch-label small { font-size: 11px; }
+  .portrait-branch-label strong { font-size: 18px; }
+  .portrait-tree-armor-root { width: 112px; height: 112px; }
+  .portrait-tree-armor-root > span { width: 96px; height: 96px; }
+  .portrait-tree-armor-root small { bottom: -4px; min-width: 54px; padding: 2px 9px; font-size: 10px; }
+
+  .portrait-weapon-tabs { right: 26px; bottom: 1.5%; left: 158px; gap: 16px; }
+  .portrait-weapon-tab {
+    grid-template-columns: 98px minmax(0, 1fr);
+    gap: 14px;
+    min-height: 132px;
+    padding: 12px 14px;
+  }
+  .portrait-weapon-art { width: 98px; height: 98px; }
+  .portrait-weapon-copy small,
+  .portrait-weapon-copy em { font-size: 11px; }
+  .portrait-weapon-copy strong { font-size: 24px; }
+
+  .prebattle-screen[data-step="presets"] .preset-loadout-detail { padding: 14px 40px; }
+  .portrait-detail-panel { grid-template-columns: 84px minmax(0, 1fr) auto; gap: 17px; }
+  .portrait-detail-panel.skill-detail { padding-left: 15px; }
+  .portrait-detail-icon { width: 80px; height: 80px; font-size: 18px; }
+  .portrait-detail-copy small { font-size: 12px; }
+  .portrait-detail-copy strong { font-size: 22px; }
+  .portrait-detail-copy p { font-size: 13px; }
+  .portrait-detail-cost,
+  .portrait-detail-state { min-width: 78px; min-height: 64px; font-size: 14px; }
+  .portrait-detail-cost small { font-size: 11px; }
+  .portrait-detail-cost b { font-size: 24px; }
+
+  .prebattle-screen[data-step="presets"] .preset-page-actions {
+    gap: 16px;
+    padding: 16px 40px max(20px, env(safe-area-inset-bottom));
+  }
+  .prebattle-screen[data-step="presets"] .preset-page-actions button { padding: 11px 22px; font-size: 18px; }
+}
+
+@media (max-width: 420px) {
+  .prebattle-screen[data-step="presets"] .loadout-preset-head { gap: 8px; padding: 6px 10px; }
+  .prebattle-screen[data-step="presets"] .loadout-preset-head > span small { display: none; }
+  .prebattle-screen[data-step="presets"] .loadout-preset-head > span strong { font-size: 19px; }
+  .prebattle-screen[data-step="presets"] .loadout-preset-head > span p,
+  .prebattle-screen[data-step="presets"] .preset-boss-context em { display: none; }
+  .prebattle-screen[data-step="presets"] .preset-boss-context {
+    grid-template-columns: 30px minmax(0, 1fr);
+    min-width: 108px;
+    padding: 3px 5px 3px 3px;
+  }
+  .prebattle-screen[data-step="presets"] .preset-boss-portrait { width: 30px; height: 30px; }
+  .portrait-armor-tabs { left: 8px; width: 52px; }
+  .portrait-armor-tab { width: 52px; }
+  .portrait-armor-tab > span { width: 39px; height: 39px; }
+  .portrait-weapon-tabs { right: 8px; left: 65px; gap: 5px; }
+  .portrait-weapon-tab { grid-template-columns: 46px minmax(0, 1fr); min-height: 64px; padding: 5px; }
+  .portrait-weapon-art { width: 45px; height: 45px; }
+  .portrait-detail-copy p { max-width: 220px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portrait-skill-node { animation: none; }
+  .portrait-skill-tree,
+  .portrait-character,
+  .portrait-weapon-tab,
+  .portrait-armor-tab > span { transition: none; }
+}
+
 /* Reference combat composition: status at lower-left, actions stacked at right. */
 .combat-action-dock {
   position: absolute;
@@ -842,6 +1858,52 @@ button:disabled {
   .battle-skill-list.page-enter-next .battle-skill-card,
   .battle-skill-list.page-enter-prev .battle-skill-card {
     animation: none;
+  }
+}
+
+/* Even weapon dock and compact armor-set rail. */
+.prebattle-screen[data-step="presets"] .portrait-weapon-tabs {
+  right: 10px;
+  left: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-weapon-tab {
+  width: 100%;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tabs {
+  top: 4%;
+  bottom: auto;
+  grid-template-rows: auto repeat(3, auto);
+  align-content: start;
+  align-items: start;
+  gap: 9px;
+  height: auto;
+}
+
+@media (min-width: 800px) and (min-height: 1100px) {
+  .prebattle-screen[data-step="presets"] .portrait-weapon-tabs {
+    right: 28px;
+    left: 28px;
+    gap: 18px;
+  }
+
+  .prebattle-screen[data-step="presets"] .portrait-armor-tabs {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .prebattle-screen[data-step="presets"] .portrait-weapon-tabs {
+    right: 8px;
+    left: 8px;
+    gap: 6px;
+  }
+
+  .prebattle-screen[data-step="presets"] .portrait-armor-tabs {
+    gap: 7px;
   }
 }
 
@@ -9600,6 +10662,832 @@ button:disabled {
   .soul-armor-button {
     right: 14px;
     bottom: 56px;
+  }
+}
+
+/* Keep the fixed 9:16 canvas centered when the generic page switch rule is applied later. */
+.prebattle-screen[data-step="presets"] .preset-page {
+  display: grid;
+  place-items: center;
+}
+
+/* Simplified loadout composition: remove the three annotated information bands. */
+.prebattle-screen[data-step="presets"] .loadout-preset-shell {
+  grid-template-rows: minmax(0, 1fr) 6.5%;
+  grid-template-areas:
+    "stage"
+    "actions";
+}
+
+.prebattle-screen[data-step="presets"] .loadout-preset-head,
+.prebattle-screen[data-step="presets"] .preset-library,
+.prebattle-screen[data-step="presets"] .preset-loadout-detail,
+.prebattle-screen[data-step="presets"] .preset-live-state {
+  display: none;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-character {
+  inset: 3% 4% 17% 13%;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-skill-tree {
+  inset: 2% 2% 17% 13%;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tabs {
+  top: 4%;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tabs {
+  grid-template-rows: auto repeat(3, minmax(0, 1fr));
+  bottom: 30%;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tab {
+  position: relative;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tab > span {
+  position: relative;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tab > span > i {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(5, 9, 12, 0.68);
+  color: #aab3b8;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tab > em {
+  color: #66d8ed;
+  font-size: 6px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tab.locked {
+  color: #59636a;
+  opacity: 0.48;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tab.locked > span {
+  border-color: rgba(122, 133, 139, 0.28);
+  filter: grayscale(1);
+  box-shadow: none;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tab.locked > em {
+  color: #70797e;
+}
+
+@media (min-width: 800px) and (min-height: 1100px) {
+  .prebattle-screen[data-step="presets"] .portrait-armor-tab > em {
+    font-size: 11px;
+  }
+
+  .prebattle-screen[data-step="presets"] .portrait-armor-tab > span > i {
+    font-size: 17px;
+  }
+}
+
+.prebattle-screen[data-step="presets"] .portrait-armor-tabs {
+  bottom: auto;
+  grid-template-rows: auto repeat(3, auto);
+  align-content: start;
+  align-items: start;
+  gap: 9px;
+  height: auto;
+}
+
+@media (min-width: 800px) and (min-height: 1100px) {
+  .prebattle-screen[data-step="presets"] .portrait-armor-tabs {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .prebattle-screen[data-step="presets"] .portrait-armor-tabs {
+    gap: 7px;
+  }
+}
+
+.portrait-skill-popup-backdrop {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.portrait-skill-popup-backdrop:hover:not(:disabled),
+.portrait-skill-popup-backdrop:focus-visible,
+.portrait-skill-popup-backdrop:active {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: 0;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-skill-branch {
+  pointer-events: none;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-skill-node {
+  pointer-events: auto;
+}
+
+.portrait-skill-popup {
+  position: absolute;
+  z-index: 31;
+  top: 11%;
+  right: 4%;
+  left: 8%;
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 9px 12px;
+  min-width: 0;
+  padding: 12px 14px 8px;
+  border: 1px solid rgba(229, 184, 83, 0.78);
+  border-radius: 7px;
+  background: rgba(5, 10, 12, 0.97);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.58), inset 0 0 24px rgba(255, 255, 255, 0.025);
+  animation: portrait-popup-enter 170ms ease both;
+}
+
+.portrait-popup-icon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--popup-color) 72%, #f4e6bc);
+  border-radius: 50%;
+  background: #0d1519;
+  box-shadow: 0 0 0 3px rgba(227, 183, 81, 0.1);
+}
+
+.portrait-popup-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portrait-popup-main {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.portrait-popup-main > header {
+  display: flex;
+  align-items: end;
+  gap: 7px;
+  min-width: 0;
+  padding-right: 22px;
+}
+
+.portrait-popup-main > header > span:first-child {
+  display: grid;
+  min-width: 0;
+}
+
+.portrait-popup-main > header small {
+  color: #aab5ba;
+  font-size: 6px;
+}
+
+.portrait-popup-main > header strong {
+  overflow: hidden;
+  color: #f3f6f7;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portrait-popup-tags {
+  display: flex;
+  gap: 3px;
+  padding-bottom: 2px;
+}
+
+.portrait-popup-tags i {
+  padding: 2px 4px;
+  border: 1px solid color-mix(in srgb, var(--popup-color) 64%, #889399);
+  color: var(--popup-color);
+  font-size: 6px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.portrait-popup-main > p {
+  margin: 0;
+  color: #d2d9dc;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.portrait-popup-main > p b {
+  font-size: 9px;
+}
+
+.portrait-popup-main .damage-value,
+.portrait-popup-main .break-value {
+  color: #f0a43e;
+}
+
+.portrait-popup-main .weak-value {
+  color: #f3cf62;
+}
+
+.portrait-popup-main .bonus-value {
+  color: #7fdda2;
+}
+
+.portrait-popup-main > small {
+  overflow: hidden;
+  color: #85939a;
+  font-size: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portrait-skill-popup > footer {
+  grid-column: 1 / 3;
+  display: flex;
+  justify-content: end;
+  gap: 12px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #77868d;
+  font-size: 6px;
+}
+
+.portrait-skill-popup > footer b {
+  color: #dce6e9;
+}
+
+.portrait-popup-close {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #89969c;
+  font-size: 16px;
+}
+
+.portrait-popup-close:hover,
+.portrait-popup-close:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+@keyframes portrait-popup-enter {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (min-width: 800px) and (min-height: 1100px) {
+  .portrait-skill-popup {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 17px 22px;
+    padding: 22px 28px 15px;
+    border-radius: 8px;
+  }
+
+  .portrait-popup-icon {
+    width: 112px;
+    height: 112px;
+  }
+
+  .portrait-popup-main { gap: 9px; }
+  .portrait-popup-main > header { gap: 13px; padding-right: 38px; }
+  .portrait-popup-main > header small { font-size: 11px; }
+  .portrait-popup-main > header strong { font-size: 28px; }
+  .portrait-popup-tags { gap: 6px; }
+  .portrait-popup-tags i { padding: 3px 7px; font-size: 11px; }
+  .portrait-popup-main > p { font-size: 15px; }
+  .portrait-popup-main > p b { font-size: 17px; }
+  .portrait-popup-main > small { font-size: 11px; }
+  .portrait-skill-popup > footer { gap: 22px; padding-top: 11px; font-size: 11px; }
+  .portrait-popup-close { top: 12px; right: 12px; width: 38px; height: 38px; font-size: 25px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portrait-skill-popup { animation: none; }
+}
+
+/* Dedicated opaque skill-selection page. */
+.prebattle-screen[data-step="presets"] .preset-stage.skill-tree-mode {
+  background-color: #071014;
+  background-image: url("./assets/skill-tree-blue-stone-bg.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.prebattle-screen[data-step="presets"] .preset-stage.skill-tree-mode .portrait-stage-grid,
+.prebattle-screen[data-step="presets"] .preset-stage.skill-tree-mode .portrait-character,
+.prebattle-screen[data-step="presets"] .preset-stage.skill-tree-mode .portrait-armor-tabs {
+  display: none;
+}
+
+.prebattle-screen[data-step="presets"] .preset-stage.skill-tree-mode .portrait-skill-tree {
+  inset: 2% 2% 17%;
+  background: transparent;
+}
+
+.prebattle-screen[data-step="presets"] .preset-stage.skill-tree-mode .portrait-skill-tree > header,
+.prebattle-screen[data-step="presets"] .preset-stage.skill-tree-mode .portrait-branch-label {
+  background: rgba(5, 14, 19, 0.82);
+  backdrop-filter: blur(3px);
+}
+
+.portrait-tree-equip-count {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 1px solid rgba(113, 204, 225, 0.38);
+  background: #0b1c23;
+  color: #8fa3ac;
+  font-size: 7px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.portrait-tree-equip-count b {
+  color: #7fe0f1;
+  font-size: 10px;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-skill-node.equipped .portrait-skill-node-art {
+  opacity: 1;
+  filter: none;
+  box-shadow: 0 0 0 3px #071014, 0 0 0 5px color-mix(in srgb, var(--skill-color) 70%, white), 0 0 16px color-mix(in srgb, var(--skill-color) 68%, transparent);
+}
+
+.prebattle-screen[data-step="presets"] .portrait-skill-node.unequipped .portrait-skill-node-art {
+  border-color: #536067;
+  opacity: 0.38;
+  filter: grayscale(1);
+  box-shadow: 0 0 0 3px #071014;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-skill-node.unequipped .portrait-skill-node-copy {
+  opacity: 1;
+}
+
+.prebattle-screen[data-step="presets"] .portrait-skill-node.unequipped.active .portrait-skill-node-art,
+.prebattle-screen[data-step="presets"] .portrait-skill-node.unequipped:hover .portrait-skill-node-art,
+.prebattle-screen[data-step="presets"] .portrait-skill-node.unequipped:focus-visible .portrait-skill-node-art {
+  border-color: #c8d3d7;
+  opacity: 0.58;
+  filter: grayscale(1);
+  box-shadow: 0 0 0 3px #071014, 0 0 0 5px rgba(206, 220, 224, 0.62);
+}
+
+.portrait-popup-equip {
+  min-width: 62px;
+  min-height: 26px;
+  margin-left: auto;
+  padding: 4px 9px;
+  border: 1px solid #d8ad4c;
+  border-radius: 3px;
+  background: #9f6d17;
+  color: #fff6df;
+  font-size: 8px;
+  font-weight: 950;
+}
+
+.portrait-popup-equip:hover:not(:disabled),
+.portrait-popup-equip:focus-visible:not(:disabled) {
+  border-color: #f0ce7c;
+  background: #c08720;
+}
+
+.portrait-popup-equip.equipped {
+  border-color: #788991;
+  background: #172229;
+  color: #c0ccd1;
+}
+
+.portrait-popup-equip:disabled {
+  border-color: #4f5a60;
+  background: #182126;
+  color: #707c82;
+  opacity: 1;
+}
+
+@media (min-width: 800px) and (min-height: 1100px) {
+  .portrait-tree-equip-count {
+    padding: 7px 14px;
+    font-size: 12px;
+  }
+
+  .portrait-tree-equip-count b { font-size: 18px; }
+
+  .portrait-popup-equip {
+    min-width: 112px;
+    min-height: 44px;
+    padding: 7px 16px;
+    font-size: 14px;
+  }
+}
+
+/* Six fixed skill slots shared by the two three-skill weapon branches. */
+.portrait-skill-loadout {
+  position: absolute;
+  z-index: 18;
+  right: 2%;
+  bottom: 1.5%;
+  left: 2%;
+  display: grid;
+  gap: 0;
+  padding: 6px 7px;
+  border-top: 1px solid rgba(110, 208, 228, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(4, 12, 16, 0.95);
+  box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.34);
+}
+
+.portrait-skill-loadout > header {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  padding: 0 2px;
+}
+
+.portrait-skill-loadout > header strong {
+  color: #e8f2f5;
+  font-size: 8px;
+}
+
+.portrait-skill-loadout > header small {
+  overflow: hidden;
+  color: #73868f;
+  font-size: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portrait-skill-loadout-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.portrait-skill-slot {
+  position: relative;
+  display: grid;
+  grid-template-rows: 42px 12px;
+  place-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #87969d;
+  box-shadow: none;
+  transform: none;
+  touch-action: none;
+}
+
+.portrait-skill-slot:hover,
+.portrait-skill-slot:focus-visible,
+.portrait-skill-slot.active {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.portrait-skill-slot-art {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border: 1px dashed rgba(151, 170, 178, 0.42);
+  border-radius: 50%;
+  background: #0a1216;
+  box-shadow: inset 0 0 0 3px #071014;
+  transition: border-color 150ms ease, box-shadow 150ms ease, filter 150ms ease, transform 150ms ease;
+}
+
+.portrait-skill-slot-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portrait-skill-slot-art i {
+  color: #64737a;
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 300;
+}
+
+.portrait-skill-slot.filled .portrait-skill-slot-art {
+  border-style: solid;
+  border-color: #d9bc68;
+  box-shadow: inset 0 0 0 2px #071014, 0 0 0 1px rgba(218, 188, 104, 0.26);
+}
+
+.portrait-skill-slot > small {
+  overflow: hidden;
+  width: 100%;
+  color: #617078;
+  font-size: 6px;
+  font-weight: 900;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portrait-skill-slot.filled > small {
+  width: auto;
+  min-width: 30px;
+  padding: 2px 5px;
+  border-radius: 2px;
+  color: #fff;
+  line-height: 1;
+}
+
+.portrait-skill-slot-label.is-single {
+  background: #b94752;
+}
+
+.portrait-skill-slot-label.is-group {
+  background: #287fa8;
+}
+
+.portrait-skill-slot-label.is-status {
+  background: #7553a1;
+}
+
+.portrait-skill-slot-cost,
+.portrait-skill-cost-badge {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border: 1px solid #d6fbff;
+  border-radius: 50%;
+  background: #45c8d6;
+  color: #062128;
+  font-weight: 950;
+  line-height: 1;
+  box-shadow: 0 0 8px rgba(69, 200, 214, 0.42);
+}
+
+.portrait-skill-slot-cost {
+  top: -2px;
+  right: 1px;
+  width: 18px;
+  height: 18px;
+  font-size: 8px;
+}
+
+.portrait-skill-cost-badge {
+  top: -2px;
+  right: -2px;
+  width: 19px;
+  height: 19px;
+  font-size: 8px;
+}
+
+.portrait-skill-slot:hover .portrait-skill-slot-art,
+.portrait-skill-slot:focus-visible .portrait-skill-slot-art,
+.portrait-skill-slot.active .portrait-skill-slot-art {
+  border-color: #f1d27b;
+  box-shadow: inset 0 0 0 2px #071014, 0 0 0 2px #e8c567, 0 0 13px rgba(232, 197, 103, 0.5);
+  transform: translateY(-2px);
+}
+
+.portrait-skill-slot.drag-over .portrait-skill-slot-art {
+  border-color: #83e4ef;
+  border-style: solid;
+  box-shadow: inset 0 0 0 2px #071014, 0 0 0 3px #59cddd, 0 0 20px rgba(89, 205, 221, 0.72);
+  transform: scale(1.08);
+}
+
+.portrait-skill-node[draggable="true"],
+.portrait-skill-slot[draggable="true"] {
+  cursor: grab;
+  touch-action: none;
+}
+
+.portrait-skill-node.is-dragging,
+.portrait-skill-slot.is-dragging {
+  opacity: 0.35;
+}
+
+.portrait-skill-drag-ghost {
+  position: fixed;
+  z-index: 9999;
+  display: block;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  transform: translate(-50%, -50%);
+  border: 2px solid #72dbe7;
+  border-radius: 50%;
+  background: #081216;
+  box-shadow: 0 0 20px rgba(80, 215, 231, 0.78);
+  pointer-events: none;
+}
+
+.portrait-skill-drag-ghost img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.prebattle-screen[data-step="presets"] .preset-stage.skill-tree-mode .portrait-skill-tree {
+  bottom: 32%;
+}
+
+@media (min-width: 800px) and (min-height: 1100px) {
+  .portrait-skill-loadout {
+    gap: 6px;
+    padding: 9px 16px 12px;
+  }
+
+  .portrait-skill-loadout > header { gap: 13px; }
+  .portrait-skill-loadout > header strong { font-size: 15px; }
+  .portrait-skill-loadout > header small { font-size: 11px; }
+  .portrait-skill-loadout-grid { gap: 11px; }
+
+  .portrait-skill-slot {
+    grid-template-rows: 76px 20px;
+    gap: 4px;
+  }
+
+  .portrait-skill-slot-art {
+    width: 72px;
+    height: 72px;
+  }
+
+  .portrait-skill-slot-art i { font-size: 30px; }
+  .portrait-skill-slot > small { font-size: 11px; }
+  .portrait-skill-slot-cost {
+    top: -3px;
+    right: calc(50% - 47px);
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+
+  .portrait-skill-cost-badge {
+    top: -4px;
+    right: -4px;
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+
+  .portrait-skill-drag-ghost {
+    width: 78px;
+    height: 78px;
+  }
+}
+
+@media (max-width: 420px) {
+  .portrait-skill-loadout {
+    right: 1.5%;
+    left: 1.5%;
+    padding-right: 5px;
+    padding-left: 5px;
+  }
+
+  .portrait-skill-loadout-grid { gap: 2px; }
+  .portrait-skill-slot-cost { right: 0; }
+}
+
+/* Both loadout views share one rounded six-slot ring. */
+.portrait-skill-loadout {
+  inset: 0;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.portrait-skill-loadout .portrait-skill-loadout-grid {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.portrait-skill-loadout-arc {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 38%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.portrait-skill-loadout-arc path {
+  fill: none;
+  stroke: rgba(102, 202, 221, 0.36);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 3px rgba(77, 194, 217, 0.24));
+}
+
+.portrait-skill-loadout-arc .portrait-skill-loadout-frame {
+  fill: rgba(0, 0, 0, 0.7);
+  stroke: none;
+  filter: none;
+}
+
+.portrait-skill-loadout .portrait-skill-slot {
+  position: absolute;
+  grid-template-rows: 48px 12px;
+  width: 58px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+.portrait-skill-loadout .portrait-skill-slot-art {
+  width: 46px;
+  height: 46px;
+}
+
+.portrait-skill-loadout .portrait-skill-slot:nth-child(1) {
+  top: 85.3%;
+  left: 15%;
+}
+
+.portrait-skill-loadout .portrait-skill-slot:nth-child(2) {
+  top: 90.8%;
+  left: 27%;
+}
+
+.portrait-skill-loadout .portrait-skill-slot:nth-child(3) {
+  top: 93.8%;
+  left: 41.5%;
+}
+
+.portrait-skill-loadout .portrait-skill-slot:nth-child(4) {
+  top: 93.8%;
+  right: auto;
+  left: 58.5%;
+}
+
+.portrait-skill-loadout .portrait-skill-slot:nth-child(5) {
+  top: 90.8%;
+  right: auto;
+  left: 73%;
+}
+
+.portrait-skill-loadout .portrait-skill-slot:nth-child(6) {
+  top: 85.3%;
+  right: auto;
+  left: 85%;
+}
+
+@media (min-width: 800px) and (min-height: 1100px) {
+  .portrait-skill-loadout .portrait-skill-slot {
+    grid-template-rows: 86px 20px;
+    width: 116px;
+  }
+
+  .portrait-skill-loadout .portrait-skill-slot-art {
+    width: 82px;
+    height: 82px;
   }
 }
 

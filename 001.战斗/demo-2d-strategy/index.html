@@ -4,8 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>M98 战斗策略版 Demo</title>
-    <link rel="stylesheet" href="./styles.css?v=stable-skill-arc-20260903" />
-    <link rel="stylesheet" href="./mobile-landscape.css?v=stable-skill-arc-20260903" />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css?v=compact-tree-labels-20260904" />
+    <link rel="stylesheet" href="./mobile-landscape.css?v=compact-tree-labels-20260904" />
   </head>
   <body>
     <div class="demo-version" data-demo-version>Demo --</div>
@@ -56,27 +57,24 @@
         <section class="loadout-preset-shell">
           <header class="loadout-preset-head">
             <span>
-              <small>战前策略</small>
-              <strong>我的装配方案</strong>
-              <p>选择方案后，武器、战甲、挂件和技能会立即替换。</p>
+              <small>PRE-BATTLE LOADOUT</small>
+              <strong>战前整备</strong>
+              <p>选择战甲部位，或从底部展开两把武器的技能分支。</p>
             </span>
             <div class="preset-boss-context" id="presetBossContext"></div>
           </header>
 
-          <aside class="preset-library" aria-label="拥有的装配方案">
-            <div class="preset-section-title">
-              <span>已拥有</span>
-              <strong id="presetOwnedCount">0 套</strong>
-            </div>
+          <nav class="preset-library" aria-label="装配方案">
+            <strong id="presetOwnedCount">0 套</strong>
             <div class="preset-list" id="loadoutPresetList"></div>
-          </aside>
+          </nav>
 
           <section class="preset-stage" id="loadoutPresetStage" aria-label="当前装配角色"></section>
           <aside class="preset-loadout-detail" id="loadoutPresetDetail" aria-label="装配与技能"></aside>
 
           <footer class="preset-page-actions">
-            <button class="edit-appearance" id="backToBossFromPresetsBtn" type="button">返回Boss图鉴</button>
-            <button class="enter-battle" id="enterBattleFromPresetsBtn" type="button">进入挑战</button>
+            <button class="edit-appearance" id="backToBossFromPresetsBtn" type="button">返回</button>
+            <button class="enter-battle" id="enterBattleFromPresetsBtn" type="button">确认搭配</button>
           </footer>
         </section>
       </section>
@@ -319,7 +317,7 @@
       <button class="gm-ui-restore" id="gmShowBattleUi" type="button">GM 显示 UI</button>
     </main>
 
-    <script src="./game.js?v=stable-skill-arc-20260903"></script>
+    <script src="./game.js?v=compact-tree-labels-20260904"></script>
   </body>
 </html>
 
