@@ -56,18 +56,26 @@
 }
 
 .combat-action-dock .skill-wheel-page-dot {
-  width: 6px;
-  height: 6px;
-  border: 0;
-  background: rgba(171, 178, 179, 0.62);
-  box-shadow: 0 0 3px rgba(207, 222, 222, 0.35);
+  width: 10px;
+  height: 10px;
+  border: 1px solid #fff0a8;
+  background: #e4a92f;
+  box-shadow:
+    0 0 0 2px rgba(109, 70, 12, 0.88),
+    0 0 8px rgba(255, 190, 49, 0.92),
+    0 0 14px rgba(255, 151, 20, 0.52);
   font-size: 0;
 }
 
 .combat-action-dock .skill-wheel-page-dot.active {
-  background: #e9bd59;
-  box-shadow: 0 0 5px rgba(239, 190, 68, 0.72);
-  transform: translate(-50%, -50%);
+  border-color: #fffbe4;
+  background: #fff4b0;
+  box-shadow:
+    inset 0 0 0 2px #f0b83d,
+    0 0 0 3px rgba(121, 74, 8, 0.9),
+    0 0 10px rgba(255, 221, 111, 1),
+    0 0 18px rgba(255, 153, 20, 0.76);
+  transform: translate(-50%, -50%) scale(1.18);
   animation: none;
 }
 
