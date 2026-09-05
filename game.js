@@ -2375,6 +2375,54 @@ function renderPortraitSkillPopup(skill, weapon) {
   `;
 }
 
+function closePortraitSkillPopup(root) {
+  loadoutState.portraitSkillPopupOpen = false;
+  root.querySelectorAll(".portrait-skill-popup-backdrop, .portrait-skill-popup").forEach((node) => node.remove());
+}
+
+function bindPortraitSkillPopup(root) {
+  root.querySelectorAll("[data-close-skill-popup]").forEach((button) => {
+    button.addEventListener("click", () => closePortraitSkillPopup(root));
+  });
+  root.querySelector("[data-toggle-skill-equip]")?.addEventListener("click", (event) => {
+    const skillId = event.currentTarget.dataset.toggleSkillEquip;
+    const equippedIds = [...loadoutState.portraitEquippedSkillIds];
+    const equippedSlotIndex = equippedIds.indexOf(skillId);
+    if (equippedSlotIndex >= 0) {
+      equippedIds[equippedSlotIndex] = null;
+      loadoutState.portraitEquippedSkillIds = equippedIds;
+    } else {
+      const emptySlotIndex = equippedIds.findIndex((equippedId) => !equippedId);
+      if (emptySlotIndex < 0 || !assignPortraitSkillToSlot(skillId, emptySlotIndex)) return;
+    }
+    renderLoadoutPresetPage();
+  });
+}
+
+function openPortraitSkillPopup(root, skillId, weaponId) {
+  const skill = portraitSkillById(skillId);
+  const weapon = weapons.find((item) => item.id === (weaponId || skill?.weaponId));
+  if (!skill || !weapon) return;
+
+  loadoutState.activePortraitWeaponId = weapon.id;
+  loadoutState.activePortraitSkillId = skill.id;
+  loadoutState.portraitSkillPopupOpen = true;
+
+  root.querySelectorAll("[data-portrait-skill], [data-slot-skill]").forEach((node) => {
+    const nodeSkillId = node.dataset.portraitSkill || node.dataset.slotSkill || "";
+    node.classList.toggle("active", nodeSkillId === skill.id);
+  });
+  const branches = [...root.querySelectorAll("[data-weapon-branch]")];
+  branches.forEach((branch) => branch.classList.toggle("active", branch.dataset.weaponBranch === weapon.id));
+  const activeBranchIndex = branches.findIndex((branch) => branch.dataset.weaponBranch === weapon.id);
+  const tree = root.querySelector(".portrait-skill-tree");
+  if (tree && activeBranchIndex >= 0) tree.dataset.activeBranch = String(activeBranchIndex);
+
+  root.querySelectorAll(".portrait-skill-popup-backdrop, .portrait-skill-popup").forEach((node) => node.remove());
+  root.insertAdjacentHTML("beforeend", renderPortraitSkillPopup(skill, weapon));
+  bindPortraitSkillPopup(root);
+}
+
 function renderPortraitLoadoutDetail(preset) {
   if (loadoutState.portraitLoadoutView === "weapon") {
     const weapon = weapons.find((item) => item.id === loadoutState.activePortraitWeaponId) || carriedWeapons()[0];
@@ -2563,19 +2611,17 @@ function renderLoadoutPresetPage() {
         return;
       }
       if (!skill) return;
-      loadoutState.activePortraitWeaponId = skill.weaponId || "";
-      loadoutState.activePortraitSkillId = skillId;
-      loadoutState.portraitSkillPopupOpen = true;
-      renderLoadoutPresetPage();
+      openPortraitSkillPopup(ui.loadoutPresetStage, skillId, skill.weaponId);
     });
   });
   ui.loadoutPresetStage.querySelectorAll("[data-portrait-skill]").forEach((button) => {
     button.addEventListener("click", () => {
       if (Date.now() < portraitSuppressSkillClickUntil) return;
-      loadoutState.activePortraitWeaponId = button.dataset.portraitWeapon;
-      loadoutState.activePortraitSkillId = button.dataset.portraitSkill;
-      loadoutState.portraitSkillPopupOpen = true;
-      renderLoadoutPresetPage();
+      openPortraitSkillPopup(
+        ui.loadoutPresetStage,
+        button.dataset.portraitSkill,
+        button.dataset.portraitWeapon,
+      );
     });
   });
   ui.loadoutPresetStage.querySelectorAll("[data-portrait-tree-weapon]").forEach((button) => {
@@ -2586,25 +2632,7 @@ function renderLoadoutPresetPage() {
       renderLoadoutPresetPage();
     });
   });
-  ui.loadoutPresetStage.querySelectorAll("[data-close-skill-popup]").forEach((button) => {
-    button.addEventListener("click", () => {
-      loadoutState.portraitSkillPopupOpen = false;
-      renderLoadoutPresetPage();
-    });
-  });
-  ui.loadoutPresetStage.querySelector("[data-toggle-skill-equip]")?.addEventListener("click", (event) => {
-    const skillId = event.currentTarget.dataset.toggleSkillEquip;
-    const equippedIds = [...loadoutState.portraitEquippedSkillIds];
-    const equippedSlotIndex = equippedIds.indexOf(skillId);
-    if (equippedSlotIndex >= 0) {
-      equippedIds[equippedSlotIndex] = null;
-      loadoutState.portraitEquippedSkillIds = equippedIds;
-    } else {
-      const emptySlotIndex = equippedIds.findIndex((equippedId) => !equippedId);
-      if (emptySlotIndex < 0 || !assignPortraitSkillToSlot(skillId, emptySlotIndex)) return;
-    }
-    renderLoadoutPresetPage();
-  });
+  bindPortraitSkillPopup(ui.loadoutPresetStage);
   bindPortraitSkillDrag(ui.loadoutPresetStage);
 }
 
