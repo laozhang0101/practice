@@ -2,7 +2,7 @@
 .combat-action-dock {
   --battle-skill-size: clamp(88px, 7.4vw, 104px);
   --weapon-toggle-size: clamp(112px, 10.2vw, 142px);
-  --weapon-overlay-right: clamp(94px, 9.5vw, 138px);
+  --weapon-overlay-right: clamp(28px, 3vw, 44px);
   --skill-orbit-radius: calc(var(--weapon-toggle-size) * 1.28);
 }
 
@@ -503,7 +503,7 @@
   .combat-action-dock {
     --battle-skill-size: clamp(70px, 11vh, 86px);
     --weapon-toggle-size: clamp(94px, 14vh, 110px);
-    --weapon-overlay-right: clamp(68px, 8vw, 96px);
+    --weapon-overlay-right: clamp(18px, 2.6vw, 34px);
   }
 
   .combat-action-dock .skill-card.battle-skill-card,
